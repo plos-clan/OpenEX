@@ -59,7 +59,6 @@ impl Code {
 
     pub fn alloc_value(
         &mut self,
-        value: Operand,
         token: Token,
         type_: ValueGuessType,
     ) -> DefaultKey {

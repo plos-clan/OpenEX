@@ -1,5 +1,3 @@
-use crate::compiler::lexer::Token;
-use crate::compiler::parser::ParserError;
 use smol_str::SmolStr;
 use std::cmp::PartialEq;
 

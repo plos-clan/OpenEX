@@ -20,6 +20,6 @@ pub fn var_semantic(
     symbol_table.add_element(name.value().unwrap(), VALUE);
     let ret_m = expr_semantic(semantic, init_var)?;
     let opread = ret_m.clone();
-    let key = code.alloc_value(ret_m.0, name, ret_m.1);
+    let key = code.alloc_value(name, ret_m.1);
     Ok(StackLocal(key, opread.0))
 }
