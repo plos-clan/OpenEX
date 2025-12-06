@@ -1,0 +1,48 @@
+use smol_str::SmolStr;
+use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
+use crate::compiler::ast::ASTExprTree::Literal;
+use crate::compiler::lexer::{Token, TokenType};
+use crate::compiler::lexer::TokenType::LP;
+use crate::compiler::parser::{Parser, ParserError};
+use crate::compiler::parser::blkparser::blk_eval;
+
+pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
+    let mut token = parser.next_parser_token()?;
+    let cond:Vec<ASTExprTree>;
+
+    match token.t_type {
+        LP => {
+            if token.value::<String>().unwrap() == "{" {
+                let tk_b = token.clone();
+                parser.cache = Some(token);
+                cond = vec![Literal(Token::new(
+                    SmolStr::new("true"),
+                    tk_b.line,
+                    tk_b.column,
+                    tk_b.index,
+                    TokenType::True,
+                ))]
+            }else {
+                parser.cache = Some(token);
+                cond = parser.parser_cond()?;
+            }
+        }
+        _ => {
+            return Err(ParserError::Expected(token,'('))
+        }
+    };
+
+    let result = parser.next_parser_token();
+    if let Err(ParserError::EOF) = result {
+        return Err(ParserError::MissingFunctionBody(parser.get_last().unwrap()));
+    }
+    token = result?;
+    parser.cache = Some(token);
+
+    let body = blk_eval(parser)?;
+
+    Ok(ASTStmtTree::Loop {
+        cond,
+        body,
+    })
+}

@@ -1,0 +1,36 @@
+use crate::compiler::ast::ASTStmtTree::Var;
+use crate::compiler::ast::ASTStmtTree;
+use crate::compiler::lexer::TokenType::{Semicolon, END};
+use crate::compiler::lexer::{Token, TokenType};
+use crate::compiler::parser::exprparser::expr_eval;
+use crate::compiler::parser::{Parser, ParserError};
+
+pub fn var_eval(parser:&mut Parser) -> Result<ASTStmtTree, ParserError> {
+    let mut token = parser.next_parser_token()?;
+    if token.t_type != TokenType::Identifier {
+        return Err(ParserError::IdentifierExpected(token));
+    }
+    let var_name = token;
+    token = parser.next_parser_token()?;
+    if token.t_type == END {
+        return Ok(Var {
+            name: var_name,
+            value: vec![],
+        })
+    }
+    parser.check_char(&mut token, Semicolon, '=')?;
+
+    let mut cone:Vec<Token> = vec![];
+    loop {
+        token = parser.next_parser_token()?;
+        if token.t_type == TokenType::END {
+            break;
+        }
+        cone.push(token);
+    }
+
+    Ok(Var {
+        name: var_name,
+        value: expr_eval(parser, cone)?,
+    })
+}
