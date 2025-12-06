@@ -1,5 +1,4 @@
 use crate::compiler::lexer::Token;
-use crate::compiler::parser::Parser;
 use std::cmp::PartialEq;
 
 #[derive(PartialEq)]
