@@ -1,0 +1,26 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build (Release)
+      run: cargo build --release --verbose
+    - name: Upload Release Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-binary
+        path: target/release/
+        compression-level: 9
