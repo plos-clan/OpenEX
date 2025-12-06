@@ -3,6 +3,7 @@ use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::{CompileStatus, CompilerData};
 use crate::compiler::parser::ParserError::LexError;
+use crate::compiler::semantic::Semantic;
 
 pub struct SourceFile {
     pub name: String,
@@ -45,7 +46,9 @@ impl SourceFile {
     pub fn compiler(&mut self) -> Result<(), ParserError> {
         let parser = Parser::new(self);
         let ast_tree = parser.parser()?;
-        dbg!(ast_tree);
+        let mut semantic = Semantic::new(self);
+        let ssa_ir = semantic.semantic(ast_tree)?;
+        dbg!(ssa_ir);
         Ok(())
     }
 }

@@ -7,6 +7,7 @@ use crate::compiler::parser::ifparser::if_eval;
 use crate::compiler::parser::varparser::var_eval;
 use crate::compiler::parser::whileparser::while_eval;
 use crate::compiler::parser::{Parser, ParserError};
+use crate::compiler::parser::retparser::return_eval;
 
 fn parser_expr(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token1 = parser.next_parser_token()?;
@@ -43,6 +44,24 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
                 stmt.push(while_eval(parser)?)
             }
             TokenType::END => {
+            }
+            TokenType::Return => {
+                parser.last = Some(token);
+                stmt.push(return_eval(parser)?)
+            }
+            TokenType::Break => {
+                stmt.push(ASTStmtTree::Break(token));
+                token = parser.next_parser_token()?;
+                if token.t_type != TokenType::END {
+                    return Err(ParserError::Expected(token,';'));
+                }
+            }
+            TokenType::Continue => {
+                stmt.push(ASTStmtTree::Continue(token));
+                token = parser.next_parser_token()?;
+                if token.t_type != TokenType::END {
+                    return Err(ParserError::Expected(token,';'));
+                }
             }
             LR => {
                 let mut t = token.clone();

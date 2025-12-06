@@ -1,4 +1,6 @@
 use crate::compiler::lexer::Token;
+use crate::compiler::parser::ParserError;
+use smol_str::SmolStr;
 use std::cmp::PartialEq;
 
 #[derive(PartialEq)]
@@ -18,7 +20,7 @@ pub enum ElementType {
 }
 
 pub struct Element {
-    token: Token,
+    name: SmolStr,
     el_type: ElementType,
 }
 
@@ -43,6 +45,18 @@ impl SymbolTable {
         table
     }
 
+    // 验证名称是否存在
+    pub fn check_element(&self,name: SmolStr) -> bool {
+        for context in &self.contexts {
+            for el in context.elements.iter() {
+                if el.name == name {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn add_context(&mut self, ctxt_type: ContextType) {
         self.contexts.push(Context {
             elements: vec![],
@@ -55,9 +69,9 @@ impl SymbolTable {
     }
 
     // 添加一个符号到顶层上下文
-    pub fn add_element(&mut self, token: Token, el_type: ElementType) {
+    pub fn add_element(&mut self, name: SmolStr, el_type: ElementType) {
         let peek_context = self.contexts.last_mut().unwrap();
-        peek_context.elements.push(Element { token, el_type });
+        peek_context.elements.push(Element { name, el_type });
     }
 
     pub fn in_context(&self, ctxt_type: ContextType) -> bool {

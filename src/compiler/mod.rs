@@ -162,6 +162,16 @@ impl Compiler {
                 column = key.column;
                 message = String::from("illegal key.");
             }
+            ParserError::BackOutsideLoop(token) => {
+                line = token.line;
+                column = token.column;
+                message = String::from("back statement outside loop.");
+            }
+            ParserError::SymbolDefined(name) => {
+                line = name.line;
+                column = name.column;
+                message = String::from("type already defined."); // 沿用 Pro 版本的彩蛋
+            }
         }
 
         Self::dump_error_info(

@@ -197,6 +197,7 @@ fn expr_bp(
         | TokenType::False
         | TokenType::LiteralString
         | TokenType::Null => ASTExprTree::Literal(token),
+        | TokenType::This => ASTExprTree::This(token),
         TokenType::Identifier => func_call_argument(token, parser, tokens)?,
         _ => return Err(IllegalKey(token)),
     };

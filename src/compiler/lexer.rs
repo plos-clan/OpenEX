@@ -13,7 +13,7 @@ pub struct LexerAnalysis {
     now_column: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub line: usize,
     pub column: usize,
@@ -92,11 +92,35 @@ impl Token {
         }
     }
 
+    pub fn value_number(&mut self) -> i64 {
+        if let Some(hex) = self
+            .data
+            .strip_prefix("0x")
+            .or_else(|| self.data.strip_prefix("0X"))
+        {
+            i64::from_str_radix(hex, 16).unwrap()
+        } else if let Some(bin) = self
+            .data
+            .strip_prefix("0b")
+            .or_else(|| self.data.strip_prefix("0B"))
+        {
+            i64::from_str_radix(bin, 2).unwrap()
+        } else if let Some(oct) = self
+            .data
+            .strip_prefix("0o")
+            .or_else(|| self.data.strip_prefix("0O"))
+        {
+            i64::from_str_radix(oct, 8).unwrap()
+        } else {
+            self.data.parse::<i64>().unwrap()
+        }
+    }
+
     pub fn value<T>(&mut self) -> Option<T>
     where
-        T: FromStr,
+        T: FromStr, <T as FromStr>::Err: Debug
     {
-        self.data.parse::<T>().ok()
+        Some(self.data.parse::<T>().unwrap())
     }
 }
 
@@ -209,15 +233,14 @@ impl LexerAnalysis {
             first_char = self.next_char();
             data.push(first_char);
             match first_char {
-                'x' => {
+                'x' | 'X' => {
                     loop {
                         match self.next_char() {
                             c if c.is_ascii_hexdigit() => data.push(c),
-                            '\0' => {
-                                self.cache = Some('\0');
+                            c => {
+                                self.cache = Some(c);
                                 break;
                             }
-                            _ => break,
                         }
                     }
                     return Ok(Token::new(
@@ -228,7 +251,7 @@ impl LexerAnalysis {
                         TokenType::Number,
                     ));
                 }
-                'b' => {
+                'b' | 'B' => {
                     loop {
                         match self.next_char() {
                             c if c == '0' || c == '1' => data.push(c),
@@ -459,7 +482,13 @@ impl LexerAnalysis {
             '!' => self.build_semicolon_op_easy(line, column, data_index, '!'),
             '&' => self.build_semicolon_op_double(line, column, data_index, '&'),
             '|' => self.build_semicolon_op_double(line, column, data_index, '|'),
-            ';' => Ok(Token::new(str_builder.finish(), line, column, data_index, END)),
+            ';' => Ok(Token::new(
+                str_builder.finish(),
+                line,
+                column,
+                data_index,
+                END,
+            )),
             _ => Err(UnexpectedCharacter(
                 Some(start),
                 format!("unexpected character {}", start),

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 smol_str = "0.3.4"
+slotmap = "1"
 
 [profile.release]
 debug = false

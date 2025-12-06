@@ -6,8 +6,8 @@ mod impparser;
 pub mod symbol_table;
 mod varparser;
 mod whileparser;
+mod retparser;
 
-use std::cmp::PartialEq;
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::file::SourceFile;
 use crate::compiler::lexer::TokenType::LP;
@@ -30,6 +30,8 @@ pub enum ParserError {
     IllegalArgument(Token),     // 非法参数组合
     IllegalExpression(Token),   // 非法的表达式组合
     IllegalKey(Token),          // 非法的关键字
+    BackOutsideLoop(Token),     // 循环退出语句位于循环体外
+    SymbolDefined(Token),         // 类型已被定义
     EOF,
 }
 
@@ -147,6 +149,7 @@ impl<'a> Parser<'a> {
                 })?)
             }
             TokenType::END => Ok(ASTStmtTree::Empty),
+            TokenType::Continue | TokenType::Break => Err(ParserError::BackOutsideLoop(root_token)),
             _ => {
                 let mut token;
                 let mut tokens: Vec<Token> = vec![root_token.clone()];

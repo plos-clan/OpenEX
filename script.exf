@@ -1,2 +1,2 @@
 
-a[1 + 1 - 2] - 2++ + null;
+var num = 0x3cfffff;

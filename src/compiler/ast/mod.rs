@@ -1,5 +1,5 @@
 pub mod eof_status;
-mod ir;
+pub mod ssa_ir;
 
 use crate::compiler::lexer::Token;
 
@@ -43,6 +43,7 @@ pub enum ExprOp {
 pub enum ASTExprTree {
     Literal(Token), // Number | String | Bool
     Var(Token),     // x
+    This(Token),    // script current context
     Expr {
         op: ExprOp,
         left: Box<ASTExprTree>,
@@ -69,7 +70,7 @@ pub enum ASTStmtTree {
         value: Vec<ASTExprTree>,
     },
     Expr(Vec<ASTExprTree>),    // 表达式语句：a + b;
-    Return(Box<ASTExprTree>),  // return x;
+    Return(Vec<ASTExprTree>),  // return x;
     Import(Token),             // import "library";
     Context(Vec<ASTStmtTree>), // 独立上下文
     Loop {
@@ -88,5 +89,7 @@ pub enum ASTStmtTree {
         then_body: Vec<ASTStmtTree>,
         else_body: Vec<ASTStmtTree>,
     },
-    Empty // 空语句需要剔除
+    Break(Token),
+    Continue(Token),
+    Empty, // 空语句需要剔除
 }
