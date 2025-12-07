@@ -172,6 +172,11 @@ impl Compiler {
                 column = name.column;
                 message = String::from("type already defined."); // 沿用 Pro 版本的彩蛋
             }
+            ParserError::IllegalTypeCombination(token) => {
+                line = token.line;
+                column = token.column;
+                message = String::from("illegal type combination.");
+            }
         }
 
         Self::dump_error_info(

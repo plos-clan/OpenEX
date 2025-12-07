@@ -10,7 +10,7 @@ use crate::compiler::semantic::Semantic;
 pub fn var_semantic(
     semantic: &mut Semantic,
     mut name: Token,
-    init_var: Vec<ASTExprTree>,
+    init_var: Option<ASTExprTree>,
     code: &mut Code,
 ) -> Result<OpCode, ParserError> {
     let symbol_table = &mut semantic.compiler_data().symbol_table;
@@ -18,7 +18,7 @@ pub fn var_semantic(
         return Err(ParserError::SymbolDefined(name));
     }
     symbol_table.add_element(name.value().unwrap(), VALUE);
-    let ret_m = expr_semantic(semantic, init_var)?;
+    let ret_m = expr_semantic(semantic, init_var,code)?;
     let opread = ret_m.clone();
     let key = code.alloc_value(name, ret_m.1);
     Ok(StackLocal(key, opread.0))

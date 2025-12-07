@@ -133,13 +133,13 @@ fn func_call_argument(
         Some(token) => {
             let mut token0 = token.clone();
             if token0.t_type == LP && token0.value::<String>().unwrap().as_str() == "(" {
-                let mut arguments: Vec<Vec<ASTExprTree>> = Vec::new();
+                let mut arguments: Vec<ASTExprTree> = Vec::new();
                 for args in parser_multi_arguments(token0, tokens)? {
-                    let args0: Vec<ASTExprTree> = match args.is_empty() {
-                        true => vec![],
-                        false => expr_eval(parser, args)?,
-                    };
-                    arguments.push(args0);
+                    if !args.is_empty() {
+                        if let Some(arg) = expr_eval(parser, args)? {
+                            arguments.push(arg);
+                        }
+                    }
                 }
                 Ok(Call {
                     name: identifier,
@@ -188,6 +188,7 @@ fn expr_bp(
             parser.last = Some(token.clone());
             let rhs = expr_bp(parser, tokens, r_bp)?;
             ASTExprTree::Unary {
+                token,
                 op,
                 code: Box::new(rhs),
             }
@@ -227,6 +228,7 @@ fn expr_bp(
                     Some(mut tk) => {
                         parser.check_char(&mut tk, TokenType::LR, ']')?;
                         expr_tree = Expr {
+                            token,
                             op: ExprOp::AIndex,
                             left: Box::new(expr_tree),
                             right: Box::new(rhs),
@@ -244,6 +246,7 @@ fn expr_bp(
                 };
 
                 expr_tree = ASTExprTree::Unary {
+                    token,
                     op,
                     code: Box::new(expr_tree),
                 };
@@ -289,6 +292,7 @@ fn expr_bp(
                 _ => return Err(IllegalExpression(token)),
             };
             expr_tree = Expr {
+                token,
                 op,
                 left: Box::new(expr_tree),
                 right: Box::new(rhs),
@@ -301,12 +305,10 @@ fn expr_bp(
     Ok(expr_tree)
 }
 
-pub fn expr_eval(parser: &mut Parser, tokens: Vec<Token>) -> Result<Vec<ASTExprTree>, ParserError> {
+pub fn expr_eval(parser: &mut Parser, tokens: Vec<Token>) -> Result<Option<ASTExprTree>, ParserError> {
     if tokens.len() == 0 {
-        return Ok(Vec::new());
+        return Ok(None);
     }
     let mut into_tokens = tokens.into_iter().peekable();
-    let mut expr_tree: Vec<ASTExprTree> = vec![];
-    expr_tree.push(expr_bp(parser, &mut into_tokens, 0)?);
-    Ok(expr_tree)
+    Ok(Some(expr_bp(parser, &mut into_tokens, 0)?))
 }

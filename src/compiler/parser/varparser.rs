@@ -15,7 +15,7 @@ pub fn var_eval(parser:&mut Parser) -> Result<ASTStmtTree, ParserError> {
     if token.t_type == END {
         return Ok(Var {
             name: var_name,
-            value: vec![],
+            value: None,
         })
     }
     parser.check_char(&mut token, Semicolon, '=')?;

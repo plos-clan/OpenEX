@@ -19,7 +19,11 @@ fn parser_expr(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
         }
         tokens.push(token1);
     }
-    Ok(ASTStmtTree::Expr(expr_eval(parser, tokens)?))
+    if let Some(expr) = expr_eval(parser, tokens)? {
+        Ok(ASTStmtTree::Expr(expr))
+    }else { 
+        Ok(ASTStmtTree::Empty)
+    }
 }
 
 pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {

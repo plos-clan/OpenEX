@@ -10,6 +10,7 @@ pub enum Operand {
     ImmNum(i64),
     ImmFlot(f64),
     ImmStr(SmolStr),
+    ExprOperand(Box<Operand>, Box<Operand>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -31,8 +32,42 @@ pub struct Value {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpCode {
-    StackLocal(DefaultKey,Operand),            // 栈局部变量加载
-    Add(Operand, Operand, Operand), // 加法 (输出,被加数,加数)
+    StackLocal(DefaultKey, Operand), // 栈局部变量加载
+    Push(Operand),                   // 将值压入操作栈
+    Call(SmolStr),                   // 函数调用 (调用路径)
+    Return,                          // 栈顶结果返回
+    Add,                             // 从栈顶提取两个操作数相加并将结果压回操作栈
+    Sub,                             // -
+    Mul,                             // *
+    Div,                             // /
+    And,                             // &&
+    Or,                              // ||
+    Rmd,                             // %
+    Equ,                             // ==
+    SAdd,                            // ++
+    SSub,                            // --
+    Not,                             // !
+    NotEqu,                          // !=
+    BigEqu,                          // >=
+    LesEqu,                          // <=
+    Big,                             // >
+    Less,                            // <
+    Store,                           // =
+    AddS,                            // +=
+    SubS,                            // -=
+    MulS,                            // *=
+    DivS,                            // /=
+    RmdS,                            // %=
+    BitAnd,                          // &
+    BitOr,                           // |
+    BitXor,                          // ^
+    BAndS,                           // &=
+    BOrS,                            // |=
+    BXorS,                           // ^=
+    BLeft,                           // <<
+    BRight,                          // >>
+    Ref,                             // .
+    AIndex,                          // 数组索引
 }
 
 #[derive(Clone, Debug)]
@@ -52,16 +87,12 @@ impl Code {
             root,
         }
     }
-    
+
     pub fn add_opcode(&mut self, opcode: OpCode) {
         self.codes.push(opcode);
     }
 
-    pub fn alloc_value(
-        &mut self,
-        token: Token,
-        type_: ValueGuessType,
-    ) -> DefaultKey {
+    pub fn alloc_value(&mut self, token: Token, type_: ValueGuessType) -> DefaultKey {
         let va = Value {
             variable: false,
             token,

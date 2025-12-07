@@ -3,10 +3,10 @@ mod exprparser;
 mod funcparser;
 mod ifparser;
 mod impparser;
+mod retparser;
 pub mod symbol_table;
 mod varparser;
 mod whileparser;
-mod retparser;
 
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::file::SourceFile;
@@ -20,18 +20,19 @@ use crate::compiler::parser::varparser::var_eval;
 use crate::compiler::parser::whileparser::while_eval;
 
 pub enum ParserError {
-    NotAStatement(Token),       // 不是一个语句
-    LexError(LexerError),       // 词法分析错误
-    IdentifierExpected(Token),  // 需要标识符
-    Expected(Token, char),      // 需要指定字符
-    MissingFunctionBody(Token), // 缺少函数体
-    MissingStatement(Token),    // 语句定义不完整
-    MissingCondition(Token),    // 缺少条件表达式
-    IllegalArgument(Token),     // 非法参数组合
-    IllegalExpression(Token),   // 非法的表达式组合
-    IllegalKey(Token),          // 非法的关键字
-    BackOutsideLoop(Token),     // 循环退出语句位于循环体外
-    SymbolDefined(Token),         // 类型已被定义
+    NotAStatement(Token),          // 不是一个语句
+    LexError(LexerError),          // 词法分析错误
+    IdentifierExpected(Token),     // 需要标识符
+    Expected(Token, char),         // 需要指定字符
+    MissingFunctionBody(Token),    // 缺少函数体
+    MissingStatement(Token),       // 语句定义不完整
+    MissingCondition(Token),       // 缺少条件表达式
+    IllegalArgument(Token),        // 非法参数组合
+    IllegalExpression(Token),      // 非法的表达式组合
+    IllegalKey(Token),             // 非法的关键字
+    BackOutsideLoop(Token),        // 循环退出语句位于循环体外
+    SymbolDefined(Token),          // 类型已被定义
+    IllegalTypeCombination(Token), //非法类型组合
     EOF,
 }
 
@@ -70,7 +71,7 @@ impl<'a> Parser<'a> {
     }
 
     // 解析 () 括号内的表达式 - 需要括号
-    pub fn parser_cond(&mut self) -> Result<Vec<ASTExprTree>, ParserError> {
+    pub fn parser_cond(&mut self) -> Result<ASTExprTree, ParserError> {
         let mut token = self.next_parser_token()?;
         self.check_char(&mut token, LP, '(')?;
         let last_token = token;
@@ -101,11 +102,11 @@ impl<'a> Parser<'a> {
             }
         }
         self.last = Some(last_token.clone());
-        let expr = expr_eval(self, cond)?;
-        if expr.is_empty() {
-            return Err(ParserError::MissingCondition(last_token));
+        if let Some(expr) = expr_eval(self, cond)? {
+            Ok(expr)
+        } else {
+            Err(ParserError::MissingCondition(last_token))
         }
-        Ok(expr)
     }
 
     fn parse_step(&mut self) -> Result<ASTStmtTree, ParserError> {
@@ -160,7 +161,11 @@ impl<'a> Parser<'a> {
                     }
                     tokens.push(token);
                 }
-                Ok(ASTStmtTree::Expr(expr_eval(self, tokens)?))
+                if let Some(expr) = expr_eval(self, tokens)? {
+                    Ok(ASTStmtTree::Expr(expr))
+                } else {
+                    Ok(ASTStmtTree::Empty)
+                }
             }
         }
     }
@@ -175,7 +180,9 @@ impl<'a> Parser<'a> {
             match self.parse_step() {
                 Ok(node) => {
                     if let ASTStmtTree::Empty = node {
-                    }else { root_tree.push(node); }
+                    } else {
+                        root_tree.push(node);
+                    }
                 }
                 Err(ParserError::EOF) => break,
                 Err(e) => return Err(e),
