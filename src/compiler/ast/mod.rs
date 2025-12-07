@@ -40,6 +40,7 @@ pub enum ExprOp {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] //TODO
 pub enum ASTExprTree {
     Literal(Token), // Number | String | Bool
     Var(Token),     // x
@@ -63,6 +64,7 @@ pub enum ASTExprTree {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] //TODO
 pub enum ASTStmtTree {
     Root(Vec<ASTStmtTree>),
     Block(Vec<ASTStmtTree>),

@@ -1,12 +1,13 @@
-mod varsemantic;
-mod exprsemantic;
+mod var;
+mod expression;
+mod optimizer;
 
 use crate::compiler::ast::ssa_ir::Code;
 use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::CompilerData;
 use crate::compiler::file::SourceFile;
 use crate::compiler::parser::ParserError;
-use crate::compiler::semantic::varsemantic::var_semantic;
+use crate::compiler::semantic::var::var_semantic;
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,

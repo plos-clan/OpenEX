@@ -1,7 +1,7 @@
 use crate::compiler::lexer::{LexerAnalysis, LexerError, Token};
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::{Parser, ParserError};
-use crate::compiler::{CompileStatus, CompilerData};
+use crate::compiler::CompilerData;
 use crate::compiler::parser::ParserError::LexError;
 use crate::compiler::semantic::Semantic;
 
@@ -22,9 +22,6 @@ impl SourceFile {
             lexer: LexerAnalysis::new(data0),
             c_data: CompilerData {
                 symbol_table: SymbolTable::new(),
-                astree: None,
-                tokens: vec![],
-                status: CompileStatus::Source,
             }
         }
     }
@@ -33,7 +30,7 @@ impl SourceFile {
         match self.lexer.next_token() {
             Ok(lexeme) => Ok(lexeme),
             Err(err) => match err {
-                LexerError::EOF => Err(ParserError::EOF),
+                LexerError::Eof => Err(ParserError::Eof),
                 err => Err(LexError(err)),
             },
         }

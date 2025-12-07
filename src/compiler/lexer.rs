@@ -1,5 +1,5 @@
-use crate::compiler::lexer::LexerError::{UnexpectedCharacter, EOF};
-use crate::compiler::lexer::TokenType::END;
+use crate::compiler::lexer::LexerError::{UnexpectedCharacter, Eof};
+use crate::compiler::lexer::TokenType::End;
 use smol_str::{SmolStr, SmolStrBuilder};
 use std::char;
 use std::fmt::Debug;
@@ -23,10 +23,10 @@ pub struct Token {
 }
 
 pub enum LexerError {
-    UnexpectedCharacter(Option<char>, String),
+    UnexpectedCharacter(Option<char>),
     IllegalEscapeChar(char),
-    IllegalLiteral(String),
-    EOF,
+    IllegalLiteral,
+    Eof,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,7 +37,7 @@ pub enum TokenType {
     Semicolon,
     LP,
     LR,
-    END,
+    End,
 
     // 关键字类型
     For,
@@ -168,7 +168,7 @@ impl LexerAnalysis {
     fn skip_whitespace(&mut self) -> Result<(), LexerError> {
         loop {
             match self.next_char() {
-                '\0' => return Err(EOF),
+                '\0' => return Err(Eof),
                 ' ' | '\t' => {
                     continue;
                 }
@@ -271,7 +271,7 @@ impl LexerAnalysis {
                     ));
                 }
                 c if c.is_ascii_digit() => {}
-                _ => return Err(LexerError::IllegalLiteral("illegal literal".to_string())),
+                _ => return Err(LexerError::IllegalLiteral),
             }
         }
 
@@ -442,7 +442,7 @@ impl LexerAnalysis {
         let mut str_builder = SmolStrBuilder::new();
         str_builder.push(start);
         match start {
-            '\0' => Err(EOF),
+            '\0' => Err(Eof),
             c if c.is_alphabetic() || c == '_' => {
                 self.cache = Some(c);
                 self.build_identifier(line, column, data_index)
@@ -487,11 +487,10 @@ impl LexerAnalysis {
                 line,
                 column,
                 data_index,
-                END,
+                End,
             )),
             _ => Err(UnexpectedCharacter(
                 Some(start),
-                format!("unexpected character {}", start),
             )),
         }
     }

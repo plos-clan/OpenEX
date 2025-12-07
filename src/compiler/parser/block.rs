@@ -2,19 +2,19 @@ use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::ast::ASTStmtTree::Context;
 use crate::compiler::lexer::TokenType::{LP, LR};
 use crate::compiler::lexer::{Token, TokenType};
-use crate::compiler::parser::exprparser::expr_eval;
-use crate::compiler::parser::ifparser::if_eval;
-use crate::compiler::parser::varparser::var_eval;
-use crate::compiler::parser::whileparser::while_eval;
+use crate::compiler::parser::expression::expr_eval;
+use crate::compiler::parser::judgment::if_eval;
+use crate::compiler::parser::var::var_eval;
+use crate::compiler::parser::r#while::while_eval;
 use crate::compiler::parser::{Parser, ParserError};
-use crate::compiler::parser::retparser::return_eval;
+use crate::compiler::parser::r#return::return_eval;
 
 fn parser_expr(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token1 = parser.next_parser_token()?;
     let mut tokens: Vec<Token> = vec![token1.clone()];
     loop {
         token1 = parser.next_parser_token()?;
-        if token1.t_type == TokenType::END {
+        if token1.t_type == TokenType::End {
             break;
         }
         tokens.push(token1);
@@ -47,7 +47,7 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
                 parser.last = Some(token);
                 stmt.push(while_eval(parser)?)
             }
-            TokenType::END => {
+            TokenType::End => {
             }
             TokenType::Return => {
                 parser.last = Some(token);
@@ -56,14 +56,14 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
             TokenType::Break => {
                 stmt.push(ASTStmtTree::Break(token));
                 token = parser.next_parser_token()?;
-                if token.t_type != TokenType::END {
+                if token.t_type != TokenType::End {
                     return Err(ParserError::Expected(token,';'));
                 }
             }
             TokenType::Continue => {
                 stmt.push(ASTStmtTree::Continue(token));
                 token = parser.next_parser_token()?;
-                if token.t_type != TokenType::END {
+                if token.t_type != TokenType::End {
                     return Err(ParserError::Expected(token,';'));
                 }
             }

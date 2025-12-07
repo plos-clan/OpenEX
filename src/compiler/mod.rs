@@ -1,29 +1,16 @@
-use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::file::SourceFile;
-use crate::compiler::lexer::{LexerError, Token};
+use crate::compiler::lexer::LexerError;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
 
+mod ast;
 pub mod file;
 pub mod lexer;
 mod parser;
-mod ast;
 mod semantic;
-
-#[derive(PartialEq)]
-pub enum CompileStatus {
-    Source,
-    Parse,
-    IR,
-    Execute,
-    Error,
-}
 
 pub struct CompilerData {
     symbol_table: SymbolTable,
-    astree: Option<ASTStmtTree>,
-    tokens: Vec<Token>,
-    status: CompileStatus,
 }
 
 pub struct Compiler {
@@ -33,7 +20,10 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Compiler {
-        Compiler { files: vec![], version: "OpenEX RustEdition v0.0.1".to_string() }
+        Compiler {
+            files: vec![],
+            version: "OpenEX RustEdition v0.0.1".to_string(),
+        }
     }
 
     pub fn get_version(&self) -> &String {
@@ -84,18 +74,20 @@ impl Compiler {
     }
 
     fn dump_lexer_error(lex_error: LexerError, file: &SourceFile) {
-        let message;
-        match lex_error {
-            LexerError::UnexpectedCharacter(_c, msg) => {
-                message = msg.to_string();
+        let message:String = match lex_error {
+            LexerError::UnexpectedCharacter(c) => {
+                format!("unexpected character {}", c.unwrap())
             }
-            LexerError::IllegalLiteral(msg) => {
-                message = msg.to_string();
+            LexerError::IllegalLiteral => {
+                String::from("illegal literal")
             }
-            _ => {
-                message = String::new();
+            LexerError::IllegalEscapeChar(char) => {
+                format!("illegal escape character {}", char)
             }
-        }
+            LexerError::Eof => {
+                String::from("EOF")
+            }
+        };
         Self::dump_error_info(
             message,
             file.lexer.get_now_line(),
@@ -105,16 +97,16 @@ impl Compiler {
     }
 
     fn dump_parser_error(error: ParserError, file: &SourceFile) {
-        let line:usize;
-        let column:usize;
-        let message:String;
+        let line: usize;
+        let column: usize;
+        let message: String;
 
         match error {
             ParserError::LexError(lex_error) => {
                 Self::dump_lexer_error(lex_error, file);
                 return;
             }
-            ParserError::EOF => {
+            ParserError::Eof => {
                 return;
             }
             ParserError::IdentifierExpected(token) => {
@@ -127,10 +119,10 @@ impl Compiler {
                 column = token.column;
                 message = "<statement> expected.".parse().unwrap();
             }
-            ParserError::Expected(token,c) => {
+            ParserError::Expected(token, c) => {
                 line = token.line;
                 column = token.column;
-                message = format!("'{}' expected.",c);
+                message = format!("'{}' expected.", c);
             }
             ParserError::MissingStatement(token) => {
                 line = token.line;
@@ -179,19 +171,13 @@ impl Compiler {
             }
         }
 
-        Self::dump_error_info(
-            message,
-            line,
-            column,
-            file,
-        );
+        Self::dump_error_info(message, line, column, file);
     }
 
     pub fn compile(&mut self) {
         for file in &mut self.files {
             file.compiler().unwrap_or_else(|error| {
-                Self::dump_parser_error(error,file);
-                
+                Self::dump_parser_error(error, file);
             })
         }
     }

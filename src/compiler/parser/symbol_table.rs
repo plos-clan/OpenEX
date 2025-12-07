@@ -2,26 +2,30 @@ use smol_str::SmolStr;
 use std::cmp::PartialEq;
 
 #[derive(PartialEq)]
+#[allow(dead_code)] //TODO
 pub enum ContextType {
-    LOOP,
-    FUNC,
-    IF,
-    NONE,
-    ROOT,
+    Loop,
+    Func,
+    If,
+    None,
+    Root,
 }
 
 #[derive(PartialEq)]
+#[allow(dead_code)] //TODO
 pub enum ElementType {
-    ARGUMENT,
-    VALUE,
-    FUNC,
+    Argument,
+    Value,
+    Func,
 }
 
+#[allow(dead_code)] //TODO
 pub struct Element {
     name: SmolStr,
     el_type: ElementType,
 }
 
+#[allow(dead_code)] //TODO
 pub struct Context {
     elements: Vec<Element>,
     ctxt_type: ContextType,
@@ -38,7 +42,7 @@ impl SymbolTable {
         };
         table.contexts.push(Context {
             elements: vec![],
-            ctxt_type: ContextType::ROOT,
+            ctxt_type: ContextType::Root,
         });
         table
     }
@@ -55,6 +59,7 @@ impl SymbolTable {
         false
     }
 
+    #[allow(dead_code)] //TODO
     pub fn add_context(&mut self, ctxt_type: ContextType) {
         self.contexts.push(Context {
             elements: vec![],
@@ -62,6 +67,7 @@ impl SymbolTable {
         });
     }
 
+    #[allow(dead_code)] //TODO
     pub fn exit_context(&mut self) {
         self.contexts.pop();
     }
@@ -72,6 +78,7 @@ impl SymbolTable {
         peek_context.elements.push(Element { name, el_type });
     }
 
+    #[allow(dead_code)] //TODO
     pub fn in_context(&self, ctxt_type: ContextType) -> bool {
         for context in &self.contexts {
             if context.ctxt_type == ctxt_type {

@@ -3,6 +3,7 @@ use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 
 #[derive(Clone, Debug, PartialEq)]
+#[allow(dead_code)] //TODO
 pub enum Operand {
     Val(DefaultKey),
     Null,
@@ -10,7 +11,7 @@ pub enum Operand {
     ImmNum(i64),
     ImmFlot(f64),
     ImmStr(SmolStr),
-    ExprOperand(Box<Operand>, Box<Operand>),
+    Expression(Box<Operand>, Box<Operand>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -31,6 +32,7 @@ pub struct Value {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[allow(dead_code)] //TODO
 pub enum OpCode {
     StackLocal(DefaultKey, Operand), // 栈局部变量加载
     Push(Operand),                   // 将值压入操作栈
@@ -71,6 +73,7 @@ pub enum OpCode {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)] //TODO
 pub struct Code {
     codes: Vec<OpCode>,
     values: SlotMap<DefaultKey, Value>,
@@ -90,6 +93,10 @@ impl Code {
 
     pub fn add_opcode(&mut self, opcode: OpCode) {
         self.codes.push(opcode);
+    }
+
+    pub fn append_code(&mut self, code: &mut Vec<OpCode>) {
+        self.codes.append(code);
     }
 
     pub fn alloc_value(&mut self, token: Token, type_: ValueGuessType) -> DefaultKey {

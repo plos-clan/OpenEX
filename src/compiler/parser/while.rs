@@ -2,7 +2,7 @@ use crate::compiler::ast::ASTExprTree::Literal;
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{Token, TokenType};
-use crate::compiler::parser::blkparser::blk_eval;
+use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::{Parser, ParserError};
 use smol_str::SmolStr;
 
@@ -31,7 +31,7 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     };
 
     let result = parser.next_parser_token();
-    if let Err(ParserError::EOF) = result {
+    if let Err(ParserError::Eof) = result {
         return Err(ParserError::MissingFunctionBody(parser.get_last().unwrap()));
     }
     token = result?;

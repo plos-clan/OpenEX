@@ -4,7 +4,7 @@ use crate::compiler::ast::ssa_ir::{Code, OpCode, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError;
-use crate::compiler::semantic::Semantic;
+use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
 use smol_str::SmolStr;
 
 fn astop_to_opcode(astop: &ExprOp) -> OpCode {
@@ -43,6 +43,31 @@ fn guess_check_type(src: ValueGuessType, args: &[ValueGuessType]) -> bool {
     false
 }
 
+fn guess_type_unary(
+    token: &Token,
+    first: ValueGuessType,
+    op: &ExprOp,
+) -> Result<ValueGuessType, ParserError> {
+    match first {
+        Bool => {
+            if matches!(op, ExprOp::Not) {
+                Ok(Bool)
+            } else {
+                Err(ParserError::IllegalTypeCombination(token.clone()))
+            }
+        }
+        Number | Float => {
+            if matches!(op, ExprOp::SAdd) || matches!(op, ExprOp::SSub) {
+                Ok(first)
+            } else {
+                Err(ParserError::IllegalTypeCombination(token.clone()))
+            }
+        }
+        Null => Err(ParserError::IllegalTypeCombination(token.clone())),
+        _ => Ok(Unknown),
+    }
+}
+
 fn guess_type(
     token: &Token,
     first: ValueGuessType,
@@ -71,25 +96,23 @@ fn guess_type(
             }
         }
         Number => {
-            if guess_check_type(second.clone(), &[Number]) {
-                Ok(Number)
-            }else if guess_check_type(second, &[Float]) {
-                Ok(Float)
-            }else {
+            if guess_check_type(second.clone(), &[Number, Float]) {
+                Ok(second)
+            } else {
                 Err(ParserError::IllegalTypeCombination(token.clone()))
             }
         }
         Float => {
-            if guess_check_type(second, &[Float,Number]) {
+            if guess_check_type(second, &[Float, Number]) {
                 Ok(Float)
-            }else {
+            } else {
                 Err(ParserError::IllegalTypeCombination(token.clone()))
             }
         }
         Null => {
             if guess_check_type(second, &[Null]) {
                 Ok(Null)
-            }else {
+            } else {
                 Err(ParserError::IllegalTypeCombination(token.clone()))
             }
         }
@@ -98,38 +121,46 @@ fn guess_type(
 }
 
 fn lower_expr(
-    semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
-    code: &mut Code,
-) -> Result<(Operand, ValueGuessType), ParserError> {
+) -> Result<(Operand, ValueGuessType, Vec<OpCode>), ParserError> {
     match expr_tree {
         ASTExprTree::Literal(lit) => {
             let tk_lit = &mut lit.clone();
             match lit.t_type {
-                TokenType::Number => Ok((
-                    Operand::ImmNum(tk_lit.value_number()),
-                    Number,
-                )),
-                TokenType::LiteralString => Ok((
-                    Operand::ImmStr(tk_lit.value::<SmolStr>().unwrap()),
-                    String,
-                )),
-                TokenType::True => Ok((Operand::ImmBool(true), Bool)),
-                TokenType::False => Ok((Operand::ImmBool(false), Bool)),
-                TokenType::Null => Ok((Operand::Null, Null)),
+                TokenType::Number => {
+                    let operand = Operand::ImmNum(tk_lit.value_number());
+                    Ok((operand.clone(), Number, vec![Push(operand)]))
+                }
+                TokenType::LiteralString => {
+                    let operand = Operand::ImmStr(tk_lit.value::<SmolStr>().unwrap());
+                    Ok((operand.clone(), String, vec![Push(operand)]))
+                }
+                TokenType::True | TokenType::False => {
+                    let operand = Operand::ImmBool(lit.t_type == TokenType::True);
+                    Ok((operand.clone(), Bool, vec![Push(operand)]))
+                }
+                TokenType::Null => Ok((Operand::Null, Bool, vec![Push(Operand::Null)])),
                 _ => {
                     todo!()
                 }
             }
         }
         ASTExprTree::Unary {
-            token: _u_token,
+            token: u_token,
             op: u_op,
             code: u_code,
         } => {
-            let a = lower_expr(semantic, u_code.as_ref(), code)?;
-            code.add_opcode(astop_to_opcode(u_op));
-            Ok(a)
+            let mut a = lower_expr(u_code.as_ref())?;
+            let g_type = guess_type_unary(u_token, a.1, u_op)?;
+            let mut op_code;
+            if let Some(operand) = unary_optimizer(u_op, &a.0) {
+                op_code = vec![Push(operand)];
+            } else {
+                op_code = vec![];
+                op_code.append(&mut a.2);
+                op_code.push(astop_to_opcode(u_op));
+            }
+            Ok((a.0, g_type, op_code))
         }
         ASTExprTree::Expr {
             token: e_token,
@@ -137,21 +168,29 @@ fn lower_expr(
             left: e_left,
             right: e_right,
         } => {
-            let left = lower_expr(semantic, e_left.as_ref(), code)?;
-            let right = lower_expr(semantic, e_right.as_ref(), code)?;
+            let mut left = lower_expr(e_left.as_ref())?;
+            let mut right = lower_expr(e_right.as_ref())?;
             let left_opd = Box::new(left.0.clone());
             let right_opd = Box::new(right.0.clone());
-            if !matches!(left.0, Operand::ExprOperand(_, _)) {
-                code.add_opcode(Push(left.0));
+            let guess_type = guess_type(e_token, left.1, right.1)?;
+            let mut op_code = vec![];
+            let n_operand;
+
+            if let Some(operand) = expr_optimizer(&left.0, &right.0, e_op) {
+                n_operand = operand.clone();
+                op_code.push(Push(operand));
+            } else {
+                if !matches!(left.0, Operand::Expression(_, _)) {
+                    op_code.append(&mut left.2);
+                }
+                if !matches!(right.0, Operand::Expression(_, _)) {
+                    op_code.append(&mut right.2);
+                }
+                op_code.push(astop_to_opcode(e_op));
+                n_operand = Operand::Expression(left_opd, right_opd);
             }
-            if !matches!(right.0, Operand::ExprOperand(_, _)) {
-                code.add_opcode(Push(right.0));
-            }
-            code.add_opcode(astop_to_opcode(e_op));
-            Ok((
-                Operand::ExprOperand(left_opd, right_opd),
-                guess_type(e_token, left.1, right.1)?,
-            ))
+
+            Ok((n_operand, guess_type, op_code))
         }
         _ => {
             todo!()
@@ -160,19 +199,19 @@ fn lower_expr(
 }
 
 pub fn expr_semantic(
-    semantic: &mut Semantic,
     expr: Option<ASTExprTree>,
     code: &mut Code,
 ) -> Result<(Operand, ValueGuessType), ParserError> {
-    let mut guess_type = Unknown;
+    let guess_type;
     let operand: Operand;
 
     if let Some(expr) = expr {
-        let exp = lower_expr(semantic, &expr, code)?;
+        let mut exp = lower_expr(&expr)?;
+        code.append_code(&mut exp.2);
         operand = exp.0;
         guess_type = exp.1;
     } else {
-        guess_type = ValueGuessType::Null;
+        guess_type = Null;
         operand = Operand::Null;
     }
 

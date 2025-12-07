@@ -1,9 +1,8 @@
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::TokenType;
 use crate::compiler::lexer::TokenType::{LP, LR};
-use crate::compiler::parser::blkparser::blk_eval;
-use crate::compiler::parser::symbol_table::ContextType::ROOT;
-use crate::compiler::parser::ParserError::{Expected, IllegalArgument, NotAStatement};
+use crate::compiler::parser::block::blk_eval;
+use crate::compiler::parser::ParserError::{Expected, IllegalArgument};
 use crate::compiler::parser::{Parser, ParserError};
 
 fn parser_argument(parser: &mut Parser) -> Result<Vec<ASTExprTree>, ParserError> {
@@ -40,11 +39,8 @@ fn parser_argument(parser: &mut Parser) -> Result<Vec<ASTExprTree>, ParserError>
 }
 
 pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
+    parser.next_parser_token()?;
     let mut token = parser.next_parser_token()?;
-    if !parser.file.c_data.symbol_table.in_context(ROOT) { //TODO ?
-        return Err(NotAStatement(token));
-    }
-    token = parser.next_parser_token()?;
     if token.t_type != TokenType::Identifier {
         return Err(ParserError::IdentifierExpected(token));
     }
@@ -69,7 +65,7 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     };
 
     let result = parser.next_parser_token();
-    if let Err(ParserError::EOF) = result {
+    if let Err(ParserError::Eof) = result {
         return Err(ParserError::MissingFunctionBody(parser.get_last().unwrap()));
     }
     token = result?;

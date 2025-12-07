@@ -97,7 +97,7 @@ fn parser_arg(
                     }
                 }
             }
-            None => return Err(ParserError::MissingCondition(token0)),
+            None => return Err(MissingCondition(token0)),
         };
     }
     if has_next {
