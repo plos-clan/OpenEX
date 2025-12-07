@@ -1,4 +1,4 @@
-use crate::compiler::lexer::LexerError::{UnexpectedCharacter, Eof};
+use crate::compiler::lexer::LexerError::{Eof, UnexpectedCharacter};
 use crate::compiler::lexer::TokenType::End;
 use smol_str::{SmolStr, SmolStrBuilder};
 use std::char;
@@ -32,6 +32,7 @@ pub enum LexerError {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
     Number,
+    Float,
     LiteralString,
     Identifier,
     Semicolon,
@@ -90,6 +91,10 @@ impl Token {
             t_type: token_type,
             index: index0,
         }
+    }
+
+    pub fn value_float(&mut self) -> f64 {
+        self.data.parse::<f64>().unwrap()
     }
 
     pub fn value_number(&mut self) -> i64 {
@@ -226,13 +231,38 @@ impl LexerAnalysis {
         data_index: usize,
     ) -> Result<Token, LexerError> {
         let mut data = SmolStrBuilder::new();
-        let mut first_char = self.next_char();
-        data.push(first_char);
+        let mut is_float = false;
+
+        let first_char = self.next_char();
+
+        if first_char == '.' {
+            let lookahead = self.next_char();
+
+            if lookahead.is_ascii_digit() {
+                // 合法浮点：.123
+                is_float = true;
+                data.push('.');
+                data.push(lookahead);
+            } else {
+                // 非法 .<num> 组合 → 返回分号，并缓存字符
+                self.cache = Some(lookahead);
+                return Ok(Token::new(
+                    ".".into(),
+                    line,
+                    column,
+                    data_index,
+                    TokenType::Semicolon,
+                ));
+            }
+        } else {
+            data.push(first_char);
+        }
 
         if first_char == '0' {
-            first_char = self.next_char();
-            data.push(first_char);
-            match first_char {
+            let next = self.next_char();
+            data.push(next);
+
+            match next {
                 'x' | 'X' => {
                     loop {
                         match self.next_char() {
@@ -243,6 +273,7 @@ impl LexerAnalysis {
                             }
                         }
                     }
+
                     return Ok(Token::new(
                         data.finish(),
                         line,
@@ -255,13 +286,13 @@ impl LexerAnalysis {
                     loop {
                         match self.next_char() {
                             c if c == '0' || c == '1' => data.push(c),
-                            '\0' => {
-                                self.cache = Some('\0');
+                            c => {
+                                self.cache = Some(c);
                                 break;
                             }
-                            _ => break,
                         }
                     }
+
                     return Ok(Token::new(
                         data.finish(),
                         line,
@@ -271,14 +302,54 @@ impl LexerAnalysis {
                     ));
                 }
                 c if c.is_ascii_digit() => {}
+                '.' => {
+                    is_float = true;
+                }
                 _ => return Err(LexerError::IllegalLiteral),
             }
         }
 
+        // ===== 小数 + 科学计数法解析 =====
         loop {
             match self.next_char() {
                 c if c.is_ascii_digit() => {
                     data.push(c);
+                }
+                '.' => {
+                    if is_float {
+                        return Err(LexerError::IllegalLiteral);
+                    }
+                    is_float = true;
+                    data.push('.');
+                }
+                'e' | 'E' => {
+                    is_float = true;
+                    data.push('e');
+
+                    let sign = self.next_char();
+                    if sign == '+' || sign == '-' || sign.is_ascii_digit() {
+                        data.push(sign);
+                    } else {
+                        return Err(LexerError::IllegalLiteral);
+                    }
+
+                    let mut has_exp_digit = false;
+                    loop {
+                        match self.next_char() {
+                            c if c.is_ascii_digit() => {
+                                has_exp_digit = true;
+                                data.push(c);
+                            }
+                            c => {
+                                if !has_exp_digit {
+                                    return Err(LexerError::IllegalLiteral);
+                                }
+                                self.cache = Some(c);
+                                break;
+                            }
+                        }
+                    }
+                    break;
                 }
                 c => {
                     self.cache = Some(c);
@@ -289,10 +360,14 @@ impl LexerAnalysis {
 
         Ok(Token::new(
             data.finish(),
-            self.now_line,
-            self.now_column,
-            self.data_index,
-            TokenType::Number,
+            line,
+            column,
+            data_index,
+            if is_float {
+                TokenType::Float
+            } else {
+                TokenType::Number
+            },
         ))
     }
 
@@ -421,7 +496,7 @@ impl LexerAnalysis {
     }
 
     fn is_sem(&self, c: char) -> bool {
-        c == ',' || c == ':' || c == '?' || c == '.'
+        c == ',' || c == ':' || c == '?'
     }
 
     pub fn get_now_line(&self) -> usize {
@@ -447,7 +522,7 @@ impl LexerAnalysis {
                 self.cache = Some(c);
                 self.build_identifier(line, column, data_index)
             }
-            c if c.is_ascii_digit() => {
+            c if c.is_ascii_digit() || c == '.' => {
                 self.cache = Some(c);
                 self.build_number(line, column, data_index)
             }

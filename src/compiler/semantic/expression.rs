@@ -131,6 +131,10 @@ fn lower_expr(
                     let operand = Operand::ImmNum(tk_lit.value_number());
                     Ok((operand.clone(), Number, vec![Push(operand)]))
                 }
+                TokenType::Float => {
+                    let operand = Operand::ImmFlot(tk_lit.value_float());
+                    Ok((operand.clone(), Float, vec![Push(operand)]))
+                }
                 TokenType::LiteralString => {
                     let operand = Operand::ImmStr(tk_lit.value::<SmolStr>().unwrap());
                     Ok((operand.clone(), String, vec![Push(operand)]))
