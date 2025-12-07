@@ -26,7 +26,7 @@ fn main() {
     let mut compiler = Compiler::new();
 
     if args.version {
-        println!("{}", compiler.get_version());
+        println!("OpenEX RustEdition v{}", compiler.get_version());
         println!("Copyright 2023-2026 by MCPPL,DotCS");
         return ;
     }
