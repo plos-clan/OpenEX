@@ -28,7 +28,7 @@ fn main() {
     if args.version {
         println!("{}", compiler.get_version());
         println!("Copyright 2023-2026 by MCPPL,DotCS");
-        return ();
+        return ;
     }
 
     if args.cli {

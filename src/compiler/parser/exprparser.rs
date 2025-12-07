@@ -135,11 +135,10 @@ fn func_call_argument(
             if token0.t_type == LP && token0.value::<String>().unwrap().as_str() == "(" {
                 let mut arguments: Vec<ASTExprTree> = Vec::new();
                 for args in parser_multi_arguments(token0, tokens)? {
-                    if !args.is_empty() {
-                        if let Some(arg) = expr_eval(parser, args)? {
+                    if !args.is_empty()
+                        && let Some(arg) = expr_eval(parser, args)? {
                             arguments.push(arg);
                         }
-                    }
                 }
                 Ok(Call {
                     name: identifier,
@@ -209,11 +208,10 @@ fn expr_bp(
             None => break,
         };
 
-        if token.t_type != TokenType::Semicolon && token.t_type != TokenType::LR {
-            if !(token.t_type == LP && token.value::<String>().unwrap().as_str() == "[") {
+        if token.t_type != TokenType::Semicolon && token.t_type != TokenType::LR
+            && !(token.t_type == LP && token.value::<String>().unwrap().as_str() == "[") {
                 return Err(IllegalExpression(token));
             }
-        }
 
         if let Some((l_bp, ())) = postfix_binding_power(&mut token) {
             if l_bp < min_bp {
@@ -306,7 +304,7 @@ fn expr_bp(
 }
 
 pub fn expr_eval(parser: &mut Parser, tokens: Vec<Token>) -> Result<Option<ASTExprTree>, ParserError> {
-    if tokens.len() == 0 {
+    if tokens.is_empty() {
         return Ok(None);
     }
     let mut into_tokens = tokens.into_iter().peekable();

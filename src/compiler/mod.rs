@@ -58,7 +58,7 @@ impl Compiler {
         let mut padding = line_content
             .chars()
             .take(target_column)
-            .map(|c| 1)
+            .map(|_c| 1)
             .sum::<usize>();
         let indicator_spaces = " ".repeat(indicator_prefix_len);
         padding = if padding > 0 { padding - 1 } else { padding };
@@ -87,10 +87,10 @@ impl Compiler {
         let message;
         match lex_error {
             LexerError::UnexpectedCharacter(_c, msg) => {
-                message = format!("{}", msg);
+                message = msg.to_string();
             }
             LexerError::IllegalLiteral(msg) => {
-                message = format!("{}", msg);
+                message = msg.to_string();
             }
             _ => {
                 message = String::new();
@@ -191,7 +191,7 @@ impl Compiler {
         for file in &mut self.files {
             file.compiler().unwrap_or_else(|error| {
                 Self::dump_parser_error(error,file);
-                ()
+                
             })
         }
     }

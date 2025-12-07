@@ -123,7 +123,7 @@ fn lower_expr(
             }
         }
         ASTExprTree::Unary {
-            token: u_token,
+            token: _u_token,
             op: u_op,
             code: u_code,
         } => {

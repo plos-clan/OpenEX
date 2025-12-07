@@ -198,7 +198,7 @@ impl LexerAnalysis {
         let mut data = String::new();
         loop {
             match self.next_char() {
-                c if c.is_alphabetic() || c == '_' || c.is_digit(10) => {
+                c if c.is_alphabetic() || c == '_' || c.is_ascii_digit() => {
                     data.push(c);
                 }
                 c => {
@@ -270,14 +270,14 @@ impl LexerAnalysis {
                         TokenType::Number,
                     ));
                 }
-                c if c.is_digit(10) => {}
+                c if c.is_ascii_digit() => {}
                 _ => return Err(LexerError::IllegalLiteral("illegal literal".to_string())),
             }
         }
 
         loop {
             match self.next_char() {
-                c if c.is_digit(10) => {
+                c if c.is_ascii_digit() => {
                     data.push(c);
                 }
                 c => {
@@ -447,7 +447,7 @@ impl LexerAnalysis {
                 self.cache = Some(c);
                 self.build_identifier(line, column, data_index)
             }
-            c if c.is_digit(10) => {
+            c if c.is_ascii_digit() => {
                 self.cache = Some(c);
                 self.build_number(line, column, data_index)
             }

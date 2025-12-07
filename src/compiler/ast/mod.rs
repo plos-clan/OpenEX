@@ -2,7 +2,6 @@ pub mod eof_status;
 pub mod ssa_ir;
 
 use crate::compiler::lexer::Token;
-use smol_str::SmolStr;
 
 #[derive(Debug)]
 pub enum ExprOp {
