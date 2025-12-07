@@ -2,23 +2,80 @@ mod compiler;
 
 use crate::compiler::file::SourceFile;
 use crate::compiler::Compiler;
-use clap::Parser;
+use getopts_macro::getopts_options;
 use std::io::Write;
+use std::path::PathBuf;
+use std::process::exit;
 use std::{fs, io};
 
-#[derive(Parser)]
 struct Args {
-    #[arg(help = "the filename of the file to compile",required_unless_present_any = ["cli","version"])]
     input: Vec<String>,
-
-    #[arg(long, short = 'd')]
+    #[expect(unused)]
     debug: bool,
-
-    #[arg(long, help = "terminal mode")]
     cli: bool,
-
-    #[arg(long, short = 'v')]
     version: bool,
+}
+
+impl Args {
+    fn parse() -> Self {
+        let options = getopts_options! {
+            -d, --debug     "";
+                --cli       "terminal mode";
+            -v, --version   "Print version";
+            -h, --help*     "Print help";
+        };
+        let m = match options.parse(std::env::args().skip(1)) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("error: {e}");
+                exit(2)
+            },
+        };
+        if m.opt_present("help") {
+            Self::help(&options);
+            exit(1)
+        }
+        let args = Self {
+            debug:   m.opt_present("debug"),
+            cli:     m.opt_present("cli"),
+            version: m.opt_present("version"),
+            input:   m.free,
+        };
+        args.check();
+        args
+    }
+
+    fn check(&self) {
+        if self.input.is_empty()
+            && !self.cli
+            && !self.version
+        {
+            eprintln!("error: required arguments were not provided: <INPUT>...");
+            exit(2)
+        }
+    }
+
+    fn help(options: &getopts_macro::getopts::Options) {
+        let brief = format!(
+            "Usage: {} [OPTIONS] [INPUT]...\n\n\
+            Arguments:\n  [INPUT]...  the filename of the file to compile",
+            Self::prog_name(),
+        );
+        print!("{}", options.usage(&brief));
+    }
+
+    fn prog_name() -> String {
+        std::env::args_os()
+            .next()
+            .and_then(|name| {
+                PathBuf::from(name)
+                    .file_name()?
+                    .to_string_lossy()
+                    .into_owned()
+                    .into()
+            })
+            .unwrap_or_else(|| env!("CARGO_BIN_NAME").into())
+    }
 }
 
 fn main() {

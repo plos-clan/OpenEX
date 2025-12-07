@@ -4,9 +4,9 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
 smol_str = "0.3.4"
 slotmap = "1"
+getopts-macro = "0.1.8"
 
 [profile.release]
 debug = false
