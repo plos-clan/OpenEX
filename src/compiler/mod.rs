@@ -15,19 +15,17 @@ pub struct CompilerData {
 
 pub struct Compiler {
     files: Vec<SourceFile>,
-    version: String,
 }
 
 impl Compiler {
     pub fn new() -> Compiler {
         Compiler {
             files: vec![],
-            version: "OpenEX RustEdition v0.0.1".to_string(),
         }
     }
 
-    pub fn get_version(&self) -> &String {
-        &self.version
+    pub fn get_version(&self) -> &str {
+        env!("CARGO_PKG_VERSION")
     }
 
     pub fn add_file(&mut self, file: SourceFile) {
