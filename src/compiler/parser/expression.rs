@@ -63,7 +63,7 @@ fn parser_arg(
             Some(token1) => {
                 let mut mut_token = token1.clone();
                 match mut_token.t_type {
-                    TokenType::Semicolon => {
+                    TokenType::Operator => {
                         if mut_token.value::<String>().unwrap().as_str() == ","
                             && parentheses_count == 0
                         {
@@ -176,7 +176,7 @@ fn expr_bp(
             parser.check_char(&mut n_token, TokenType::LR, ')')?;
             lhs?
         }
-        TokenType::Semicolon => {
+        TokenType::Operator => {
             let ((), r_bp) = prefix_binding_power(&mut token);
             let op = match token.value::<String>().unwrap().as_str() {
                 "++" => ExprOp::SAdd,
@@ -209,7 +209,7 @@ fn expr_bp(
             None => break,
         };
 
-        if token.t_type != TokenType::Semicolon && token.t_type != TokenType::LR
+        if token.t_type != TokenType::Operator && token.t_type != TokenType::LR
             && !(token.t_type == LP && token.value::<String>().unwrap().as_str() == "[") {
                 return Err(IllegalExpression(token));
             }

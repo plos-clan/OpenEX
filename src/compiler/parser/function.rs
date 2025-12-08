@@ -22,7 +22,7 @@ fn parser_argument(parser: &mut Parser) -> Result<Vec<ASTExprTree>, ParserError>
                     arguments.push(ASTExprTree::Var(token));
                     is_split = true;
                 }
-                TokenType::Semicolon => {
+                TokenType::Operator => {
                     if !is_split {
                         return Err(ParserError::IdentifierExpected(token));
                     }

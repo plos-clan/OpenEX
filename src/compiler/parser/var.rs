@@ -1,6 +1,6 @@
 use crate::compiler::ast::ASTStmtTree::Var;
 use crate::compiler::ast::ASTStmtTree;
-use crate::compiler::lexer::TokenType::{Semicolon, End};
+use crate::compiler::lexer::TokenType::{Operator, End};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::expression::expr_eval;
 use crate::compiler::parser::{Parser, ParserError};
@@ -18,7 +18,7 @@ pub fn var_eval(parser:&mut Parser) -> Result<ASTStmtTree, ParserError> {
             value: None,
         })
     }
-    parser.check_char(&mut token, Semicolon, '=')?;
+    parser.check_char(&mut token, Operator, '=')?;
 
     let mut cone:Vec<Token> = vec![];
     loop {

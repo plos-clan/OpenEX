@@ -35,7 +35,7 @@ pub enum TokenType {
     Float,
     LiteralString,
     Identifier,
-    Semicolon,
+    Operator,
     LP,
     LR,
     End,
@@ -78,18 +78,18 @@ const KEYWORDS: [(&str, TokenType); 15] = [
 
 impl Token {
     pub fn new(
-        data0: SmolStr,
-        line0: usize,
-        column0: usize,
-        index0: usize,
-        token_type: TokenType,
+        data: SmolStr,
+        line: usize,
+        column: usize,
+        index: usize,
+        t_type: TokenType,
     ) -> Token {
         Token {
-            line: line0,
-            column: column0,
-            data: data0,
-            t_type: token_type,
-            index: index0,
+            line,
+            column,
+            data,
+            t_type,
+            index,
         }
     }
 
@@ -123,7 +123,8 @@ impl Token {
 
     pub fn value<T>(&mut self) -> Option<T>
     where
-        T: FromStr, <T as FromStr>::Err: Debug
+        T: FromStr,
+        <T as FromStr>::Err: Debug,
     {
         Some(self.data.parse::<T>().unwrap())
     }
@@ -244,14 +245,14 @@ impl LexerAnalysis {
                 data.push('.');
                 data.push(lookahead);
             } else {
-                // 非法 .<num> 组合 → 返回分号，并缓存字符
+                // 非法 .<num> 组合 → 返回 . 并缓存字符
                 self.cache = Some(lookahead);
                 return Ok(Token::new(
                     ".".into(),
                     line,
                     column,
                     data_index,
-                    TokenType::Semicolon,
+                    TokenType::Operator,
                 ));
             }
         } else {
@@ -435,7 +436,7 @@ impl LexerAnalysis {
             line,
             column,
             data_index,
-            TokenType::Semicolon,
+            TokenType::Operator,
         ))
     }
 
@@ -463,7 +464,7 @@ impl LexerAnalysis {
             line,
             column,
             data_index,
-            TokenType::Semicolon,
+            TokenType::Operator,
         ))
     }
 
@@ -491,7 +492,7 @@ impl LexerAnalysis {
             line,
             column,
             data_index,
-            TokenType::Semicolon,
+            TokenType::Operator,
         ))
     }
 
@@ -545,7 +546,7 @@ impl LexerAnalysis {
                 line,
                 column,
                 data_index,
-                TokenType::Semicolon,
+                TokenType::Operator,
             )),
             '"' => self.build_string(line, column, data_index),
             '+' => self.build_semicolon_op_in(line, column, data_index, '+'),
@@ -564,9 +565,7 @@ impl LexerAnalysis {
                 data_index,
                 End,
             )),
-            _ => Err(UnexpectedCharacter(
-                Some(start),
-            )),
+            _ => Err(UnexpectedCharacter(Some(start))),
         }
     }
 }
