@@ -32,4 +32,7 @@ declare_lint! {
     All "all",
     FuncNoArg "func-no-arg",
     LoopNoExpr "loop-no-expr",
+    NoTypeGuess "no-type-guess",
+    UnusedValue "unused-value",
+    UnusedLibrary "unused-library",
 }

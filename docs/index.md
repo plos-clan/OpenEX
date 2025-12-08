@@ -1,0 +1,49 @@
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: "OpenEX RustEdition"
+  text: "OpenEX 文档 | 3.0"
+  tagline: OpenEX Script Language Document
+  actions:
+    - theme: brand
+      text: 快速开始
+      link: /started
+    - theme: alt
+      text: API Examples
+      link: /api-examples
+  image:
+    src: /icon.png
+    alt: logo icon
+features:
+  - icon: 🛠️
+    title: 新特性
+    details: 支持更多简便写法, 以及编译器类型校验和推断, 更加强大的常量折叠等优化
+  - icon: ⚡️
+    title: 速度
+    details: 相比上一个分支版本, 采用 rust 编写, 编译与运行速度都得到大幅度提升.
+  - icon: 🌞
+    title: 社区
+    details: DotCS 与 plos-clan 双社区模式, 提供更好的反馈与更新渠道
+---
+
+<style>
+:root {
+
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
+}
+</style>
+
+<hr>

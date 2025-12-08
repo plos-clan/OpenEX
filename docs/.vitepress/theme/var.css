@@ -1,0 +1,36 @@
+:root {
+    --vp-c-brand-1: #561879;
+    --vp-c-brand-2: #6f2997;
+    --vp-c-brand-3: #a4309a;
+
+    @media (min-width: 960px) {
+        /* 文档页分割线 */
+        .VPNavBar:not(.home.top) .divider-line {
+            background-color: rgba(255, 255, 255, 0);
+            backdrop-filter: blur(10px);
+        }
+
+        /* 首页分割线 */
+        .VPNavBar:not(.has-sidebar):not(.home.top) .divider {
+            background-color: rgba(255, 255, 255, 0);
+            backdrop-filter: blur(10px);
+        }
+    }
+}
+
+/* 提示框 */
+.custom-block.tip {
+    border-color: var(--vp-c-green-2);
+}
+
+/* 警告框 */
+.custom-block.warning {
+    /* border-color: #d97706; */
+    border-color: var(--vp-c-yellow-2);
+}
+
+/* 危险框 */
+.custom-block.danger {
+    /* border-color: #f43f5e; */
+    border-color: var(--vp-c-red-2);
+}
