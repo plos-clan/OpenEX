@@ -4,17 +4,26 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
       - name: Install dependencies
-        run: bun install
-      - name: Build VitePress
-        run: bun run docs:build
+        run: |
+          cd docs
+          bun install
+      - name: Build docs
+        run: |
+          cd docs
+          bun run docs:build
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/.vitepress/dist

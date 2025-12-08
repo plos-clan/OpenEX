@@ -1,6 +1,7 @@
 import {defineConfig} from 'vitepress'
 
 export default defineConfig({
+    base: "/OpenEX/",
     title: "OpenEX",
     description: "OpenEX RustEdition",
     themeConfig: {
