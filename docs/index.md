@@ -1,5 +1,5 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
+
 layout: home
 
 hero:
@@ -27,23 +27,5 @@ features:
     title: 社区
     details: DotCS 与 plos-clan 双社区模式, 提供更好的反馈与更新渠道
 ---
-
-<style>
-:root {
-
-}
-
-@media (min-width: 640px) {
-  :root {
-    --vp-home-hero-image-filter: blur(56px);
-  }
-}
-
-@media (min-width: 960px) {
-  :root {
-    --vp-home-hero-image-filter: blur(68px);
-  }
-}
-</style>
 
 <hr>
