@@ -1,8 +1,9 @@
 mod compiler;
 
 use crate::compiler::file::SourceFile;
-use crate::compiler::Compiler;
+use crate::compiler::{Compiler, lints};
 use getopts_macro::getopts_options;
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
@@ -13,16 +14,19 @@ struct Args {
     #[expect(unused)]
     debug: bool,
     cli: bool,
+    #[expect(unused)]
+    allow: HashSet<lints::Lint>,
     version: bool,
 }
 
 impl Args {
     fn parse() -> Self {
         let options = getopts_options! {
-            -d, --debug     "";
-                --cli       "terminal mode";
-            -v, --version   "Print version";
-            -h, --help*     "Print help";
+            -d, --debug         "";
+                --cli           "terminal mode";
+            -A, --allow*=LINT   "Disable compiler warning";
+            -v, --version       "Print version";
+            -h, --help*         "Print help";
         };
         let m = match options.parse(std::env::args().skip(1)) {
             Ok(m) => m,
@@ -38,6 +42,7 @@ impl Args {
         let args = Self {
             debug:   m.opt_present("debug"),
             cli:     m.opt_present("cli"),
+            allow:   m.opt_strs("allow").iter().filter_map(Self::parse_allow).collect(),
             version: m.opt_present("version"),
             input:   m.free,
         };
@@ -53,6 +58,13 @@ impl Args {
             eprintln!("error: required arguments were not provided: <INPUT>...");
             exit(2)
         }
+    }
+
+    fn parse_allow(lint: impl AsRef<str>) -> Option<lints::Lint> {
+        lint.as_ref()
+            .parse()
+            .map_err(|e| eprintln!("warning: {e}"))
+            .ok()
     }
 
     fn help(options: &getopts_macro::getopts::Options) {

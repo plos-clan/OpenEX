@@ -8,6 +8,8 @@ pub mod file;
 pub mod lexer;
 mod parser;
 mod semantic;
+#[allow(unused)]
+pub mod lints;
 
 pub struct CompilerData {
     symbol_table: SymbolTable,
