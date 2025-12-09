@@ -128,6 +128,10 @@ impl Token {
     {
         Some(self.data.parse::<T>().unwrap())
     }
+
+    pub fn text(&self) -> &str {
+        &self.data
+    }
 }
 
 impl LexerAnalysis {

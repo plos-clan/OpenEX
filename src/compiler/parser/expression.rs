@@ -10,8 +10,7 @@ use std::iter::Peekable;
 use std::vec::IntoIter;
 
 fn prefix_binding_power(token: &mut Token) -> ((), u8) {
-    let sem = token.value::<String>().unwrap();
-    match sem.as_str() {
+    match token.text() {
         "++" | "--" => ((), 21),
         "!" => ((), 23),
         _ => ((), 0),
@@ -19,8 +18,7 @@ fn prefix_binding_power(token: &mut Token) -> ((), u8) {
 }
 
 fn postfix_binding_power(token: &mut Token) -> Option<(u8, ())> {
-    let sem = token.value::<String>().unwrap();
-    match sem.as_str() {
+    match token.text() {
         "++" | "--" => Some((21, ())),
         "[" => Some((27, ())),
         _ => None,
@@ -28,8 +26,7 @@ fn postfix_binding_power(token: &mut Token) -> Option<(u8, ())> {
 }
 
 fn binding_power(token: &mut Token) -> Option<(u8, u8)> {
-    let sem = token.value::<String>().unwrap();
-    match sem.as_str() {
+    match token.text() {
         "=" => Some((2, 1)),
         "&&" | "||" => Some((3, 4)),
         "|" => Some((5, 6)),
@@ -61,38 +58,38 @@ fn parser_arg(
     loop {
         match tokens.peek() {
             Some(token1) => {
-                let mut mut_token = token1.clone();
-                match mut_token.t_type {
+                let owned_token = token1.clone();
+                match owned_token.t_type {
                     TokenType::Operator => {
-                        if mut_token.value::<String>().unwrap().as_str() == ","
+                        if owned_token.text() == ","
                             && parentheses_count == 0
                         {
                             has_next = true;
                             break;
                         }
-                        expr.push(mut_token);
+                        expr.push(owned_token);
                         tokens.next();
                     }
                     LP => {
-                        if mut_token.value::<String>().unwrap() == "(" {
+                        if owned_token.text() == "(" {
                             parentheses_count += 1;
                         }
-                        expr.push(mut_token);
+                        expr.push(owned_token);
                         tokens.next();
                     }
                     TokenType::LR => {
-                        if mut_token.value::<String>().unwrap() == ")" {
+                        if owned_token.text() == ")" {
                             if parentheses_count == 0 {
                                 has_next = false;
                                 break;
                             }
                             parentheses_count -= 1;
                         }
-                        expr.push(mut_token);
+                        expr.push(owned_token);
                         tokens.next();
                     }
                     _ => {
-                        expr.push(mut_token);
+                        expr.push(owned_token);
                         tokens.next();
                     }
                 }
@@ -131,8 +128,8 @@ fn func_call_argument(
 ) -> Result<ASTExprTree, ParserError> {
     match tokens.peek() {
         Some(token) => {
-            let mut token0 = token.clone();
-            if token0.t_type == LP && token0.value::<String>().unwrap().as_str() == "(" {
+            let token0 = token.clone();
+            if token0.t_type == LP && token0.text() == "(" {
                 let mut arguments: Vec<ASTExprTree> = Vec::new();
                 for args in parser_multi_arguments(token0, tokens)? {
                     if !args.is_empty()
@@ -164,8 +161,8 @@ fn expr_bp(
 
     let mut expr_tree: ASTExprTree = match token.t_type {
         LP => {
-            let mut t = token.clone();
-            if t.value::<String>().unwrap().as_str() != "(" {
+            let t = token.clone();
+            if t.text() != "(" {
                 return Err(IllegalExpression(token));
             }
             let lhs = expr_bp(parser, tokens, 0);
@@ -178,7 +175,7 @@ fn expr_bp(
         }
         TokenType::Operator => {
             let ((), r_bp) = prefix_binding_power(&mut token);
-            let op = match token.value::<String>().unwrap().as_str() {
+            let op = match token.text() {
                 "++" => ExprOp::SAdd,
                 "--" => ExprOp::SSub,
                 "!" => ExprOp::Not,
@@ -210,7 +207,7 @@ fn expr_bp(
         };
 
         if token.t_type != TokenType::Operator && token.t_type != TokenType::LR
-            && !(token.t_type == LP && token.value::<String>().unwrap().as_str() == "[") {
+            && !(token.t_type == LP && token.text() == "[") {
                 return Err(IllegalExpression(token));
             }
 
@@ -238,7 +235,7 @@ fn expr_bp(
                     }
                 }
             } else {
-                let op = match token.value::<String>().unwrap().as_str() {
+                let op = match token.text() {
                     "++" => ExprOp::SAdd,
                     "--" => ExprOp::SSub,
                     _ => return Err(IllegalExpression(token)),
@@ -259,7 +256,7 @@ fn expr_bp(
             }
             tokens.next();
             let rhs = expr_bp(parser, tokens, r_bp)?;
-            let op = match token.value::<String>().unwrap().as_str() {
+            let op = match token.text() {
                 "+" => ExprOp::Add,
                 "-" => ExprOp::Sub,
                 "*" => ExprOp::Mul,

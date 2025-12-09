@@ -50,7 +50,7 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let args:Vec<ASTExprTree>;
     match token.t_type {
         LP => {
-            if token.value::<String>().unwrap() == "{" {
+            if token.text() == "{" {
                 parser.cache = Some(token);
                 args = vec![]
             }else {

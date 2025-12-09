@@ -12,7 +12,7 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
 
     match token.t_type {
         LP => {
-            if token.value::<String>().unwrap() == "{" {
+            if token.text() == "{" {
                 let tk_b = token.clone();
                 parser.cache = Some(token);
                 cond = Literal(Token::new(
