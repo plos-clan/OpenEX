@@ -58,7 +58,7 @@ impl<'a> Parser<'a> {
         type_: TokenType,
         c: char,
     ) -> Result<(), ParserError> {
-        if !(token.t_type == type_ && token.value::<String>().unwrap() == c.to_string()) {
+        if !(token.t_type == type_ && token.text() == c.encode_utf8(&mut [0; 4])) {
             return Err(ParserError::Expected(token.clone(), c));
         }
         Ok(())
@@ -83,13 +83,13 @@ impl<'a> Parser<'a> {
             token = self.next_parser_token()?;
             match token.t_type {
                 LP => {
-                    if token.value::<String>().unwrap() == "(" {
+                    if token.text() == "(" {
                         parentheses_count += 1;
                     }
                     cond.push(token);
                 }
                 TokenType::LR => {
-                    if token.value::<String>().unwrap() == ")" {
+                    if token.text() == ")" {
                         if parentheses_count == 0 {
                             break;
                         }

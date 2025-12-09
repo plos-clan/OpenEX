@@ -68,16 +68,16 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
                 }
             }
             LR => {
-                let mut t = token.clone();
+                let t = token.clone();
                 parser.cache = Some(token);
-                if t.value::<String>().unwrap() == "}" {
+                if t.text() == "}" {
                     break;
                 }
             }
             LP => {
-                let mut t = token.clone();
+                let t = token.clone();
                 parser.cache = Some(token);
-                if t.value::<String>().unwrap() == "{" {
+                if t.text() == "{" {
                     stmt.push(Context(blk_eval(parser)?))
                 } else {
                     stmt.push(parser_expr(parser)?)
