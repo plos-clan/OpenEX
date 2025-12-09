@@ -8,6 +8,9 @@ pub mod symbol_table;
 mod var;
 mod r#while;
 
+#[cfg(test)]
+mod tests;
+
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::file::SourceFile;
 use crate::compiler::lexer::TokenType::LP;
@@ -19,6 +22,7 @@ use crate::compiler::parser::import::import_eval;
 use crate::compiler::parser::var::var_eval;
 use crate::compiler::parser::r#while::while_eval;
 
+#[derive(Debug)]
 pub enum ParserError {
     NotAStatement(Token),          // 不是一个语句
     LexError(LexerError),          // 词法分析错误
