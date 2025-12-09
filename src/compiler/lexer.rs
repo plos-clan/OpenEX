@@ -22,6 +22,7 @@ pub struct Token {
     data: SmolStr,
 }
 
+#[derive(Debug)]
 pub enum LexerError {
     UnexpectedCharacter(Option<char>),
     IllegalEscapeChar(char),
