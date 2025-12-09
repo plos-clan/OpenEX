@@ -1,4 +1,3 @@
-pub mod eof_status;
 pub mod ssa_ir;
 
 use crate::compiler::lexer::Token;
@@ -58,7 +57,7 @@ pub enum ASTExprTree {
     },
     Call {
         // foo(1, 2)
-        name: Token,
+        name: Box<ASTExprTree>, // 必须为 Var
         args: Vec<ASTExprTree>,
     },
 }

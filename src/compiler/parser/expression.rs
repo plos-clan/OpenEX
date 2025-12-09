@@ -1,5 +1,3 @@
-use crate::compiler::ast::eof_status::EofStatus;
-use crate::compiler::ast::eof_status::EofStatus::{Eof, Next};
 use crate::compiler::ast::ASTExprTree::{Call, Expr, Var};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::TokenType::LP;
@@ -20,7 +18,7 @@ fn prefix_binding_power(token: &mut Token) -> ((), u8) {
 fn postfix_binding_power(token: &mut Token) -> Option<(u8, ())> {
     match token.text() {
         "++" | "--" => Some((21, ())),
-        "[" => Some((27, ())),
+        "[" | "(" => Some((27, ())),
         _ => None,
     }
 }
@@ -44,108 +42,6 @@ fn binding_power(token: &mut Token) -> Option<(u8, u8)> {
         "*=" | "/=" | "%=" => Some((20, 19)),
         "." => Some((26, 25)),
         _ => None,
-    }
-}
-
-fn parser_arg(
-    token0: Token,
-    tokens: &mut Peekable<IntoIter<Token>>,
-) -> Result<EofStatus<Vec<Token>>, ParserError> {
-    let mut expr: Vec<Token> = vec![];
-    let mut parentheses_count: usize = 0;
-    tokens.next();
-    let has_next: bool;
-    loop {
-        match tokens.peek() {
-            Some(token1) => {
-                let owned_token = token1.clone();
-                match owned_token.t_type {
-                    TokenType::Operator => {
-                        if owned_token.text() == ","
-                            && parentheses_count == 0
-                        {
-                            has_next = true;
-                            break;
-                        }
-                        expr.push(owned_token);
-                        tokens.next();
-                    }
-                    LP => {
-                        if owned_token.text() == "(" {
-                            parentheses_count += 1;
-                        }
-                        expr.push(owned_token);
-                        tokens.next();
-                    }
-                    TokenType::LR => {
-                        if owned_token.text() == ")" {
-                            if parentheses_count == 0 {
-                                has_next = false;
-                                break;
-                            }
-                            parentheses_count -= 1;
-                        }
-                        expr.push(owned_token);
-                        tokens.next();
-                    }
-                    _ => {
-                        expr.push(owned_token);
-                        tokens.next();
-                    }
-                }
-            }
-            None => return Err(MissingCondition(token0)),
-        };
-    }
-    if has_next {
-        Ok(Next(expr))
-    } else {
-        Ok(Eof(expr))
-    }
-}
-
-fn parser_multi_arguments(
-    token0: Token,
-    tokens: &mut Peekable<IntoIter<Token>>,
-) -> Result<Vec<Vec<Token>>, ParserError> {
-    let mut arguments: Vec<Vec<Token>> = Vec::new();
-    loop {
-        match parser_arg(token0.clone(), tokens)? {
-            Next(args) => arguments.push(args),
-            Eof(args) => {
-                arguments.push(args);
-                break;
-            }
-        }
-    }
-    Ok(arguments)
-}
-
-fn func_call_argument(
-    identifier: Token,
-    parser: &mut Parser,
-    tokens: &mut Peekable<IntoIter<Token>>,
-) -> Result<ASTExprTree, ParserError> {
-    match tokens.peek() {
-        Some(token) => {
-            let token0 = token.clone();
-            if token0.t_type == LP && token0.text() == "(" {
-                let mut arguments: Vec<ASTExprTree> = Vec::new();
-                for args in parser_multi_arguments(token0, tokens)? {
-                    if !args.is_empty()
-                        && let Some(arg) = expr_eval(parser, args)? {
-                            arguments.push(arg);
-                        }
-                }
-                Ok(Call {
-                    name: identifier,
-                    args: arguments,
-                })
-            } else {
-                Ok(Var(identifier))
-            }
-        }
-        None => Ok(Var(identifier)),
     }
 }
 
@@ -195,8 +91,8 @@ fn expr_bp(
         | TokenType::LiteralString
         | TokenType::Float
         | TokenType::Null => ASTExprTree::Literal(token),
-        | TokenType::This => ASTExprTree::This(token),
-        TokenType::Identifier => func_call_argument(token, parser, tokens)?,
+        TokenType::This => ASTExprTree::This(token),
+        TokenType::Identifier => Var(token),
         _ => return Err(IllegalKey(token)),
     };
 
@@ -206,10 +102,12 @@ fn expr_bp(
             None => break,
         };
 
-        if token.t_type != TokenType::Operator && token.t_type != TokenType::LR
-            && !(token.t_type == LP && token.text() == "[") {
-                return Err(IllegalExpression(token));
-            }
+        if token.t_type != TokenType::Operator
+            && token.t_type != TokenType::LR
+            && !(token.t_type == LP && (token.text() == "[" || token.text() == "("))
+        {
+            return Err(IllegalExpression(token));
+        }
 
         if let Some((l_bp, ())) = postfix_binding_power(&mut token) {
             if l_bp < min_bp {
@@ -218,20 +116,60 @@ fn expr_bp(
 
             tokens.next();
             if token.t_type == LP {
-                parser.check_char(&mut token, LP, '[')?;
-                let rhs = expr_bp(parser, tokens, 0)?;
-                match tokens.next() {
-                    Some(mut tk) => {
-                        parser.check_char(&mut tk, TokenType::LR, ']')?;
-                        expr_tree = Expr {
-                            token,
-                            op: ExprOp::AIndex,
-                            left: Box::new(expr_tree),
-                            right: Box::new(rhs),
-                        };
+                match parser.check_char(&mut token, LP, '[') {
+                    Ok(_) => {
+                        let rhs = expr_bp(parser, tokens, 0)?;
+                        match tokens.next() {
+                            Some(mut tk) => {
+                                parser.check_char(&mut tk, TokenType::LR, ']')?;
+                                expr_tree = Expr {
+                                    token,
+                                    op: ExprOp::AIndex,
+                                    left: Box::new(expr_tree),
+                                    right: Box::new(rhs),
+                                };
+                            }
+                            None => {
+                                return Err(MissingCondition(token));
+                            }
+                        }
                     }
-                    None => {
-                        return Err(MissingCondition(token));
+                    Err(_) => {
+                        parser.check_char(&mut token, LP, '(')?;
+                        let mut arguments: Vec<ASTExprTree> = vec![];
+                        loop {
+                            let mut sub_tokens: Vec<Token> = vec![];
+                            token = tokens.next().ok_or(MissingCondition(token))?;
+                            let mut p_count: u64 = 0;
+                            let mut done: bool = false;
+                            loop {
+                                if token.t_type == TokenType::Operator && token.text() == "," {
+                                    break;
+                                }
+                                if token.t_type == LP && token.text() == "(" {
+                                    p_count += 1;
+                                }
+                                if token.t_type == TokenType::LR && token.text() == ")" {
+                                    if p_count == 0 {
+                                        done = true;
+                                        break;
+                                    }
+                                    p_count -= 1;
+                                }
+                                sub_tokens.push(token.clone());
+                                token = tokens.next().ok_or(MissingCondition(token))?;
+                            }
+                            if let Some(expr) = expr_eval(parser, sub_tokens)? {
+                                arguments.push(expr);
+                            }
+                            if done {
+                                break;
+                            }
+                        }
+                        expr_tree = Call {
+                            name: Box::new(expr_tree),
+                            args: arguments,
+                        }
                     }
                 }
             } else {
@@ -301,7 +239,10 @@ fn expr_bp(
     Ok(expr_tree)
 }
 
-pub fn expr_eval(parser: &mut Parser, tokens: Vec<Token>) -> Result<Option<ASTExprTree>, ParserError> {
+pub fn expr_eval(
+    parser: &mut Parser,
+    tokens: Vec<Token>,
+) -> Result<Option<ASTExprTree>, ParserError> {
     if tokens.is_empty() {
         return Ok(None);
     }

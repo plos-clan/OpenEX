@@ -3,14 +3,15 @@ use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 
 #[derive(Clone, Debug, PartialEq)]
-#[allow(dead_code)] //TODO
 pub enum Operand {
     Val(DefaultKey),
+    Library(SmolStr),
     Null,
     ImmBool(bool),
     ImmNum(i64),
     ImmFlot(f64),
     ImmStr(SmolStr),
+    Call(SmolStr),
     Expression(Box<Operand>, Box<Operand>, Box<OpCode>),
 }
 
@@ -21,6 +22,7 @@ pub enum ValueGuessType {
     String,
     Float,
     Null,
+    Library,
     Unknown,
 }
 
@@ -37,7 +39,7 @@ pub enum OpCode {
     StackLocal(DefaultKey, Operand), // 栈局部变量加载
     StoreLocal(DefaultKey, Operand), // 将一个变量加载到栈顶
     Push(Operand),                   // 将值压入操作栈
-    Call(SmolStr),                   // 函数调用 (调用路径)
+    Call(SmolStr),                   // 函数调用 (调用路径) : 只能被 Ref 操作触发
     Return,                          // 栈顶结果返回
     Add,                             // 从栈顶提取两个操作数相加并将结果压回操作栈
     Sub,                             // -
@@ -102,7 +104,7 @@ impl Code {
 
     pub fn find_value_key(&mut self, name: SmolStr) -> Option<DefaultKey> {
         for (key, value) in self.values.iter_mut() {
-            if value.token.value::<SmolStr>().unwrap() == name {
+            if value.token.text() == name {
                 return Some(key);
             }
         }

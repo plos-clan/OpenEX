@@ -1,5 +1,7 @@
 use crate::compiler::ast::ssa_ir::OpCode::Push;
-use crate::compiler::ast::ssa_ir::ValueGuessType::{Bool, Float, Null, Number, String, Unknown};
+use crate::compiler::ast::ssa_ir::ValueGuessType::{
+    Bool, Float, Library, Null, Number, String, Unknown,
+};
 use crate::compiler::ast::ssa_ir::{Code, OpCode, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
@@ -187,12 +189,9 @@ fn lower_expr(
                 n_operand = operand.clone();
                 op_code.push(Push(operand));
             } else {
-                if !matches!(left.0, Operand::Expression(_, _, _)) {
-                    op_code.append(&mut left.2);
-                }
-                if !matches!(right.0, Operand::Expression(_, _, _)) {
-                    op_code.append(&mut right.2);
-                }
+                op_code.append(&mut left.2);
+                op_code.append(&mut right.2);
+
                 let opcode = astop_to_opcode(e_op);
                 n_operand = Operand::Expression(left_opd, right_opd, Box::from(opcode.clone()));
                 op_code.push(opcode);
@@ -209,16 +208,38 @@ fn lower_expr(
             {
                 return Err(ParserError::UnableResolveSymbols(u_token.clone()));
             }
-            if let Some(key) = code.find_value_key(var_name) {
+            if let Some(key) = code.find_value_key(var_name.clone()) {
                 let value = code.find_value(key).unwrap();
                 value.variable = true;
-                Ok((
-                    Operand::Val(key),
-                    value.type_.clone(),
-                    vec![OpCode::StoreLocal(key, Operand::Val(key))],
-                ))
+                let opcode_vec: Vec<OpCode> = match value.type_ {
+                    Library => {
+                        vec![Push(Operand::Library(var_name))]
+                    }
+                    _ => {
+                        vec![OpCode::StoreLocal(key, Operand::Val(key))]
+                    }
+                };
+                Ok((Operand::Val(key), value.type_.clone(), opcode_vec))
             } else {
-                todo!()
+                unreachable!()
+            }
+        }
+        ASTExprTree::Call { name, args } => {
+            let mut vec_opcode: Vec<OpCode> = vec![];
+            for arg in args {
+                let mut expr = lower_expr(semantic, arg, code)?;
+                vec_opcode.append(&mut expr.2);
+            }
+
+            match name.as_ref() {
+                ASTExprTree::Var(token) => {
+                    let path = token.clone().value::<SmolStr>().unwrap();
+                    vec_opcode.push(OpCode::Call(path.clone()));
+                    Ok((Operand::Call(path), Unknown, vec_opcode))
+                }
+                _ => {
+                    unreachable!()
+                }
             }
         }
         _ => {
@@ -227,15 +248,22 @@ fn lower_expr(
     }
 }
 
-// 检查表达式是否含有指定操作码
-pub fn check_expr_operand(operand: &Operand, op_code: &OpCode) -> bool {
+// 检查表达式是否含有指定操作码同时检查是否含有 call 操作
+pub fn check_expr_operand(operand: &Operand, op_code: &OpCode, call_count: i32) -> bool {
     match operand {
         Operand::Expression(right, left, expr_op) => {
-            let mut status = check_expr_operand(right.as_ref(), op_code);
-            status &= check_expr_operand(left.as_ref(), op_code);
+            let mut status = check_expr_operand(right.as_ref(), op_code, call_count + 1);
+            status &= check_expr_operand(left.as_ref(), op_code, call_count + 1);
             if expr_op.as_ref() == op_code {
                 true
             } else {
+                if ((matches!(right.as_ref(), Operand::Call(_))
+                    && matches!(left.as_ref(), Operand::Val(_)))
+                    || (matches!(left.as_ref(), Operand::Call(_))))
+                    && call_count == 0
+                {
+                    return true;
+                }
                 status
             }
         }

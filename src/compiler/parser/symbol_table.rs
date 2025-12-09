@@ -15,6 +15,7 @@ pub enum ContextType {
 #[allow(dead_code)] //TODO
 pub enum ElementType {
     Argument,
+    Library,
     Value,
     Func,
 }
