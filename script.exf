@@ -3,3 +3,5 @@ var num = .5138;
 var num1 = 1.2e-3;
 var num2 = 10.;
 var num3 = 3.14159265358979;
+
+num + 34;

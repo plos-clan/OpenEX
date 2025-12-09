@@ -3,7 +3,7 @@ pub mod ssa_ir;
 
 use crate::compiler::lexer::Token;
 
-#[derive(Debug)]
+#[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord)]
 pub enum ExprOp {
     Add,           // +
     Sub,           // -
@@ -39,7 +39,7 @@ pub enum ExprOp {
     AIndex,        // 数组索引
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 #[allow(dead_code)] //TODO
 pub enum ASTExprTree {
     Literal(Token), // Number | String | Bool

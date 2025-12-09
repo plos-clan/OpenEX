@@ -32,7 +32,8 @@ pub enum ParserError {
     IllegalKey(Token),             // 非法的关键字
     BackOutsideLoop(Token),        // 循环退出语句位于循环体外
     SymbolDefined(Token),          // 类型已被定义
-    IllegalTypeCombination(Token), //非法类型组合
+    IllegalTypeCombination(Token), // 非法类型组合
+    UnableResolveSymbols(Token),   // 无法解析符号
     Eof,
 }
 

@@ -35,4 +35,5 @@ declare_lint! {
     NoTypeGuess "no-type-guess",
     UnusedValue "unused-value",
     UnusedLibrary "unused-library",
+    UnusedExpression "unused-expression",
 }

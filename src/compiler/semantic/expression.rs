@@ -5,6 +5,7 @@ use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
+use crate::compiler::semantic::Semantic;
 use smol_str::SmolStr;
 
 fn astop_to_opcode(astop: &ExprOp) -> OpCode {
@@ -121,7 +122,9 @@ fn guess_type(
 }
 
 fn lower_expr(
+    semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
+    code: &mut Code,
 ) -> Result<(Operand, ValueGuessType, Vec<OpCode>), ParserError> {
     match expr_tree {
         ASTExprTree::Literal(lit) => {
@@ -154,7 +157,7 @@ fn lower_expr(
             op: u_op,
             code: u_code,
         } => {
-            let mut a = lower_expr(u_code.as_ref())?;
+            let mut a = lower_expr(semantic, u_code.as_ref(), code)?;
             let g_type = guess_type_unary(u_token, a.1, u_op)?;
             let mut op_code;
             if let Some(operand) = unary_optimizer(u_op, &a.0) {
@@ -172,8 +175,8 @@ fn lower_expr(
             left: e_left,
             right: e_right,
         } => {
-            let mut left = lower_expr(e_left.as_ref())?;
-            let mut right = lower_expr(e_right.as_ref())?;
+            let mut left = lower_expr(semantic, e_left.as_ref(), code)?;
+            let mut right = lower_expr(semantic, e_right.as_ref(), code)?;
             let left_opd = Box::new(left.0.clone());
             let right_opd = Box::new(right.0.clone());
             let guess_type = guess_type(e_token, left.1, right.1)?;
@@ -184,17 +187,39 @@ fn lower_expr(
                 n_operand = operand.clone();
                 op_code.push(Push(operand));
             } else {
-                if !matches!(left.0, Operand::Expression(_, _)) {
+                if !matches!(left.0, Operand::Expression(_, _, _)) {
                     op_code.append(&mut left.2);
                 }
-                if !matches!(right.0, Operand::Expression(_, _)) {
+                if !matches!(right.0, Operand::Expression(_, _, _)) {
                     op_code.append(&mut right.2);
                 }
-                op_code.push(astop_to_opcode(e_op));
-                n_operand = Operand::Expression(left_opd, right_opd);
+                let opcode = astop_to_opcode(e_op);
+                n_operand = Operand::Expression(left_opd, right_opd, Box::from(opcode.clone()));
+                op_code.push(opcode);
             }
 
             Ok((n_operand, guess_type, op_code))
+        }
+        ASTExprTree::Var(u_token) => {
+            let var_name = u_token.clone().value::<SmolStr>().unwrap();
+            if !semantic
+                .compiler_data()
+                .symbol_table
+                .check_element(var_name.clone())
+            {
+                return Err(ParserError::UnableResolveSymbols(u_token.clone()));
+            }
+            if let Some(key) = code.find_value_key(var_name) {
+                let value = code.find_value(key).unwrap();
+                value.variable = true;
+                Ok((
+                    Operand::Val(key),
+                    value.type_.clone(),
+                    vec![OpCode::StoreLocal(key, Operand::Val(key))],
+                ))
+            } else {
+                todo!()
+            }
         }
         _ => {
             todo!()
@@ -202,7 +227,24 @@ fn lower_expr(
     }
 }
 
+// 检查表达式是否含有指定操作码
+pub fn check_expr_operand(operand: &Operand, op_code: &OpCode) -> bool {
+    match operand {
+        Operand::Expression(right, left, expr_op) => {
+            let mut status = check_expr_operand(right.as_ref(), op_code);
+            status &= check_expr_operand(left.as_ref(), op_code);
+            if expr_op.as_ref() == op_code {
+                true
+            } else {
+                status
+            }
+        }
+        _ => false,
+    }
+}
+
 pub fn expr_semantic(
+    semantic: &mut Semantic,
     expr: Option<ASTExprTree>,
     code: &mut Code,
 ) -> Result<(Operand, ValueGuessType), ParserError> {
@@ -210,7 +252,7 @@ pub fn expr_semantic(
     let operand: Operand;
 
     if let Some(expr) = expr {
-        let mut exp = lower_expr(&expr)?;
+        let mut exp = lower_expr(semantic, &expr, code)?;
         code.append_code(&mut exp.2);
         operand = exp.0;
         guess_type = exp.1;

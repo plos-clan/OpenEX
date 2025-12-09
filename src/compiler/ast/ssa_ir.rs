@@ -11,7 +11,7 @@ pub enum Operand {
     ImmNum(i64),
     ImmFlot(f64),
     ImmStr(SmolStr),
-    Expression(Box<Operand>, Box<Operand>),
+    Expression(Box<Operand>, Box<Operand>, Box<OpCode>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,15 +26,16 @@ pub enum ValueGuessType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Value {
-    variable: bool,        // 是否被重赋值
-    type_: ValueGuessType, // 猜测类型
-    token: Token,
+    pub(crate) variable: bool,        // 是否被重赋值
+    pub(crate) type_: ValueGuessType, // 猜测类型
+    token: Token,                     // 变量名 token
 }
 
 #[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)] //TODO
 pub enum OpCode {
     StackLocal(DefaultKey, Operand), // 栈局部变量加载
+    StoreLocal(DefaultKey, Operand), // 将一个变量加载到栈顶
     Push(Operand),                   // 将值压入操作栈
     Call(SmolStr),                   // 函数调用 (调用路径)
     Return,                          // 栈顶结果返回
@@ -97,6 +98,19 @@ impl Code {
 
     pub fn append_code(&mut self, code: &mut Vec<OpCode>) {
         self.codes.append(code);
+    }
+
+    pub fn find_value_key(&mut self, name: SmolStr) -> Option<DefaultKey> {
+        for (key, value) in self.values.iter_mut() {
+            if value.token.value::<SmolStr>().unwrap() == name {
+                return Some(key);
+            }
+        }
+        None
+    }
+
+    pub fn find_value(&mut self, key: DefaultKey) -> Option<&mut Value> {
+        self.values.get_mut(key)
     }
 
     pub fn alloc_value(&mut self, token: Token, type_: ValueGuessType) -> DefaultKey {

@@ -1,7 +1,8 @@
 mod compiler;
+mod runtime;
 
 use crate::compiler::file::SourceFile;
-use crate::compiler::{Compiler, lints};
+use crate::compiler::{lints, Compiler};
 use getopts_macro::getopts_options;
 use std::collections::HashSet;
 use std::io::Write;
@@ -14,7 +15,6 @@ struct Args {
     #[expect(unused)]
     debug: bool,
     cli: bool,
-    #[expect(unused)]
     allow: HashSet<lints::Lint>,
     version: bool,
 }
@@ -33,28 +33,29 @@ impl Args {
             Err(e) => {
                 eprintln!("error: {e}");
                 exit(2)
-            },
+            }
         };
         if m.opt_present("help") {
             Self::help(&options);
             exit(1)
         }
         let args = Self {
-            debug:   m.opt_present("debug"),
-            cli:     m.opt_present("cli"),
-            allow:   m.opt_strs("allow").iter().filter_map(Self::parse_allow).collect(),
+            debug: m.opt_present("debug"),
+            cli: m.opt_present("cli"),
+            allow: m
+                .opt_strs("allow")
+                .iter()
+                .filter_map(Self::parse_allow)
+                .collect(),
             version: m.opt_present("version"),
-            input:   m.free,
+            input: m.free,
         };
         args.check();
         args
     }
 
     fn check(&self) {
-        if self.input.is_empty()
-            && !self.cli
-            && !self.version
-        {
+        if self.input.is_empty() && !self.cli && !self.version {
             eprintln!("error: required arguments were not provided: <INPUT>...");
             exit(2)
         }
@@ -97,7 +98,7 @@ fn main() {
     if args.version {
         println!("OpenEX RustEdition v{}", compiler.get_version());
         println!("Copyright 2023-2026 by MCPPL,DotCS");
-        return ;
+        return;
     }
 
     if args.cli {
@@ -107,7 +108,7 @@ fn main() {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_) => {
-                compiler.add_file(SourceFile::new("<console>".to_string(), input));
+                compiler.add_file(SourceFile::new("<console>".to_string(), input, args.allow));
             }
             Err(_) => {
                 eprintln!("error: cannot read from stdin.");
@@ -118,7 +119,7 @@ fn main() {
             let file_name = file.clone();
             let data =
                 fs::read_to_string(file).unwrap_or_else(|e| panic!("error: cannot read file{}", e));
-            compiler.add_file(SourceFile::new(file_name, data));
+            compiler.add_file(SourceFile::new(file_name, data, HashSet::new()));
         }
     }
 

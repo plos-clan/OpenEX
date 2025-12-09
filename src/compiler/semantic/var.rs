@@ -18,7 +18,7 @@ pub fn var_semantic(
         return Err(ParserError::SymbolDefined(name));
     }
     symbol_table.add_element(name.value().unwrap(), Value);
-    let ret_m = expr_semantic(init_var,code)?;
+    let ret_m = expr_semantic(semantic,init_var,code)?;
     let opread = ret_m.clone();
     let key = code.alloc_value(name, ret_m.1);
     Ok(StackLocal(key, opread.0))

@@ -1,18 +1,22 @@
+use crate::compiler::ast::ASTExprTree;
 use crate::compiler::file::SourceFile;
-use crate::compiler::lexer::LexerError;
+use crate::compiler::lexer::{LexerError, Token};
+use crate::compiler::lints::Lint;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
+use std::collections::HashSet;
 
 mod ast;
 pub mod file;
 pub mod lexer;
-mod parser;
-mod semantic;
 #[allow(unused)]
 pub mod lints;
+mod parser;
+mod semantic;
 
 pub struct CompilerData {
     symbol_table: SymbolTable,
+    lints: HashSet<Lint>,
 }
 
 pub struct Compiler {
@@ -21,9 +25,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Compiler {
-        Compiler {
-            files: vec![],
-        }
+        Compiler { files: vec![] }
     }
 
     pub fn get_version(&self) -> &str {
@@ -74,19 +76,15 @@ impl Compiler {
     }
 
     fn dump_lexer_error(lex_error: LexerError, file: &SourceFile) {
-        let message:String = match lex_error {
+        let message: String = match lex_error {
             LexerError::UnexpectedCharacter(c) => {
                 format!("unexpected character {}", c.unwrap())
             }
-            LexerError::IllegalLiteral => {
-                String::from("illegal literal")
-            }
+            LexerError::IllegalLiteral => String::from("illegal literal"),
             LexerError::IllegalEscapeChar(char) => {
                 format!("illegal escape character {}", char)
             }
-            LexerError::Eof => {
-                String::from("EOF")
-            }
+            LexerError::Eof => String::from("EOF"),
         };
         Self::dump_error_info(
             message,
@@ -169,9 +167,32 @@ impl Compiler {
                 column = token.column;
                 message = String::from("illegal type combination.");
             }
+            ParserError::UnableResolveSymbols(token) => {
+                line = token.line;
+                column = token.column;
+                message = String::from("unable to resolve symbols.");
+            }
         }
 
         Self::dump_error_info(message, line, column, file);
+    }
+
+    pub fn warning_info_expr(source_file: &mut SourceFile, msg: &str, expr: &ASTExprTree,lint: Lint) {
+        if !source_file.has_warnings(lint) {
+            let token: &Token = match expr {
+                ASTExprTree::Var(token)
+                | ASTExprTree::Literal(token)
+                | ASTExprTree::This(token) => token,
+                ASTExprTree::Call { name: e_name, .. } => e_name,
+                ASTExprTree::Unary { token: u_token, .. } => u_token,
+                ASTExprTree::Expr { token: e_token, .. } => e_token,
+            };
+            println!("warning: {}", msg);
+            println!(
+                "{}",
+                Self::highlight_line_and_column(source_file.get_data(), token.line, token.column)
+            );
+        }
     }
 
     pub fn compile(&mut self) {

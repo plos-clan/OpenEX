@@ -1,9 +1,11 @@
 use crate::compiler::lexer::{LexerAnalysis, LexerError, Token};
+use crate::compiler::lints::Lint;
 use crate::compiler::parser::symbol_table::SymbolTable;
-use crate::compiler::parser::{Parser, ParserError};
-use crate::compiler::CompilerData;
 use crate::compiler::parser::ParserError::LexError;
+use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::semantic::Semantic;
+use crate::compiler::CompilerData;
+use std::collections::HashSet;
 
 pub struct SourceFile {
     pub name: String,
@@ -13,7 +15,7 @@ pub struct SourceFile {
 }
 
 impl SourceFile {
-    pub fn new(name: String, data: String) -> SourceFile {
+    pub fn new(name: String, data: String, lints: HashSet<Lint>) -> SourceFile {
         let data0 = data.clone();
 
         SourceFile {
@@ -22,6 +24,7 @@ impl SourceFile {
             lexer: LexerAnalysis::new(data0),
             c_data: CompilerData {
                 symbol_table: SymbolTable::new(),
+                lints
             }
         }
     }
@@ -34,6 +37,10 @@ impl SourceFile {
                 err => Err(LexError(err)),
             },
         }
+    }
+
+    pub fn has_warnings(&mut self, lint: Lint) -> bool {
+        self.c_data.lints.contains(&lint)
     }
 
     pub fn get_data(&self) -> &str {
