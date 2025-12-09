@@ -77,6 +77,7 @@ pub enum ASTStmtTree {
     Import(Token),               // import "library";
     Context(Vec<ASTStmtTree>),   // 独立上下文
     Loop {
+        token: Token,
         cond: ASTExprTree,
         body: Vec<ASTStmtTree>,
     },

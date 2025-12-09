@@ -8,6 +8,7 @@ use smol_str::SmolStr;
 
 pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
+    let head = token.clone();
     let cond: ASTExprTree;
 
     match token.t_type {
@@ -39,5 +40,5 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
 
     let body = blk_eval(parser)?;
 
-    Ok(ASTStmtTree::Loop { cond, body })
+    Ok(ASTStmtTree::Loop { token:head,cond, body })
 }

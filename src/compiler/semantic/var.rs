@@ -1,5 +1,5 @@
 use crate::compiler::ast::ssa_ir::OpCode::StackLocal;
-use crate::compiler::ast::ssa_ir::{Code, OpCode};
+use crate::compiler::ast::ssa_ir::{Code, OpCodeTable};
 use crate::compiler::ast::ASTExprTree;
 use crate::compiler::lexer::Token;
 use crate::compiler::parser::symbol_table::ElementType::Value;
@@ -12,14 +12,18 @@ pub fn var_semantic(
     mut name: Token,
     init_var: Option<ASTExprTree>,
     code: &mut Code,
-) -> Result<OpCode, ParserError> {
+) -> Result<OpCodeTable, ParserError> {
     let symbol_table = &mut semantic.compiler_data().symbol_table;
     if symbol_table.check_element(name.value().unwrap()) {
         return Err(ParserError::SymbolDefined(name));
     }
     symbol_table.add_element(name.value().unwrap(), Value);
-    let ret_m = expr_semantic(semantic,init_var,code)?;
+    let mut opcode_vec = OpCodeTable::new();
+    let mut ret_m = expr_semantic(semantic, init_var, code)?;
+    opcode_vec.append_code(&mut ret_m.2);
     let opread = ret_m.clone();
     let key = code.alloc_value(name, ret_m.1);
-    Ok(StackLocal(key, opread.0))
+    
+    opcode_vec.add_opcode(StackLocal(None,key, opread.0));
+    Ok(opcode_vec)
 }

@@ -1,6 +1,13 @@
 use crate::compiler::lexer::Token;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
+use std::collections::HashMap;
+use linked_hash_map::LinkedHashMap;
+
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct LocalAddr {
+    pub offset: usize,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Operand {
@@ -34,51 +41,164 @@ pub struct Value {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-#[allow(dead_code)] //TODO
+#[allow(dead_code)] // TODO
 pub enum OpCode {
-    StackLocal(DefaultKey, Operand), // 栈局部变量加载
-    StoreLocal(DefaultKey, Operand), // 将一个变量加载到栈顶
-    Push(Operand),                   // 将值压入操作栈
-    Call(SmolStr),                   // 函数调用 (调用路径) : 只能被 Ref 操作触发
-    Return,                          // 栈顶结果返回
-    Add,                             // 从栈顶提取两个操作数相加并将结果压回操作栈
-    Sub,                             // -
-    Mul,                             // *
-    Div,                             // /
-    And,                             // &&
-    Or,                              // ||
-    Rmd,                             // %
-    Equ,                             // ==
-    SAdd,                            // ++
-    SSub,                            // --
-    Not,                             // !
-    NotEqu,                          // !=
-    BigEqu,                          // >=
-    LesEqu,                          // <=
-    Big,                             // >
-    Less,                            // <
-    Store,                           // =
-    AddS,                            // +=
-    SubS,                            // -=
-    MulS,                            // *=
-    DivS,                            // /=
-    RmdS,                            // %=
-    BitAnd,                          // &
-    BitOr,                           // |
-    BitXor,                          // ^
-    BAndS,                           // &=
-    BOrS,                            // |=
-    BXorS,                           // ^=
-    BLeft,                           // <<
-    BRight,                          // >>
-    Ref,                             // .
-    AIndex,                          // 数组索引
+    // Option<LocalAddr> 为各 IR 的逻辑地址
+    StackLocal(Option<LocalAddr>, DefaultKey, Operand), // 栈局部变量加载
+    StoreLocal(Option<LocalAddr>, DefaultKey, Operand), // 将一个变量加载到栈顶
+    Push(Option<LocalAddr>, Operand),                   // 将值压入操作栈
+    Call(Option<LocalAddr>, SmolStr),                   // 函数调用
+    Jump(Option<LocalAddr>, LocalAddr),                 // 无条件跳转
+    JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
+    Return(Option<LocalAddr>),                          // 栈顶结果返回
+    Break(Option<LocalAddr>),                           // 退出循环
+    Continue(Option<LocalAddr>),                        // 取消本次循环
+    Nop(Option<LocalAddr>),                             // 空操作
+
+    Add(Option<LocalAddr>), // +
+    Sub(Option<LocalAddr>), // -
+    Mul(Option<LocalAddr>), // *
+    Div(Option<LocalAddr>), // /
+    And(Option<LocalAddr>), // &&
+    Or(Option<LocalAddr>),  // ||
+    Rmd(Option<LocalAddr>), // %
+
+    Equ(Option<LocalAddr>),    // ==
+    NotEqu(Option<LocalAddr>), // !=
+    BigEqu(Option<LocalAddr>), // >=
+    LesEqu(Option<LocalAddr>), // <=
+    Big(Option<LocalAddr>),    // >
+    Less(Option<LocalAddr>),   // <
+
+    SAdd(Option<LocalAddr>), // ++
+    SSub(Option<LocalAddr>), // --
+
+    Not(Option<LocalAddr>), // !
+
+    Store(Option<LocalAddr>), // =
+    AddS(Option<LocalAddr>),  // +=
+    SubS(Option<LocalAddr>),  // -=
+    MulS(Option<LocalAddr>),  // *=
+    DivS(Option<LocalAddr>),  // /=
+    RmdS(Option<LocalAddr>),  // %=
+
+    BitAnd(Option<LocalAddr>), // &
+    BitOr(Option<LocalAddr>),  // |
+    BitXor(Option<LocalAddr>), // ^
+
+    BAndS(Option<LocalAddr>), // &=
+    BOrS(Option<LocalAddr>),  // |=
+    BXorS(Option<LocalAddr>), // ^=
+
+    BLeft(Option<LocalAddr>),  // <<
+    BRight(Option<LocalAddr>), // >>
+
+    Ref(Option<LocalAddr>),    // .
+    AIndex(Option<LocalAddr>), // 数组索引
 }
 
-#[derive(Clone, Debug)]
+impl OpCode {
+    fn relocate_addr(&mut self, addr_map: &HashMap<LocalAddr, LocalAddr>) {
+        // 重定位第一个字段：Option<LocalAddr>
+        if let Some(new_addr) = addr_map.get(&self.get_id()) {
+            self.set_id(*new_addr);
+        }
+
+        // 重定位 Jump 和 JumpTrue 的跳转目标
+        match self {
+            OpCode::Jump(_, target_addr) => {
+                if let Some(new_addr) = addr_map.get(target_addr) {
+                    *target_addr = *new_addr;
+                }
+            }
+            OpCode::JumpTrue(_, target, ..) => {
+                if let Some(j_target) = target
+                    && let Some(&new_target) = addr_map.get(j_target)
+                {
+                    *target = Some(new_target);
+                }
+            }
+            // 其他 OpCode 没有额外的 LocalAddr 字段
+            _ => {}
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct OpCodeTable {
+    opcodes: LinkedHashMap<LocalAddr, OpCode>,
+    alloc_addr: LocalAddr,
+}
+
+impl OpCodeTable {
+    pub fn new() -> Self {
+        OpCodeTable {
+            opcodes: LinkedHashMap::new(),
+            alloc_addr: LocalAddr { offset: 0 },
+        }
+    }
+
+    pub fn add_opcode(&mut self, opcode: OpCode) -> LocalAddr {
+        let addr = self.alloc_addr;
+        self.opcodes.insert(addr, opcode);
+        self.alloc_addr.offset += 1;
+        if let Some(op) = self.opcodes.get_mut(&addr) {
+            op.set_id(addr);
+        } else {
+            unreachable!()
+        }
+        addr
+    }
+
+    // 返回IR块最后一条IR的逻辑地址
+    pub fn append_code(&mut self, code: &mut OpCodeTable) -> (LocalAddr,Option<LocalAddr>) {
+        let start_offset = self.alloc_addr.offset;
+        if code.opcodes.is_empty() {
+            return (LocalAddr {
+                offset: self.alloc_addr.offset,
+            },None);
+        }
+        let mut old_to_new: HashMap<LocalAddr, LocalAddr> = HashMap::new();
+
+        // 遍历所有 opcode（按 offset 顺序）
+        let mut entries: Vec<_> = code.opcodes.iter().collect();
+        entries.sort_unstable_by_key(|&(addr, _)| addr.offset);
+
+        // 为每个旧地址分配新地址
+        for (old_addr, _) in &entries {
+            let od = **old_addr;
+            old_to_new.insert(
+                od,
+                LocalAddr {
+                    offset: self.alloc_addr.offset,
+                },
+            );
+            self.alloc_addr.offset += 1;
+        }
+
+        // 插入并重定位
+        let mut last_addr = None;
+        for (old_addr, op) in entries {
+            let mut new_op = op.clone();
+            new_op.relocate_addr(&old_to_new);
+
+            let new_addr = old_to_new[old_addr];
+            self.opcodes.insert(new_addr, new_op);
+            last_addr = Some(new_addr);
+        }
+
+        (LocalAddr{offset:start_offset},last_addr)
+    }
+
+    pub fn find_code_mut(&mut self, key: LocalAddr) -> Option<&mut OpCode> {
+        self.opcodes.get_mut(&key)
+    }
+}
+
+#[derive(Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub struct Code {
-    codes: Vec<OpCode>,
+    codes: OpCodeTable,
     values: SlotMap<DefaultKey, Value>,
     stack_size: usize,
     root: bool, // 是否是根脚本上下文 (true: 根上下文|false: 函数上下文)
@@ -87,19 +207,15 @@ pub struct Code {
 impl Code {
     pub fn new(root: bool) -> Code {
         Self {
-            codes: vec![],
+            codes: OpCodeTable::new(),
             values: SlotMap::new(),
             stack_size: 0,
             root,
         }
     }
 
-    pub fn add_opcode(&mut self, opcode: OpCode) {
-        self.codes.push(opcode);
-    }
-
-    pub fn append_code(&mut self, code: &mut Vec<OpCode>) {
-        self.codes.append(code);
+    pub fn get_code_table(&mut self) -> &mut OpCodeTable {
+        &mut self.codes
     }
 
     pub fn find_value_key(&mut self, name: SmolStr) -> Option<DefaultKey> {
@@ -122,5 +238,64 @@ impl Code {
             type_,
         };
         self.values.insert(va)
+    }
+}
+
+macro_rules! mathch_opcodes {
+    ($expr: expr,$slot:ident,$stmt: expr) => {
+        match $expr {
+            OpCode::StackLocal($slot, ..)
+            | OpCode::StoreLocal($slot, ..)
+            | OpCode::Push($slot, ..)
+            | OpCode::Call($slot, ..)
+            | OpCode::Jump($slot, ..)
+            | OpCode::JumpTrue($slot, ..)
+            | OpCode::Return($slot)
+            | OpCode::Break($slot)
+            | OpCode::Continue($slot)
+            | OpCode::Add($slot)
+            | OpCode::Sub($slot)
+            | OpCode::Mul($slot)
+            | OpCode::Div($slot)
+            | OpCode::And($slot)
+            | OpCode::Or($slot)
+            | OpCode::Rmd($slot)
+            | OpCode::Equ($slot)
+            | OpCode::NotEqu($slot)
+            | OpCode::BigEqu($slot)
+            | OpCode::LesEqu($slot)
+            | OpCode::Big($slot)
+            | OpCode::Less($slot)
+            | OpCode::SAdd($slot)
+            | OpCode::SSub($slot)
+            | OpCode::Not($slot)
+            | OpCode::Store($slot)
+            | OpCode::AddS($slot)
+            | OpCode::SubS($slot)
+            | OpCode::MulS($slot)
+            | OpCode::DivS($slot)
+            | OpCode::RmdS($slot)
+            | OpCode::BitAnd($slot)
+            | OpCode::BitOr($slot)
+            | OpCode::BitXor($slot)
+            | OpCode::BAndS($slot)
+            | OpCode::BOrS($slot)
+            | OpCode::BXorS($slot)
+            | OpCode::BLeft($slot)
+            | OpCode::BRight($slot)
+            | OpCode::Ref($slot)
+            | OpCode::AIndex($slot)
+            | OpCode::Nop($slot) => $stmt,
+        }
+    };
+}
+
+impl OpCode {
+    pub fn get_id(&self) -> LocalAddr {
+        mathch_opcodes!(self, slot, slot).unwrap()
+    }
+
+    pub fn set_id(&mut self, id: LocalAddr) {
+        mathch_opcodes!(self, slot, *slot = Some(id));
     }
 }
