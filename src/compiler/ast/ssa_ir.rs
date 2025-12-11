@@ -1,8 +1,8 @@
 use crate::compiler::lexer::Token;
+use linked_hash_map::LinkedHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 use std::collections::HashMap;
-use linked_hash_map::LinkedHashMap;
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct LocalAddr {
@@ -14,6 +14,7 @@ pub enum Operand {
     Val(DefaultKey),
     Library(SmolStr),
     Null,
+    This,
     ImmBool(bool),
     ImmNum(i64),
     ImmFlot(f64),
@@ -30,6 +31,7 @@ pub enum ValueGuessType {
     Float,
     Null,
     Library,
+    This,
     Unknown,
 }
 
@@ -44,15 +46,14 @@ pub struct Value {
 #[allow(dead_code)] // TODO
 pub enum OpCode {
     // Option<LocalAddr> 为各 IR 的逻辑地址
-    StackLocal(Option<LocalAddr>, DefaultKey, Operand), // 栈局部变量加载
+    LoadGlobal(Option<LocalAddr>, DefaultKey, Operand), // 全局变量加载
+    LoadLocal(Option<LocalAddr>, DefaultKey, Operand),  // 局部变量加载
     StoreLocal(Option<LocalAddr>, DefaultKey, Operand), // 将一个变量加载到栈顶
     Push(Option<LocalAddr>, Operand),                   // 将值压入操作栈
     Call(Option<LocalAddr>, SmolStr),                   // 函数调用
     Jump(Option<LocalAddr>, LocalAddr),                 // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
     Return(Option<LocalAddr>),                          // 栈顶结果返回
-    Break(Option<LocalAddr>),                           // 退出循环
-    Continue(Option<LocalAddr>),                        // 取消本次循环
     Nop(Option<LocalAddr>),                             // 空操作
 
     Add(Option<LocalAddr>), // +
@@ -151,12 +152,15 @@ impl OpCodeTable {
     }
 
     // 返回IR块最后一条IR的逻辑地址
-    pub fn append_code(&mut self, code: &mut OpCodeTable) -> (LocalAddr,Option<LocalAddr>) {
+    pub fn append_code(&mut self, code: &mut OpCodeTable) -> (LocalAddr, Option<LocalAddr>) {
         let start_offset = self.alloc_addr.offset;
         if code.opcodes.is_empty() {
-            return (LocalAddr {
-                offset: self.alloc_addr.offset,
-            },None);
+            return (
+                LocalAddr {
+                    offset: self.alloc_addr.offset,
+                },
+                None,
+            );
         }
         let mut old_to_new: HashMap<LocalAddr, LocalAddr> = HashMap::new();
 
@@ -187,7 +191,12 @@ impl OpCodeTable {
             last_addr = Some(new_addr);
         }
 
-        (LocalAddr{offset:start_offset},last_addr)
+        (
+            LocalAddr {
+                offset: start_offset,
+            },
+            last_addr,
+        )
     }
 
     pub fn find_code_mut(&mut self, key: LocalAddr) -> Option<&mut OpCode> {
@@ -195,11 +204,19 @@ impl OpCodeTable {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function {
+    pub(crate) name: SmolStr,
+    pub(crate) args: usize,
+    pub(crate) codes: Option<OpCodeTable>, // 为 None 代表本地方法实现
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub struct Code {
     codes: OpCodeTable,
     values: SlotMap<DefaultKey, Value>,
+    funcs: Vec<Function>,
     stack_size: usize,
     root: bool, // 是否是根脚本上下文 (true: 根上下文|false: 函数上下文)
 }
@@ -210,6 +227,7 @@ impl Code {
             codes: OpCodeTable::new(),
             values: SlotMap::new(),
             stack_size: 0,
+            funcs: Vec::new(),
             root,
         }
     }
@@ -239,20 +257,34 @@ impl Code {
         };
         self.values.insert(va)
     }
+
+    pub fn add_function(&mut self, func: Function) {
+        self.funcs.push(func);
+    }
+
+    pub fn find_function(&mut self, key: SmolStr) -> Option<&mut Function> {
+        let mut ret_m = None;
+        for i in 0..self.funcs.len() {
+            if self.funcs.get_mut(i)?.name == key {
+                ret_m = Some(self.funcs.get_mut(i)?);
+                break
+            }
+        }
+        ret_m
+    }
 }
 
 macro_rules! mathch_opcodes {
     ($expr: expr,$slot:ident,$stmt: expr) => {
         match $expr {
-            OpCode::StackLocal($slot, ..)
+            OpCode::LoadGlobal($slot,..)
+            | OpCode::LoadLocal($slot, ..)
             | OpCode::StoreLocal($slot, ..)
             | OpCode::Push($slot, ..)
             | OpCode::Call($slot, ..)
             | OpCode::Jump($slot, ..)
             | OpCode::JumpTrue($slot, ..)
             | OpCode::Return($slot)
-            | OpCode::Break($slot)
-            | OpCode::Continue($slot)
             | OpCode::Add($slot)
             | OpCode::Sub($slot)
             | OpCode::Mul($slot)

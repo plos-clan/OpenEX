@@ -87,6 +87,10 @@ pub enum ASTStmtTree {
         args: Vec<ASTExprTree>,
         body: Vec<ASTStmtTree>,
     },
+    NativeFunction {
+        name: Token,
+        args: Vec<ASTExprTree>,
+    },
     If {
         // if (cond) { then } elif (cond) { elif_ } else { else_ }
         cond: ASTExprTree,

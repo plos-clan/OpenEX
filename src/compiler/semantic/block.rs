@@ -18,12 +18,12 @@ pub fn block_semantic(semantic: &mut Semantic, stmt_tree:Vec<ASTStmtTree>, code:
                 opcodes.append_code(&mut block_semantic(semantic, stmts,code)?);
             }
             ASTStmtTree::Var { name, value } => {
-                let mut opcode = var_semantic(semantic, name, value, code)?;
+                let mut opcode = var_semantic(semantic, name, value, code, false)?;
                 opcodes.append_code(&mut opcode);
             }
             ASTStmtTree::Expr(expr) => {
                 let ref_expr = expr.clone();
-                let ret_m = expr_semantic(semantic, Some(expr), code)?;
+                let mut ret_m = expr_semantic(semantic, Some(expr), code)?;
                 if !check_expr_operand(&ret_m.0, &OpCode::Store(None), 0) {
                     Compiler::warning_info_expr(
                         semantic.file,
@@ -32,6 +32,7 @@ pub fn block_semantic(semantic: &mut Semantic, stmt_tree:Vec<ASTStmtTree>, code:
                         UnusedExpression,
                     );
                 }
+                opcodes.append_code(&mut ret_m.2);
             },
             _ => todo!()
         }

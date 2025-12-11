@@ -1,7 +1,6 @@
+use getopts_macro::getopts::HasArg::No;
 use crate::compiler::ast::ssa_ir::OpCode::Push;
-use crate::compiler::ast::ssa_ir::ValueGuessType::{
-    Bool, Float, Library, Null, Number, String, Unknown,
-};
+use crate::compiler::ast::ssa_ir::ValueGuessType::{Bool, Float, Library, Null, Number, String, This, Unknown};
 use crate::compiler::ast::ssa_ir::{Code, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
@@ -13,20 +12,20 @@ use smol_str::SmolStr;
 macro_rules! check_bool_expr {
     ($op:expr,$second:expr) => {
         if check_opts(
-                    $op,
-                    &[
-                        ExprOp::Equ,
-                        ExprOp::NotEqu,
-                        ExprOp::BigEqu,
-                        ExprOp::LesEqu,
-                        ExprOp::Less,
-                        ExprOp::Big,
-                    ],
-                ) {
-                    Ok(Bool)
-                } else {
-                    Ok($second)
-                }
+            $op,
+            &[
+                ExprOp::Equ,
+                ExprOp::NotEqu,
+                ExprOp::BigEqu,
+                ExprOp::LesEqu,
+                ExprOp::Less,
+                ExprOp::Big,
+            ],
+        ) {
+            Ok(Bool)
+        } else {
+            Ok($second)
+        }
     };
 }
 
@@ -135,7 +134,7 @@ fn guess_type(
             {
                 if check_opts(op, &[ExprOp::Equ, ExprOp::NotEqu]) {
                     Ok(Bool)
-                }else {
+                } else {
                     Ok(String)
                 }
             } else {
@@ -223,6 +222,22 @@ fn guess_type(
     }
 }
 
+fn lower_call(
+    semantic: &mut Semantic,
+    expr_tree: &ASTExprTree,
+    code: &mut Code,
+) -> Result<Option<(Operand, ValueGuessType, OpCodeTable)>, ParserError> {
+    if let ASTExprTree::Expr {token,op,left,right} = expr_tree
+    && matches!(op,ExprOp::Ref){
+        let left_expr = lower_expr(semantic,left.as_ref(),code)?;
+        let right_expr = lower_expr(semantic,right.as_ref(),code)?;
+
+        Ok(None) // TODO
+    }else {
+        Ok(None)
+    }
+}
+
 pub(crate) fn lower_expr(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
@@ -262,6 +277,10 @@ pub(crate) fn lower_expr(
                 }
             }
         }
+        ASTExprTree::This(token) => {
+            opcode_table.add_opcode(Push(None, Operand::This));
+            Ok((Operand::This, This, opcode_table))
+        }
         ASTExprTree::Unary {
             token: u_token,
             op: u_op,
@@ -283,26 +302,30 @@ pub(crate) fn lower_expr(
             left: e_left,
             right: e_right,
         } => {
-            let mut left = lower_expr(semantic, e_left.as_ref(), code)?;
-            let mut right = lower_expr(semantic, e_right.as_ref(), code)?;
-            let left_opd = Box::new(left.0.clone());
-            let right_opd = Box::new(right.0.clone());
-            let guess_type = guess_type(e_token, left.1, right.1, e_op)?;
-            let n_operand;
+            if let Some(call_ret) = lower_call(semantic, expr_tree, code)? {
+                Ok(call_ret)
+            }else {
+                let mut left = lower_expr(semantic, e_left.as_ref(), code)?;
+                let mut right = lower_expr(semantic, e_right.as_ref(), code)?;
+                let left_opd = Box::new(left.0.clone());
+                let right_opd = Box::new(right.0.clone());
+                let guess_type = guess_type(e_token, left.1, right.1, e_op)?;
+                let n_operand;
 
-            if let Some(operand) = expr_optimizer(&left.0, &right.0, e_op) {
-                n_operand = operand.clone();
-                opcode_table.add_opcode(Push(None, operand));
-            } else {
-                opcode_table.append_code(&mut left.2);
-                opcode_table.append_code(&mut right.2);
+                if let Some(operand) = expr_optimizer(&left.0, &right.0, e_op) {
+                    n_operand = operand.clone();
+                    opcode_table.add_opcode(Push(None, operand));
+                } else {
+                    opcode_table.append_code(&mut left.2);
+                    opcode_table.append_code(&mut right.2);
 
-                let opcode = astop_to_opcode(e_op);
-                n_operand = Operand::Expression(left_opd, right_opd, Box::from(opcode.clone()));
-                opcode_table.add_opcode(opcode);
+                    let opcode = astop_to_opcode(e_op);
+                    n_operand = Operand::Expression(left_opd, right_opd, Box::from(opcode.clone()));
+
+                    opcode_table.add_opcode(opcode);
+                }
+                Ok((n_operand, guess_type, opcode_table))
             }
-
-            Ok((n_operand, guess_type, opcode_table))
         }
         ASTExprTree::Var(u_token) => {
             let var_name = u_token.clone().value::<SmolStr>().unwrap();
@@ -346,7 +369,8 @@ pub(crate) fn lower_expr(
                 }
             }
         }
-        _ => {
+        e => {
+            dbg!(e);
             todo!()
         }
     }

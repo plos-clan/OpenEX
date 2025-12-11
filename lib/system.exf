@@ -1,0 +1,6 @@
+
+function native print(output);
+
+function println(output) {
+    this.print(output + "\n");
+}

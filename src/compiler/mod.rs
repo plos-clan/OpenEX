@@ -11,7 +11,7 @@ pub mod file;
 pub mod lexer;
 #[allow(unused)]
 pub mod lints;
-mod parser;
+pub(crate) mod parser;
 mod semantic;
 
 pub struct CompilerData {
@@ -171,6 +171,11 @@ impl Compiler {
                 line = token.line;
                 column = token.column;
                 message = String::from("unable to resolve symbols.");
+            }
+            ParserError::NoNativeImplement(token) => {
+                line = token.line;
+                column = token.column;
+                message = String::from("no native implement.");
             }
         }
 

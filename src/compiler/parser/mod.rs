@@ -23,7 +23,7 @@ use crate::compiler::parser::var::var_eval;
 use crate::compiler::parser::r#while::while_eval;
 
 #[derive(Debug)]
-pub enum ParserError {
+pub(crate) enum ParserError {
     NotAStatement(Token),          // 不是一个语句
     LexError(LexerError),          // 词法分析错误
     IdentifierExpected(Token),     // 需要标识符
@@ -38,6 +38,7 @@ pub enum ParserError {
     SymbolDefined(Token),          // 类型已被定义
     IllegalTypeCombination(Token), // 非法类型组合
     UnableResolveSymbols(Token),   // 无法解析符号
+    NoNativeImplement(Token),      // 无本地实现
     Eof,
 }
 

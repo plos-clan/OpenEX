@@ -16,6 +16,7 @@ pub enum ContextType {
 pub enum ElementType {
     Argument,
     Library,
+    Function(usize), // usize: 形参个数
     Value,
     Func,
 }

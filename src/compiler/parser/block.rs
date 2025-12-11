@@ -10,8 +10,9 @@ use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::parser::r#return::return_eval;
 
 fn parser_expr(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
+    let mut tokens: Vec<Token> = vec![];
     let mut token1 = parser.next_parser_token()?;
-    let mut tokens: Vec<Token> = vec![token1.clone()];
+    tokens.push(token1);
     loop {
         token1 = parser.next_parser_token()?;
         if token1.t_type == TokenType::End {
@@ -83,7 +84,10 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
                     stmt.push(parser_expr(parser)?)
                 }
             }
-            _ => stmt.push(parser_expr(parser)?),
+            _ => {
+                parser.cache = Some(token);
+                stmt.push(parser_expr(parser)?)
+            } ,
         }
     }
     token = parser.next_parser_token()?;

@@ -1,3 +1,5 @@
+use smol_str::SmolStr;
+use crate::library::ModuleFunc;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)] //TODO
@@ -11,4 +13,16 @@ pub enum CodeImm {
 #[allow(dead_code)] //TODO
 pub enum ByteCode {
     Push(CodeImm),
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[allow(dead_code)] //TODO
+pub enum Types {
+    String(SmolStr),
+    Number(i64),
+    Bool(bool),
+    Null,
+}
+
+pub enum RuntimeError {
 }

@@ -1,8 +1,9 @@
+mod block;
 mod expression;
+mod function;
 mod optimizer;
 mod var;
 mod r#while;
-mod block;
 
 use crate::compiler::ast::ssa_ir::{Code, OpCode, ValueGuessType};
 use crate::compiler::ast::ASTStmtTree;
@@ -11,10 +12,11 @@ use crate::compiler::lints::Lint::UnusedExpression;
 use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic};
+use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::{Compiler, CompilerData};
 use smol_str::SmolStr;
-use crate::compiler::semantic::r#while::while_semantic;
+use crate::compiler::semantic::function::{function_semantic, native_function_semantic};
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,
@@ -35,7 +37,7 @@ impl<'a> Semantic<'a> {
             for stmt in stmts {
                 match stmt {
                     ASTStmtTree::Var { name, value } => {
-                        let mut opcode = var_semantic(self, name, value, code)?;
+                        let mut opcode = var_semantic(self, name, value, code, true)?;
                         code.get_code_table().append_code(&mut opcode);
                     }
                     ASTStmtTree::Expr(expr) => {
@@ -59,14 +61,24 @@ impl<'a> Semantic<'a> {
                             .add_element(name, ElementType::Library);
                         code.alloc_value(token, ValueGuessType::Library);
                     }
-                    ASTStmtTree::Loop { token:_token,cond, body } => {
+                    ASTStmtTree::Loop {
+                        token: _token,
+                        cond,
+                        body,
+                    } => {
                         let mut ret_m = while_semantic(self, cond, body, code)?;
                         code.get_code_table().append_code(&mut ret_m);
+                    }
+                    ASTStmtTree::Function { name, args, body } => {
+                        function_semantic(self, name, args,body,code)?;
+                    }
+                    ASTStmtTree::NativeFunction { name, args } => {
+                        native_function_semantic(self, name, args,code)?;
                     }
                     _ => todo!(),
                 }
             }
-        }else {
+        } else {
             unreachable!()
         }
         Ok(code.clone())
