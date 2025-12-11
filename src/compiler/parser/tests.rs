@@ -1,4 +1,4 @@
-use expect_test::{Expect, expect};
+use expect_test::{expect, Expect};
 
 use crate::compiler::{file::SourceFile, parser::Parser};
 
@@ -16,84 +16,88 @@ fn check(src: &str, expect: Expect) {
 
 #[test]
 fn basic_work() {
-    check(r#"import system; system.println() + 3;"#, expect![[r#"
-        Root(
-            [
-                Import(
-                    Token {
-                        line: 0,
-                        column: 8,
-                        t_type: Identifier,
-                        index: 8,
-                        data: "system",
-                    },
-                ),
-                Expr(
-                    Expr {
-                        token: Token {
+    check(
+        r#"import system; system.println() + 3;"#,
+        expect![[r#"
+            Root(
+                [
+                    Import(
+                        Token {
                             line: 0,
-                            column: 33,
-                            t_type: Operator,
-                            index: 33,
-                            data: "+",
+                            column: 8,
+                            t_type: Identifier,
+                            index: 8,
+                            data: "system",
                         },
-                        op: Add,
-                        left: Expr {
+                    ),
+                    Expr(
+                        Expr {
                             token: Token {
                                 line: 0,
-                                column: 22,
+                                column: 33,
                                 t_type: Operator,
-                                index: 22,
-                                data: ".",
+                                index: 33,
+                                data: "+",
                             },
-                            op: Ref,
-                            left: Var(
-                                Token {
-                                    line: 0,
-                                    column: 16,
-                                    t_type: Identifier,
-                                    index: 16,
-                                    data: "system",
-                                },
-                            ),
-                            right: Call {
-                                name: Var(
-                                    Token {
+                            op: Add,
+                            left: Call {
+                                name: Expr {
+                                    token: Token {
                                         line: 0,
-                                        column: 23,
-                                        t_type: Identifier,
-                                        index: 23,
-                                        data: "println",
+                                        column: 22,
+                                        t_type: Operator,
+                                        index: 22,
+                                        data: ".",
                                     },
-                                ),
+                                    op: Ref,
+                                    left: Var(
+                                        Token {
+                                            line: 0,
+                                            column: 16,
+                                            t_type: Identifier,
+                                            index: 16,
+                                            data: "system",
+                                        },
+                                    ),
+                                    right: Var(
+                                        Token {
+                                            line: 0,
+                                            column: 23,
+                                            t_type: Identifier,
+                                            index: 23,
+                                            data: "println",
+                                        },
+                                    ),
+                                },
                                 args: [],
                             },
+                            right: Literal(
+                                Token {
+                                    line: 0,
+                                    column: 35,
+                                    t_type: Number,
+                                    index: 35,
+                                    data: "3",
+                                },
+                            ),
                         },
-                        right: Literal(
-                            Token {
-                                line: 0,
-                                column: 35,
-                                t_type: Number,
-                                index: 35,
-                                data: "3",
-                            },
-                        ),
-                    },
-                ),
-            ],
-        )
-    "#]]);
+                    ),
+                ],
+            )
+        "#]],
+    );
 }
 
 #[test]
 fn vars() {
-    check(r#"
+    check(
+        r#"
 var num = .5138;
 var num1 = 1.2e-3;
 var num2 = 10.;
 var num3 = 3.14159265358979;
 num + 34;"#,
-    expect![[r#"
+        expect![[r#"
         Root(
             [
                 Var {
@@ -208,5 +212,6 @@ num + 34;"#,
                 ),
             ],
         )
-    "#]]);
+    "#]],
+    );
 }

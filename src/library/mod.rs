@@ -88,6 +88,6 @@ pub(crate) fn load_libraries(
 
     register_system_lib();
 
-    compiler.compile();
+    compiler.compile(false);
     Ok(())
 }

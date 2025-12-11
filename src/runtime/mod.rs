@@ -1,5 +1,4 @@
 use smol_str::SmolStr;
-use crate::library::ModuleFunc;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)] //TODO

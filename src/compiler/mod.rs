@@ -191,7 +191,9 @@ impl Compiler {
                 ASTExprTree::Call { name: e_name, .. } =>{
                     match e_name.as_ref() { 
                         ASTExprTree::Var(token ) => token,
-                        _=> unreachable!()
+                        _=> {
+                            return;
+                        }
                     }
                 },
                 ASTExprTree::Unary { token: u_token, .. } => u_token,
@@ -205,9 +207,9 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self) {
+    pub fn compile(&mut self,debug: bool) {
         for file in &mut self.files {
-            file.compiler().unwrap_or_else(|error| {
+            file.compiler(debug).unwrap_or_else(|error| {
                 Self::dump_parser_error(error, file);
             })
         }

@@ -141,6 +141,6 @@ fn main() -> io::Result<()> {
         }
     }
 
-    compiler.compile();
+    compiler.compile(true);
     Ok(())
 }

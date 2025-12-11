@@ -20,6 +20,7 @@ pub enum Operand {
     ImmFlot(f64),
     ImmStr(SmolStr),
     Call(SmolStr),
+    Reference(SmolStr), // 对象引用
     Expression(Box<Operand>, Box<Operand>, Box<OpCode>),
 }
 

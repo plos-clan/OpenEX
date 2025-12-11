@@ -1,13 +1,14 @@
-use getopts_macro::getopts::HasArg::No;
 use crate::compiler::ast::ssa_ir::OpCode::Push;
-use crate::compiler::ast::ssa_ir::ValueGuessType::{Bool, Float, Library, Null, Number, String, This, Unknown};
+use crate::compiler::ast::ssa_ir::ValueGuessType::{
+    Bool, Float, Library, Null, Number, String, This, Unknown,
+};
 use crate::compiler::ast::ssa_ir::{Code, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
 use crate::compiler::semantic::Semantic;
-use smol_str::SmolStr;
+use smol_str::{SmolStr, SmolStrBuilder, ToSmolStr};
 
 macro_rules! check_bool_expr {
     ($op:expr,$second:expr) => {
@@ -222,20 +223,53 @@ fn guess_type(
     }
 }
 
-fn lower_call(
+fn lower_ref(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
     code: &mut Code,
-) -> Result<Option<(Operand, ValueGuessType, OpCodeTable)>, ParserError> {
-    if let ASTExprTree::Expr {token,op,left,right} = expr_tree
-    && matches!(op,ExprOp::Ref){
-        let left_expr = lower_expr(semantic,left.as_ref(),code)?;
-        let right_expr = lower_expr(semantic,right.as_ref(),code)?;
+) -> Result<(SmolStr, OpCodeTable), ParserError> {
+    let mut opcode_table = OpCodeTable::new();
+    let mut path = SmolStrBuilder::new();
 
-        Ok(None) // TODO
+    if let ASTExprTree::Expr {
+        token:_,
+        op:_,
+        left,
+        right,
+    } = expr_tree
+    {
+        let left_tree = left.as_ref();
+        let right_tree = right.as_ref();
+
+        if matches!(left_tree, ASTExprTree::Call { .. }) || matches!(left_tree, ASTExprTree::This(_token)) ||
+            matches!(left_tree, ASTExprTree::Var(_token)) {
+            let mut table = lower_expr(semantic, left_tree, code)?.2;
+            opcode_table.append_code(&mut table);
+        }else {
+            unreachable!()
+        }
+
+        if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree{
+            path.push_str(format!("/{}", token.text()).as_str());
+            let code = match right_tree {
+                ASTExprTree::Var(token) => {
+                    Push(None,Operand::Reference(token.text().to_smolstr()))
+                },
+                ASTExprTree::This(_token) => {
+                    Push(None,Operand::This)
+                },
+                _ => unreachable!()
+            };
+            opcode_table.add_opcode(code);
+        }else {
+            unreachable!()
+        }
+
     }else {
-        Ok(None)
+        unreachable!()
     }
+
+    Ok((path.finish(), opcode_table))
 }
 
 pub(crate) fn lower_expr(
@@ -277,7 +311,7 @@ pub(crate) fn lower_expr(
                 }
             }
         }
-        ASTExprTree::This(token) => {
+        ASTExprTree::This(_token) => {
             opcode_table.add_opcode(Push(None, Operand::This));
             Ok((Operand::This, This, opcode_table))
         }
@@ -302,30 +336,26 @@ pub(crate) fn lower_expr(
             left: e_left,
             right: e_right,
         } => {
-            if let Some(call_ret) = lower_call(semantic, expr_tree, code)? {
-                Ok(call_ret)
-            }else {
-                let mut left = lower_expr(semantic, e_left.as_ref(), code)?;
-                let mut right = lower_expr(semantic, e_right.as_ref(), code)?;
-                let left_opd = Box::new(left.0.clone());
-                let right_opd = Box::new(right.0.clone());
-                let guess_type = guess_type(e_token, left.1, right.1, e_op)?;
-                let n_operand;
+            let mut left = lower_expr(semantic, e_left.as_ref(), code)?;
+            let mut right = lower_expr(semantic, e_right.as_ref(), code)?;
+            let left_opd = Box::new(left.0.clone());
+            let right_opd = Box::new(right.0.clone());
+            let guess_type = guess_type(e_token, left.1, right.1, e_op)?;
+            let n_operand;
 
-                if let Some(operand) = expr_optimizer(&left.0, &right.0, e_op) {
-                    n_operand = operand.clone();
-                    opcode_table.add_opcode(Push(None, operand));
-                } else {
-                    opcode_table.append_code(&mut left.2);
-                    opcode_table.append_code(&mut right.2);
+            if let Some(operand) = expr_optimizer(&left.0, &right.0, e_op) {
+                n_operand = operand.clone();
+                opcode_table.add_opcode(Push(None, operand));
+            } else {
+                opcode_table.append_code(&mut left.2);
+                opcode_table.append_code(&mut right.2);
 
-                    let opcode = astop_to_opcode(e_op);
-                    n_operand = Operand::Expression(left_opd, right_opd, Box::from(opcode.clone()));
+                let opcode = astop_to_opcode(e_op);
+                n_operand = Operand::Expression(left_opd, right_opd, Box::from(opcode.clone()));
 
-                    opcode_table.add_opcode(opcode);
-                }
-                Ok((n_operand, guess_type, opcode_table))
+                opcode_table.add_opcode(opcode);
             }
+            Ok((n_operand, guess_type, opcode_table))
         }
         ASTExprTree::Var(u_token) => {
             let var_name = u_token.clone().value::<SmolStr>().unwrap();
@@ -364,14 +394,22 @@ pub(crate) fn lower_expr(
                     opcode_table.add_opcode(OpCode::Call(None, path.clone()));
                     Ok((Operand::Call(path), Unknown, opcode_table))
                 }
+                ASTExprTree::Expr {
+                    token: _token,
+                    op: _op,
+                    left: _left,
+                    right: _right,
+                } => {
+                    let mut refs = lower_ref(semantic, name.as_ref(), code)?;
+                    opcode_table.append_code(&mut refs.1);
+                    let cl_str = refs.0.clone();
+                    opcode_table.add_opcode(OpCode::Call(None,refs.0));
+                    Ok((Operand::Call(cl_str), Unknown, opcode_table))
+                }
                 _ => {
                     unreachable!()
                 }
             }
-        }
-        e => {
-            dbg!(e);
-            todo!()
         }
     }
 }

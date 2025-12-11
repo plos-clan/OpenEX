@@ -47,12 +47,18 @@ impl SourceFile {
         &self.data
     }
 
-    pub fn compiler(&mut self) -> Result<(), ParserError> {
+    pub fn compiler(&mut self,debug: bool) -> Result<(), ParserError> {
         let parser = Parser::new(self);
         let ast_tree = parser.parser()?;
+        if debug {
+            dbg!(&ast_tree);
+        }
         let mut semantic = Semantic::new(self);
-        let ssa_ir = semantic.semantic(ast_tree)?;
-        dbg!(ssa_ir);
+        // let ssa_ir =
+            semantic.semantic(ast_tree)?;
+        // if debug {
+        //     dbg!(ssa_ir);
+        // }
         Ok(())
     }
 }

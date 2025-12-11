@@ -3,6 +3,7 @@ use crate::runtime::{RuntimeError, Types};
 use smol_str::SmolStr;
 
 fn system_print(args:Vec<Types>) -> Result<Types,RuntimeError> {
+    println!("{:?}",args.first());
     Ok(Types::Null)
 }
 fn reg_println() -> ModuleFunc{
