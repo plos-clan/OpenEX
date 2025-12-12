@@ -1,6 +1,6 @@
 use crate::compiler::ast::ssa_ir::OpCode::Push;
 use crate::compiler::ast::ssa_ir::ValueGuessType::{
-    Bool, Float, Library, Null, Number, String, This, Unknown,
+    Bool, Float, Null, Number, String, This, Unknown,
 };
 use crate::compiler::ast::ssa_ir::{Code, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
@@ -311,6 +311,10 @@ pub(crate) fn lower_expr(
                 }
             }
         }
+        ASTExprTree::Ref(token) => {
+            opcode_table.add_opcode(Push(None, Operand::Reference(token.text().to_smolstr())));
+            Ok((Operand::Reference(token.text().to_smolstr()), ValueGuessType::Ref, opcode_table))
+        }
         ASTExprTree::This(_token) => {
             opcode_table.add_opcode(Push(None, Operand::This));
             Ok((Operand::This, This, opcode_table))
@@ -370,7 +374,7 @@ pub(crate) fn lower_expr(
                 let value = code.find_value(key).unwrap();
                 value.variable = true;
                 match value.type_ {
-                    Library => {
+                    ValueGuessType::Ref => {
                         opcode_table.add_opcode(Push(None, Operand::Library(var_name)));
                     }
                     _ => {

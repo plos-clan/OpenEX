@@ -2,7 +2,7 @@ use crate::compiler::lexer::Token;
 use linked_hash_map::LinkedHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct LocalAddr {
@@ -31,7 +31,7 @@ pub enum ValueGuessType {
     String,
     Float,
     Null,
-    Library,
+    Ref,
     This,
     Unknown,
 }
@@ -205,11 +205,39 @@ impl OpCodeTable {
     }
 }
 
+// SSA_IR 局部变量映射表
+#[derive(Debug, Clone, PartialEq)]
+pub struct LocalMap {
+    pub(crate) locals: BTreeMap<DefaultKey, usize>, // 局部变量表映射
+    now_index: usize,
+}
+
+impl LocalMap {
+    pub fn new() -> LocalMap {
+        Self  {
+            locals: BTreeMap::new(),
+            now_index: 0,
+        }
+    }
+    
+    pub fn add_local(&mut self, local: DefaultKey) -> usize {
+        self.locals.insert(local,self.now_index);
+        let ret_m = self.now_index;
+        self.now_index += 1;
+        ret_m
+    }
+    
+    pub fn get_index(&self, key: &DefaultKey) -> Option<&usize> {
+        self.locals.get(key)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub(crate) name: SmolStr,
     pub(crate) args: usize,
     pub(crate) codes: Option<OpCodeTable>, // 为 None 代表本地方法实现
+    pub(crate) locals: LocalMap,    // 局部变量表映射
 }
 
 #[derive(Debug, Clone)]
@@ -217,7 +245,7 @@ pub struct Function {
 pub struct Code {
     codes: OpCodeTable,
     values: SlotMap<DefaultKey, Value>,
-    funcs: Vec<Function>,
+    pub(crate) funcs: Vec<Function>,
     root: bool, // 是否是根脚本上下文 (true: 根上下文|false: 函数上下文)
 }
 
@@ -266,7 +294,7 @@ impl Code {
         for i in 0..self.funcs.len() {
             if self.funcs.get_mut(i)?.name == key {
                 ret_m = Some(self.funcs.get_mut(i)?);
-                break
+                break;
             }
         }
         ret_m
@@ -276,7 +304,7 @@ impl Code {
 macro_rules! mathch_opcodes {
     ($expr: expr,$slot:ident,$stmt: expr) => {
         match $expr {
-            OpCode::LoadGlobal($slot,..)
+            OpCode::LoadGlobal($slot, ..)
             | OpCode::LoadLocal($slot, ..)
             | OpCode::StoreLocal($slot, ..)
             | OpCode::Push($slot, ..)

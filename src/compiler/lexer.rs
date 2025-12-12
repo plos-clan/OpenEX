@@ -5,6 +5,7 @@ use std::char;
 use std::fmt::Debug;
 use std::str::FromStr;
 
+#[derive(Debug, Clone)]
 pub struct LexerAnalysis {
     data: String,
     cache: Option<char>,

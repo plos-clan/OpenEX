@@ -39,6 +39,7 @@ pub(crate) enum ParserError {
     IllegalTypeCombination(Token), // 非法类型组合
     UnableResolveSymbols(Token),   // 无法解析符号
     NoNativeImplement(Token),      // 无本地实现
+    NotFoundLibrary(Token),        // 找不到库
     Eof,
 }
 

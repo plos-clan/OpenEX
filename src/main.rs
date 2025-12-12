@@ -142,7 +142,7 @@ fn main() -> io::Result<()> {
         }
     }
 
-    compiler.compile(true);
+    compiler.compile();
     executor_run();
     Ok(())
 }

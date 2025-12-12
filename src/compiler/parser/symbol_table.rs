@@ -1,7 +1,7 @@
 use smol_str::SmolStr;
 use std::cmp::PartialEq;
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub enum ContextType {
     Loop,
@@ -11,7 +11,7 @@ pub enum ContextType {
     Root,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub enum ElementType {
     Argument,
@@ -21,18 +21,21 @@ pub enum ElementType {
     Func,
 }
 
+#[derive(Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub struct Element {
     name: SmolStr,
     el_type: ElementType,
 }
 
+#[derive(Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub struct Context {
     elements: Vec<Element>,
     ctxt_type: ContextType,
 }
 
+#[derive(Debug, Clone)]
 pub struct SymbolTable {
     contexts: Vec<Context>
 }

@@ -1,4 +1,4 @@
-use crate::compiler::ast::ssa_ir::{Code, Function, OpCode, OpCodeTable, Operand, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{Code, Function, LocalMap, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::Token;
 use crate::compiler::parser::symbol_table::ElementType::Argument;
@@ -38,6 +38,7 @@ pub fn native_function_semantic(
                 name: func_name,
                 args: func.arity,
                 codes: None,
+                locals: LocalMap::new(),
             });
             Ok(())
         } else {
@@ -62,12 +63,14 @@ pub fn function_semantic(
         .symbol_table
         .add_context(ContextType::Func);
     let mut tables = OpCodeTable::new();
+    let mut locals = LocalMap::new();
 
     let args_len = arguments.len();
     for i in arguments {
         if let ASTExprTree::Var(token) = i {
             let mut token_c = token.clone();
             let key = code.alloc_value(token, ValueGuessType::Unknown);
+            locals.add_local(key);
             semantic
                 .compiler_data()
                 .symbol_table
@@ -76,7 +79,7 @@ pub fn function_semantic(
         }
     }
 
-    let mut blk = block_semantic(semantic, body, code)?;
+    let mut blk = block_semantic(semantic, body, code, &mut locals)?;
     tables.append_code(&mut blk);
 
     semantic.compiler_data().symbol_table.exit_context();
@@ -85,6 +88,7 @@ pub fn function_semantic(
         name: func_name,
         args: args_len,
         codes: Some(tables),
+        locals,
     });
     Ok(())
 }

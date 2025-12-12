@@ -1,21 +1,21 @@
+use crate::compiler::ast::vm_ir::{ssa_to_vm, VMIRTable};
 use crate::compiler::lexer::{LexerAnalysis, LexerError, Token};
 use crate::compiler::lints::Lint;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError::LexError;
 use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::semantic::Semantic;
-use crate::compiler::CompilerData;
+use crate::compiler::{Compiler, CompilerData};
 use std::collections::HashSet;
-use crate::compiler::ast::vm_ir::VMIRTable;
 
-
+#[derive(Debug,Clone)]
 #[allow(dead_code)] // TODO
 pub struct SourceFile {
     pub name: String,
     data: String,
     pub lexer: LexerAnalysis,
     pub(crate) c_data: CompilerData,
-    ir_table: VMIRTable
+    ir_table: VMIRTable,
 }
 
 impl SourceFile {
@@ -28,7 +28,7 @@ impl SourceFile {
             lexer: LexerAnalysis::new(data0),
             c_data: CompilerData {
                 symbol_table: SymbolTable::new(),
-                lints
+                lints,
             },
             ir_table: VMIRTable::new(),
         }
@@ -52,18 +52,13 @@ impl SourceFile {
         &self.data
     }
 
-    pub fn compiler(&mut self,debug: bool) -> Result<(), ParserError> {
+    pub fn compiler(&mut self,compiler: &mut Compiler) -> Result<(), ParserError> {
         let parser = Parser::new(self);
         let ast_tree = parser.parser()?;
-        if debug {
-            dbg!(&ast_tree);
-        }
-        let mut semantic = Semantic::new(self);
-        // let ssa_ir =
-            semantic.semantic(ast_tree)?;
-        // if debug {
-        //     dbg!(ssa_ir);
-        // }
+        let mut semantic = Semantic::new(self,compiler);
+        let ssa_ir = semantic.semantic(ast_tree)?;
+        let vm_ir = ssa_to_vm(ssa_ir.0,ssa_ir.1);
+        dbg!(vm_ir);
         Ok(())
     }
 }

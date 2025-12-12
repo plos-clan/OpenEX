@@ -14,11 +14,13 @@ pub mod lints;
 pub(crate) mod parser;
 mod semantic;
 
+#[derive(Debug, Clone)]
 pub struct CompilerData {
     symbol_table: SymbolTable,
     lints: HashSet<Lint>,
 }
 
+#[derive(Debug,Clone)]
 pub struct Compiler {
     files: Vec<SourceFile>,
 }
@@ -34,6 +36,15 @@ impl Compiler {
 
     pub fn add_file(&mut self, file: SourceFile) {
         self.files.push(file);
+    }
+    
+    pub fn find_file(&self, path: &str) -> Option<&SourceFile> {
+        for file in &self.files {
+            if file.name.as_str().split(".").next().unwrap() == path {
+                return Some(file)
+            }
+        }
+        None
     }
 
     fn highlight_line_and_column(data: &str, target_line: usize, target_column: usize) -> String {
@@ -177,6 +188,11 @@ impl Compiler {
                 column = token.column;
                 message = String::from("no native implement.");
             }
+            ParserError::NotFoundLibrary(token) => {
+                line = token.line;
+                column = token.column;
+                message = String::from("not found import library.");
+            }
         }
 
         Self::dump_error_info(message, line, column, file);
@@ -187,7 +203,8 @@ impl Compiler {
             let token: &Token = match expr {
                 ASTExprTree::Var(token)
                 | ASTExprTree::Literal(token)
-                | ASTExprTree::This(token) => token,
+                | ASTExprTree::This(token)
+                | ASTExprTree::Ref(token)=> token,
                 ASTExprTree::Call { name: e_name, .. } =>{
                     match e_name.as_ref() { 
                         ASTExprTree::Var(token ) => token,
@@ -207,9 +224,10 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self,debug: bool) {
+    pub fn compile(&mut self) {
+        let mut compiler = self.clone();
         for file in &mut self.files {
-            file.compiler(debug).unwrap_or_else(|error| {
+            file.compiler(&mut compiler).unwrap_or_else(|error| {
                 Self::dump_parser_error(error, file);
             })
         }

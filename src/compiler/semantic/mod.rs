@@ -5,39 +5,42 @@ mod optimizer;
 mod var;
 mod r#while;
 
-use crate::compiler::ast::ssa_ir::{Code, OpCode, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, ValueGuessType};
 use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::file::SourceFile;
 use crate::compiler::lints::Lint::UnusedExpression;
 use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic};
+use crate::compiler::semantic::function::{function_semantic, native_function_semantic};
 use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::{Compiler, CompilerData};
 use smol_str::SmolStr;
-use crate::compiler::semantic::function::{function_semantic, native_function_semantic};
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,
+    compiler: &'a mut Compiler,
 }
 
 impl<'a> Semantic<'a> {
-    pub fn new(file: &'a mut SourceFile) -> Semantic<'a> {
-        Self { file }
+    pub fn new(file: &'a mut SourceFile, compiler:&'a mut Compiler) -> Semantic<'a> {
+        Self { file,compiler }
     }
 
     pub fn compiler_data(&mut self) -> &mut CompilerData {
         &mut self.file.c_data
     }
 
-    pub fn semantic(&mut self, stmt_tree: ASTStmtTree) -> Result<Code, ParserError> {
+    pub fn semantic(&mut self, stmt_tree: ASTStmtTree) -> Result<(Code,LocalMap), ParserError> {
         let code = &mut Code::new(true);
+        let mut global = LocalMap::new();
+
         if let ASTStmtTree::Root(stmts) = stmt_tree {
             for stmt in stmts {
                 match stmt {
                     ASTStmtTree::Var { name, value } => {
-                        let mut opcode = var_semantic(self, name, value, code, true)?;
+                        let mut opcode = var_semantic(self, name, value, code, true, &mut global)?;
                         code.get_code_table().append_code(&mut opcode);
                     }
                     ASTStmtTree::Expr(expr) => {
@@ -54,19 +57,22 @@ impl<'a> Semantic<'a> {
                         }
                     }
                     ASTStmtTree::Import(token) => {
-                        //TODO 检查库是否存在
+                        let lib_name = token.text();
+                        if self.compiler.find_file(lib_name).is_none() {
+                            return Err(ParserError::NotFoundLibrary(token))
+                        }
                         let name = token.clone().value::<SmolStr>().unwrap();
                         self.compiler_data()
                             .symbol_table
                             .add_element(name, ElementType::Library);
-                        code.alloc_value(token, ValueGuessType::Library);
+                        code.alloc_value(token, ValueGuessType::Ref);
                     }
                     ASTStmtTree::Loop {
                         token: _token,
                         cond,
                         body,
                     } => {
-                        let mut ret_m = while_semantic(self, cond, body, code)?;
+                        let mut ret_m = while_semantic(self, cond, body, code, &mut global)?;
                         code.get_code_table().append_code(&mut ret_m);
                     }
                     ASTStmtTree::Function { name, args, body } => {
@@ -81,6 +87,6 @@ impl<'a> Semantic<'a> {
         } else {
             unreachable!()
         }
-        Ok(code.clone())
+        Ok((code.clone(),global))
     }
 }

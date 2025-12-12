@@ -44,6 +44,7 @@ pub enum ExprOp {
 pub enum ASTExprTree {
     Literal(Token), // Number | String | Bool
     Var(Token),     // x
+    Ref(Token),
     This(Token),    // script current context
     Expr {
         token: Token,
