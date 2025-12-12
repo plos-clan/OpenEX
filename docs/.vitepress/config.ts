@@ -20,10 +20,17 @@ export default defineConfig({
                 ]
             },
             {
+                text: '基础教程',
+                items: [
+                    {text: '第一个程序', link: '/example'},
+                    {text: '表达式', link: '/example/expression'},
+                ]
+            },
+            {
                 text: 'Runtime API',
                 items: [
                     {text: 'Index', link: '/api'},
-                    {text: 'Lang library', link: '/api/lang'}
+                    {text: 'system', link: '/api/system'}
                 ]
             }
         ],
@@ -43,5 +50,8 @@ export default defineConfig({
                 interval: 100
             }
         }
+    },
+    markdown: {
+        lineNumbers: true
     }
 })
