@@ -1,5 +1,6 @@
 use crate::library::{register_library, LibModule, ModuleFunc};
-use crate::runtime::{RuntimeError, Types};
+use crate::runtime::{RuntimeError};
+use crate::compiler::ast::vm_ir::Types;
 use smol_str::SmolStr;
 
 fn system_print(args:Vec<Types>) -> Result<Types,RuntimeError> {

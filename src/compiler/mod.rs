@@ -6,7 +6,7 @@ use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
 use std::collections::HashSet;
 
-mod ast;
+pub(crate) mod ast;
 pub mod file;
 pub mod lexer;
 #[allow(unused)]

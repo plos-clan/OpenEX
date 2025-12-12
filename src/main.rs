@@ -12,6 +12,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
+use crate::runtime::executor_run;
 
 struct Args {
     input: Vec<String>,
@@ -142,5 +143,6 @@ fn main() -> io::Result<()> {
     }
 
     compiler.compile(true);
+    executor_run();
     Ok(())
 }

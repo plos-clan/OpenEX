@@ -128,7 +128,7 @@ impl OpCode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct OpCodeTable {
-    opcodes: LinkedHashMap<LocalAddr, OpCode>,
+    pub(crate) opcodes: LinkedHashMap<LocalAddr, OpCode>,
     alloc_addr: LocalAddr,
 }
 
@@ -218,7 +218,6 @@ pub struct Code {
     codes: OpCodeTable,
     values: SlotMap<DefaultKey, Value>,
     funcs: Vec<Function>,
-    stack_size: usize,
     root: bool, // 是否是根脚本上下文 (true: 根上下文|false: 函数上下文)
 }
 
@@ -227,7 +226,6 @@ impl Code {
         Self {
             codes: OpCodeTable::new(),
             values: SlotMap::new(),
-            stack_size: 0,
             funcs: Vec::new(),
             root,
         }

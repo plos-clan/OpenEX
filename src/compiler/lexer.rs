@@ -555,6 +555,54 @@ impl LexerAnalysis {
                 data_index,
                 TokenType::Operator,
             )),
+            '/' => {
+                let mut c = self.next_char();
+                match c {
+                    '/' => {
+                        loop {
+                            c = self.next_char();
+                            if c == '\n' || c == '\0' {
+                                break;
+                            }
+                        }
+                        self.cache = Some(c);
+                        self.next_token()
+                    }
+                    '*' => {
+                        loop {
+                            c = self.next_char();
+                            if c == '*' {
+                                c = self.next_char();
+                                if c == '/' {
+                                    break;
+                                }else if c == '\0' { return Err(Eof); }
+                            }else if c == '\0' { return Err(Eof); }
+                        }
+                        self.cache = Some(c);
+                        self.next_token()
+                    }
+                    '=' => {
+                        str_builder.push(c);
+                        Ok(Token::new(
+                            str_builder.finish(),
+                            line,
+                            column,
+                            data_index,
+                            TokenType::Operator,
+                        ))
+                    }
+                    _ => {
+                        self.cache = Some(c);
+                        Ok(Token::new(
+                            str_builder.finish(),
+                            line,
+                            column,
+                            data_index,
+                            TokenType::Operator,
+                        ))
+                    }
+                }
+            }
             '"' => self.build_string(line, column, data_index),
             '+' => self.build_semicolon_op_in(line, column, data_index, '+'),
             '-' => self.build_semicolon_op_in(line, column, data_index, '-'),

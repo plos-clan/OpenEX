@@ -6,12 +6,16 @@ use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::semantic::Semantic;
 use crate::compiler::CompilerData;
 use std::collections::HashSet;
+use crate::compiler::ast::vm_ir::VMIRTable;
 
+
+#[allow(dead_code)] // TODO
 pub struct SourceFile {
     pub name: String,
     data: String,
     pub lexer: LexerAnalysis,
     pub(crate) c_data: CompilerData,
+    ir_table: VMIRTable
 }
 
 impl SourceFile {
@@ -25,7 +29,8 @@ impl SourceFile {
             c_data: CompilerData {
                 symbol_table: SymbolTable::new(),
                 lints
-            }
+            },
+            ir_table: VMIRTable::new(),
         }
     }
 

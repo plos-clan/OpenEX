@@ -3,13 +3,14 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::ParserError;
 use crate::compiler::Compiler;
 use crate::library::system::register_system_lib;
-use crate::runtime::{RuntimeError, Types};
+use crate::runtime::{RuntimeError};
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::sync::{LazyLock, RwLock};
+use crate::compiler::ast::vm_ir::Types;
 
 mod system;
 

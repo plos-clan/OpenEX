@@ -1,27 +1,9 @@
-use smol_str::SmolStr;
+mod executor;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)] //TODO
-pub enum CodeImm {
-    Float(f64),
-    Int(i64),
-    Null,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)] //TODO
-pub enum ByteCode {
-    Push(CodeImm),
-}
-
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
-#[allow(dead_code)] //TODO
-pub enum Types {
-    String(SmolStr),
-    Number(i64),
-    Bool(bool),
-    Null,
-}
-
+#[allow(dead_code)] // TODO
 pub enum RuntimeError {
+}
+
+pub fn executor_run() {
+    
 }

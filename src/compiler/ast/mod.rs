@@ -1,4 +1,5 @@
 pub mod ssa_ir;
+pub(crate) mod vm_ir;
 
 use crate::compiler::lexer::Token;
 
