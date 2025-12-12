@@ -1,7 +1,5 @@
 # 第一个 OpenEX 程序
 
-> 如果还没有配置好 OpenEX, 请前往 [简介](/started)
-
 ## Hello! World!
 
 创建一个名为 `script.exf` 的空文件, 并在其添加以下代码
