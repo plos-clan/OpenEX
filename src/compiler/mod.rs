@@ -5,7 +5,7 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
 use std::collections::HashSet;
-use crate::compiler::ast::vm_ir::VMIRTable;
+use std::process::exit;
 
 pub(crate) mod ast;
 pub mod file;
@@ -239,7 +239,7 @@ impl Compiler {
             let vm_ir = file.compiler(&mut compiler).unwrap_or_else(|error| {
                 Self::dump_parser_error(error, file);
                 failed = true;
-                VMIRTable::new()
+                exit(-1);
             });
             if failed {
                 continue;

@@ -14,7 +14,7 @@ pub fn while_semantic(
     code: &mut Code,
     locals:&mut LocalMap
 ) -> Result<OpCodeTable, ParserError> {
-    let mut exp = lower_expr(semantic, &expr, code)?;
+    let mut exp = lower_expr(semantic, &expr, code, None)?;
     let mut code_table = OpCodeTable::new();
 
     if exp.1 == ValueGuessType::Bool && !semantic.file.has_warnings(LoopNoExpr) {

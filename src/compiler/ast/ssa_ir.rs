@@ -48,6 +48,7 @@ pub struct Value {
 pub enum OpCode {
     // Option<LocalAddr> 为各 IR 的逻辑地址
     LoadGlobal(Option<LocalAddr>, DefaultKey, Operand), // 栈顶元素加载到全局变量
+    StoreGlobal(Option<LocalAddr>, DefaultKey, Operand), // 将一个全局变量加载到栈顶
     LoadLocal(Option<LocalAddr>, DefaultKey, Operand),  // 栈顶元素加载到局部变量
     StoreLocal(Option<LocalAddr>, DefaultKey, Operand), // 将一个变量加载到栈顶
     Push(Option<LocalAddr>, Operand),                   // 将值压入操作栈
@@ -214,14 +215,14 @@ pub struct LocalMap {
 
 impl LocalMap {
     pub fn new() -> LocalMap {
-        Self  {
+        Self {
             locals: BTreeMap::new(),
             now_index: 0,
         }
     }
 
     pub fn add_local(&mut self, local: DefaultKey) -> usize {
-        self.locals.insert(local,self.now_index);
+        self.locals.insert(local, self.now_index);
         let ret_m = self.now_index;
         self.now_index += 1;
         ret_m
@@ -237,7 +238,7 @@ pub struct Function {
     pub(crate) name: SmolStr,
     pub(crate) args: usize,
     pub(crate) codes: Option<OpCodeTable>, // 为 None 代表本地方法实现
-    pub(crate) locals: LocalMap,    // 局部变量表映射
+    pub(crate) locals: LocalMap,           // 局部变量表映射
 }
 
 #[derive(Debug, Clone)]
@@ -305,6 +306,7 @@ macro_rules! mathch_opcodes {
     ($expr: expr,$slot:ident,$stmt: expr) => {
         match $expr {
             OpCode::LoadGlobal($slot, ..)
+            | OpCode::StoreGlobal($slot, ..)
             | OpCode::LoadLocal($slot, ..)
             | OpCode::StoreLocal($slot, ..)
             | OpCode::Push($slot, ..)

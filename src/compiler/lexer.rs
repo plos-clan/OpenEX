@@ -98,7 +98,7 @@ impl Token {
     }
 
     pub fn value_float(&mut self) -> f64 {
-        self.data.parse::<f64>().unwrap()
+        f64::from_str(&self.data).unwrap_or(0.0)
     }
 
     pub fn value_number(&mut self) -> i64 {

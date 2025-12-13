@@ -108,6 +108,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::Equ(_) => ByteCode::Equ,
         OpCode::Call(_, _imm) => ByteCode::Call,
         OpCode::Ref(_) => ByteCode::GetRef,
+
         c => {
             dbg!(c);
             todo!()
@@ -153,6 +154,14 @@ impl IrFunction {
                 OpCode::StoreLocal(_, key, _) => {
                     let index = locals.get_index(&key).unwrap();
                     self.codes.push(ByteCode::Store(*index));
+                }
+                OpCode::LoadGlobal(_, key, _) => {
+                    let index = locals.get_index(&key).unwrap();
+                    self.codes.push(ByteCode::LoadGlobal(*index));
+                }
+                OpCode::StoreGlobal(_, key, _) => {
+                    let index = locals.get_index(&key).unwrap();
+                    self.codes.push(ByteCode::StoreGlobal(*index));
                 }
                 c => {
                     self.codes.push(opcode_to_vmir(c));
@@ -224,6 +233,14 @@ impl VMIRTable {
                     self.codes.push(ByteCode::LoadGlobal(*index));
                 }
                 OpCode::StoreLocal(_, key, _) => {
+                    let index = locals.get_index(&key).unwrap();
+                    self.codes.push(ByteCode::StoreGlobal(*index));
+                }
+                OpCode::LoadGlobal(_, key, _) => {
+                    let index = locals.get_index(&key).unwrap();
+                    self.codes.push(ByteCode::LoadGlobal(*index));
+                }
+                OpCode::StoreGlobal(_, key, _) => {
                     let index = locals.get_index(&key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }

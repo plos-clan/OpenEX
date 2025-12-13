@@ -7,6 +7,7 @@ use smol_str::{SmolStr, ToSmolStr};
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
+use crate::runtime::operation::{add_value, sub_value};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -95,8 +96,8 @@ impl StackFrame {
         self.local_tables[index] = value;
     }
 
-    pub fn get_var_table(&mut self, index: usize) -> Value {
-        self.local_tables.get_mut(index).unwrap().clone()
+    pub fn get_var_table(&self, index: usize) -> Value {
+        self.local_tables.get(index).unwrap().clone()
     }
 
     pub fn is_native(&self) -> Option<SmolStr> {
@@ -206,32 +207,6 @@ impl Executor {
     }
 }
 
-fn add_value(left: Value, right: Value) -> Value {
-    use Value::*;
-    if matches!(left, String(_)) || matches!(right, String(_)) {
-        let left_str = left.to_string();
-        let right_str = right.to_string();
-        return String(left_str + &right_str);
-    }
-
-    match (left, right) {
-        // Int + Int → Int
-        (Int(l), Int(r)) => Int(l + r),
-
-        // Int + Float → Float
-        (Int(l), Float(r)) => Float(l as f64 + r),
-
-        // Float + Int → Float
-        (Float(l), Int(r)) => Float(l + r as f64),
-
-        // Float + Float → Float
-        (Float(l), Float(r)) => Float(l + r),
-
-        (String(l), String(r)) => String(l + &r),
-        _ => unreachable!(),
-    }
-}
-
 pub(crate) fn run_executor(
     frame_index: usize,
     executor: &mut Executor,
@@ -240,21 +215,54 @@ pub(crate) fn run_executor(
 // Option<StackFrame> 不为 None 代表是函数调用请求
 // bool 为 true 代表操作栈栈顶作为返回值压入父栈帧
 {
-    let stack_frame = thread.get_mut_frame(frame_index);
+    let mut root_frame;
+    let stack_frame;
+    if frame_index == 0 {
+        root_frame = None;
+        stack_frame = thread.get_mut_frame(frame_index);
+    } else {
+        let call_stack = &mut thread.call_stack;
+        let (left, right) = call_stack.split_at_mut(frame_index);
+        root_frame = Some(&mut left[0]);
+        stack_frame = &mut right[0];
+    }
 
     while let Some(instr) = stack_frame.fetch_current() {
         match instr {
-            ByteCode::Push(const_index) => {
-                if let Some(value) = stack_frame.get_const(*const_index) {
+            ByteCode::Push(const_index0) => {
+                let const_index = *const_index0;
+
+                if let Some(value) = stack_frame.get_const(const_index) {
                     if let Value::Ref(path) = value.clone()
                         && path.as_str() == "this"
                     {
                         let path = stack_frame.file_name.split(".").next().unwrap();
                         stack_frame.push_op_stack(Value::Ref(path.to_string()));
-                    }else {
+                    } else {
                         stack_frame.push_op_stack(value);
                     }
                 }
+                stack_frame.next_pc();
+            }
+            ByteCode::LoadGlobal(var_index) => {
+                let index = *var_index;
+                let result = stack_frame.pop_op_stack().unwrap();
+                if let Some(ref mut root) = root_frame {
+                    root.set_var_table(index, result);
+                } else {
+                    stack_frame.set_var_table(index, result);
+                }
+                stack_frame.next_pc();
+            }
+            ByteCode::StoreGlobal(var_index) => {
+                let index = *var_index;
+
+                let result = if let Some(ref root) = root_frame {
+                    root.get_var_table(index)
+                } else {
+                    stack_frame.get_var_table(index)
+                };
+                stack_frame.push_op_stack(result);
                 stack_frame.next_pc();
             }
             ByteCode::Load(var_index) => {
@@ -271,7 +279,13 @@ pub(crate) fn run_executor(
             ByteCode::Add => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(add_value(value_1, value_0));
+                stack_frame.push_op_stack(add_value(value_1, value_0)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::Sub =>  {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(sub_value(value_1, value_0)?);
                 stack_frame.next_pc();
             }
             ByteCode::Nol => stack_frame.next_pc(),

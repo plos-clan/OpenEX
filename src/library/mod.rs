@@ -50,7 +50,7 @@ fn register_library(library: LibModule) {
         .insert(library.name.clone(), library);
 }
 
-pub(crate) fn find_library(
+pub fn find_library(
     name: &str,
     f: impl FnOnce(Option<&mut LibModule>) -> Result<(), ParserError>,
 ) -> Result<(), ParserError> {

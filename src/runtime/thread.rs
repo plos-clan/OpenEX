@@ -54,7 +54,7 @@ impl ThreadPool {
 #[allow(dead_code)] // TODO
 pub struct OpenEXThread {
     name: String,
-    call_stack: Vec<StackFrame>,
+    pub(crate) call_stack: Vec<StackFrame>,
 }
 
 impl OpenEXThread {
@@ -89,7 +89,6 @@ impl OpenEXThread {
                 0 => break, // 栈空，程序结束
                 n => n - 1,
             };
-
             let stack_frame = self.get_mut_frame(frame_index);
 
             if let Some(path) = stack_frame.is_native() {
@@ -132,6 +131,7 @@ impl OpenEXThread {
                     }
                 }
             } else {
+
                 match run_executor(frame_index, executor, self) {
                     Ok(frame_o) => {
                         // 有函数调用

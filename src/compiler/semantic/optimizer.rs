@@ -41,6 +41,18 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: &ExprOp) -> Option<Op
         (ImmNum(a), ImmNum(b), ExprOp::Div) => Some(ImmNum(a / b)),
         (ImmNum(a), ImmNum(b), ExprOp::Rmd) => Some(ImmNum(a % b)),
 
+        (ImmNum(a), ImmFlot(b), ExprOp::Add) => Some(ImmFlot(*a as f64 + b)),
+        (ImmNum(a), ImmFlot(b), ExprOp::Sub) => Some(ImmFlot(*a as f64 - b)),
+        (ImmNum(a), ImmFlot(b), ExprOp::Mul) => Some(ImmFlot(*a as f64 * b)),
+        (ImmNum(a), ImmFlot(b), ExprOp::Div) => Some(ImmFlot(*a as f64 / b)),
+        (ImmNum(a), ImmFlot(b), ExprOp::Rmd) => Some(ImmFlot(*a as f64 % b)),
+
+        (ImmFlot(a), ImmNum(b), ExprOp::Add) => Some(ImmFlot(a + *b as f64)),
+        (ImmFlot(a), ImmNum(b), ExprOp::Sub) => Some(ImmFlot(a - *b as f64)),
+        (ImmFlot(a), ImmNum(b), ExprOp::Mul) => Some(ImmFlot(a * *b as f64)),
+        (ImmFlot(a), ImmNum(b), ExprOp::Div) => Some(ImmFlot(a / *b as f64)),
+        (ImmFlot(a), ImmNum(b), ExprOp::Rmd) => Some(ImmFlot(a % *b as f64)),
+
         // 位运算
         (ImmNum(a), ImmNum(b), ExprOp::BitAnd) => Some(ImmNum(a & b)),
         (ImmNum(a), ImmNum(b), ExprOp::BitOr)  => Some(ImmNum(a | b)),
