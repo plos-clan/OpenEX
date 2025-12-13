@@ -19,13 +19,12 @@ static THREAD_POOL: LazyLock<ThreadPool> = LazyLock::new(|| ThreadPool::new(4));
 impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
         let (sender, receiver) = unbounded::<Job>();
-        let receiver = Arc::new(Mutex::new(receiver));
 
         for _ in 0..size {
             let rx = receiver.clone();
             thread::spawn(move || {
                 loop {
-                    let job = rx.lock().unwrap().recv().unwrap();
+                    let job = rx.recv().unwrap();
                     job();
                 }
             });
