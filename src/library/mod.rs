@@ -3,21 +3,21 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::ParserError;
 use crate::compiler::Compiler;
 use crate::library::system::register_system_lib;
-use crate::runtime::{RuntimeError};
+use crate::runtime::executor::Value;
+use crate::runtime::RuntimeError;
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::sync::{LazyLock, RwLock};
-use crate::compiler::ast::vm_ir::Types;
 
 mod system;
 
 static MODULES: LazyLock<RwLock<BTreeMap<SmolStr, LibModule>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
-pub type NativeFunc = fn(Vec<Types>) -> Result<Types, RuntimeError>;
+pub type NativeFunc = fn(Vec<Value>) -> Result<Value, RuntimeError>;
 
 #[derive(Debug, Clone, Hash)]
 pub struct ModuleFunc {
@@ -83,7 +83,7 @@ pub(crate) fn load_libraries(
                 .unwrap_or("<invalid>")
                 .to_string();
             let data = SmolStr::new(std::str::from_utf8(&buf).expect("error: file not UTF-8"));
-            compiler.add_file(SourceFile::new(name, data.to_string(), lints.clone()))
+            compiler.add_file(SourceFile::new(name, data.to_string(), lints.clone(), true))
         }
     }
 

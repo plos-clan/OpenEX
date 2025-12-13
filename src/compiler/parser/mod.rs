@@ -1,8 +1,8 @@
 mod block;
 mod expression;
 mod function;
-mod judgment;
 mod import;
+mod judgment;
 mod r#return;
 pub mod symbol_table;
 mod var;
@@ -17,10 +17,10 @@ use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{LexerError, Token, TokenType};
 use crate::compiler::parser::expression::expr_eval;
 use crate::compiler::parser::function::func_eval;
-use crate::compiler::parser::judgment::if_eval;
 use crate::compiler::parser::import::import_eval;
-use crate::compiler::parser::var::var_eval;
+use crate::compiler::parser::judgment::if_eval;
 use crate::compiler::parser::r#while::while_eval;
+use crate::compiler::parser::var::var_eval;
 
 #[derive(Debug)]
 pub(crate) enum ParserError {
@@ -40,6 +40,7 @@ pub(crate) enum ParserError {
     UnableResolveSymbols(Token),   // 无法解析符号
     NoNativeImplement(Token),      // 无本地实现
     NotFoundLibrary(Token),        // 找不到库
+    Empty,                         // 占位符
     Eof,
 }
 

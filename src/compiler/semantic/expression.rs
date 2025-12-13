@@ -53,6 +53,11 @@ fn astop_to_opcode(astop: &ExprOp) -> OpCode {
         ExprOp::SAdd => OpCode::SAdd(None),
         ExprOp::SSub => OpCode::SSub(None),
         ExprOp::Store => OpCode::Store(None),
+        ExprOp::BigEqu => OpCode::BigEqu(None),
+        ExprOp::LesEqu => OpCode::LesEqu(None),
+        ExprOp::Less => OpCode::Less(None),
+        ExprOp::Big => OpCode::Big(None),
+        ExprOp::Equ => OpCode::Equ(None),
         _ => todo!(),
     }
 }
@@ -233,7 +238,7 @@ fn lower_ref(
 
     if let ASTExprTree::Expr {
         token:_,
-        op:_,
+        op:_op,
         left,
         right,
     } = expr_tree
@@ -264,10 +269,12 @@ fn lower_ref(
         }else {
             unreachable!()
         }
-
+        opcode_table.add_opcode(OpCode::Ref(None));
     }else {
         unreachable!()
     }
+
+
 
     Ok((path.finish(), opcode_table))
 }

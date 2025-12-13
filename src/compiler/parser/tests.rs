@@ -3,7 +3,7 @@ use expect_test::{expect, Expect};
 use crate::compiler::{file::SourceFile, parser::Parser};
 
 fn parse_source(src: &str) -> Result<crate::compiler::ast::ASTStmtTree, super::ParserError> {
-    let mut file = SourceFile::new("<test_input>".into(), src.into(), Default::default());
+    let mut file = SourceFile::new("<test_input>".into(), src.into(), Default::default(), false);
     let parser = Parser::new(&mut file);
     parser.parser()
 }

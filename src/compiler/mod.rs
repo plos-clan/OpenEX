@@ -5,6 +5,7 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
 use std::collections::HashSet;
+use crate::compiler::ast::vm_ir::VMIRTable;
 
 pub(crate) mod ast;
 pub mod file;
@@ -37,7 +38,11 @@ impl Compiler {
     pub fn add_file(&mut self, file: SourceFile) {
         self.files.push(file);
     }
-    
+
+    pub fn get_files(&mut self) -> &mut Vec<SourceFile> {
+        &mut self.files
+    }
+
     pub fn find_file(&self, path: &str) -> Option<&SourceFile> {
         for file in &self.files {
             if file.name.as_str().split(".").next().unwrap() == path {
@@ -115,7 +120,7 @@ impl Compiler {
                 Self::dump_lexer_error(lex_error, file);
                 return;
             }
-            ParserError::Eof => {
+            ParserError::Eof | ParserError::Empty => {
                 return;
             }
             ParserError::IdentifierExpected(token) => {
@@ -227,9 +232,20 @@ impl Compiler {
     pub fn compile(&mut self) {
         let mut compiler = self.clone();
         for file in &mut self.files {
-            file.compiler(&mut compiler).unwrap_or_else(|error| {
+            if file.compiled {
+                continue;
+            }
+            let mut failed = false;
+            let vm_ir = file.compiler(&mut compiler).unwrap_or_else(|error| {
                 Self::dump_parser_error(error, file);
-            })
+                failed = true;
+                VMIRTable::new()
+            });
+            if failed {
+                continue;
+            }
+            file.ir_table = Some(Box::new(vm_ir));
+            file.compiled = true;
         }
     }
 }

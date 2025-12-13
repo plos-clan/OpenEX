@@ -47,8 +47,8 @@ pub struct Value {
 #[allow(dead_code)] // TODO
 pub enum OpCode {
     // Option<LocalAddr> 为各 IR 的逻辑地址
-    LoadGlobal(Option<LocalAddr>, DefaultKey, Operand), // 全局变量加载
-    LoadLocal(Option<LocalAddr>, DefaultKey, Operand),  // 局部变量加载
+    LoadGlobal(Option<LocalAddr>, DefaultKey, Operand), // 栈顶元素加载到全局变量
+    LoadLocal(Option<LocalAddr>, DefaultKey, Operand),  // 栈顶元素加载到局部变量
     StoreLocal(Option<LocalAddr>, DefaultKey, Operand), // 将一个变量加载到栈顶
     Push(Option<LocalAddr>, Operand),                   // 将值压入操作栈
     Call(Option<LocalAddr>, SmolStr),                   // 函数调用
@@ -209,7 +209,7 @@ impl OpCodeTable {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalMap {
     pub(crate) locals: BTreeMap<DefaultKey, usize>, // 局部变量表映射
-    now_index: usize,
+    pub(crate) now_index: usize,
 }
 
 impl LocalMap {
@@ -219,14 +219,14 @@ impl LocalMap {
             now_index: 0,
         }
     }
-    
+
     pub fn add_local(&mut self, local: DefaultKey) -> usize {
         self.locals.insert(local,self.now_index);
         let ret_m = self.now_index;
         self.now_index += 1;
         ret_m
     }
-    
+
     pub fn get_index(&self, key: &DefaultKey) -> Option<&usize> {
         self.locals.get(key)
     }

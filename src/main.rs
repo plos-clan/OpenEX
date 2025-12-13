@@ -12,7 +12,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
-use crate::runtime::executor_run;
+use crate::runtime::executor::Executor;
 
 struct Args {
     input: Vec<String>,
@@ -127,7 +127,7 @@ fn main() -> io::Result<()> {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_) => {
-                compiler.add_file(SourceFile::new("<console>".to_string(), input, args.allow));
+                compiler.add_file(SourceFile::new("<console>".to_string(), input, args.allow, false));
             }
             Err(_) => {
                 eprintln!("error: cannot read from stdin.");
@@ -138,11 +138,12 @@ fn main() -> io::Result<()> {
             let file_name = file.clone();
             let data =
                 fs::read_to_string(file).unwrap_or_else(|e| panic!("error: cannot read file{}", e));
-            compiler.add_file(SourceFile::new(file_name, data, args.allow.clone()));
+            compiler.add_file(SourceFile::new(file_name, data, args.allow.clone(), false));
         }
     }
 
     compiler.compile();
-    executor_run();
+    let executor = Executor::new();
+    executor.run(compiler);
     Ok(())
 }
