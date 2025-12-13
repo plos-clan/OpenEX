@@ -13,6 +13,7 @@ use std::io::Read;
 use std::sync::{LazyLock, RwLock};
 
 mod system;
+pub mod output_capture;
 
 static MODULES: LazyLock<RwLock<BTreeMap<SmolStr, LibModule>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
