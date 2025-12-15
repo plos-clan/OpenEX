@@ -1,6 +1,6 @@
 use crate::compiler::ast::ssa_ir::Operand;
-use crate::compiler::ast::ExprOp;
 use crate::compiler::ast::ssa_ir::Operand::{ImmBool, ImmFlot, ImmNum, ImmStr};
+use crate::compiler::ast::ExprOp;
 
 pub fn unary_optimizer(op: &ExprOp, operand: &Operand) -> Option<Operand> {
     match op {
@@ -8,7 +8,7 @@ pub fn unary_optimizer(op: &ExprOp, operand: &Operand) -> Option<Operand> {
             if let ImmBool(b) = operand {
                 Some(ImmBool(!b))
             } else {
-                todo!() // 理论来讲已经过了一遍检查器了, 类型全部合法不会到达这里
+                None
             }
         }
         ExprOp::SAdd => {
@@ -17,7 +17,7 @@ pub fn unary_optimizer(op: &ExprOp, operand: &Operand) -> Option<Operand> {
             } else if let ImmFlot(flot) = operand {
                 Some(ImmFlot(flot + 1.0))
             } else {
-                todo!()
+                None
             }
         }
         ExprOp::SSub => {
@@ -26,7 +26,7 @@ pub fn unary_optimizer(op: &ExprOp, operand: &Operand) -> Option<Operand> {
             } else if let ImmFlot(flot) = operand {
                 Some(ImmFlot(flot - 1.0))
             } else {
-                todo!()
+                None
             }
         }
         _ => None,
@@ -55,17 +55,17 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: &ExprOp) -> Option<Op
 
         // 位运算
         (ImmNum(a), ImmNum(b), ExprOp::BitAnd) => Some(ImmNum(a & b)),
-        (ImmNum(a), ImmNum(b), ExprOp::BitOr)  => Some(ImmNum(a | b)),
+        (ImmNum(a), ImmNum(b), ExprOp::BitOr) => Some(ImmNum(a | b)),
         (ImmNum(a), ImmNum(b), ExprOp::BitXor) => Some(ImmNum(a ^ b)),
-        (ImmNum(a), ImmNum(b), ExprOp::BLeft)  => Some(ImmNum(a << b)),
+        (ImmNum(a), ImmNum(b), ExprOp::BLeft) => Some(ImmNum(a << b)),
         (ImmNum(a), ImmNum(b), ExprOp::BRight) => Some(ImmNum(a >> b)),
 
         // 比较
-        (ImmNum(a), ImmNum(b), ExprOp::Big)    => Some(ImmBool(a > b)),
-        (ImmNum(a), ImmNum(b), ExprOp::Less)   => Some(ImmBool(a < b)),
+        (ImmNum(a), ImmNum(b), ExprOp::Big) => Some(ImmBool(a > b)),
+        (ImmNum(a), ImmNum(b), ExprOp::Less) => Some(ImmBool(a < b)),
         (ImmNum(a), ImmNum(b), ExprOp::BigEqu) => Some(ImmBool(a >= b)),
         (ImmNum(a), ImmNum(b), ExprOp::LesEqu) => Some(ImmBool(a <= b)),
-        (ImmNum(a), ImmNum(b), ExprOp::Equ)    => Some(ImmBool(a == b)),
+        (ImmNum(a), ImmNum(b), ExprOp::Equ) => Some(ImmBool(a == b)),
         (ImmNum(a), ImmNum(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
 
         (ImmFlot(a), ImmFlot(b), ExprOp::Add) => Some(ImmFlot(a + b)),
@@ -74,19 +74,19 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: &ExprOp) -> Option<Op
         (ImmFlot(a), ImmFlot(b), ExprOp::Div) => Some(ImmFlot(a / b)),
 
         // 浮点比较
-        (ImmFlot(a), ImmFlot(b), ExprOp::Big)    => Some(ImmBool(a > b)),
-        (ImmFlot(a), ImmFlot(b), ExprOp::Less)   => Some(ImmBool(a < b)),
+        (ImmFlot(a), ImmFlot(b), ExprOp::Big) => Some(ImmBool(a > b)),
+        (ImmFlot(a), ImmFlot(b), ExprOp::Less) => Some(ImmBool(a < b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::BigEqu) => Some(ImmBool(a >= b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::LesEqu) => Some(ImmBool(a <= b)),
-        (ImmFlot(a), ImmFlot(b), ExprOp::Equ)    => Some(ImmBool(a == b)),
+        (ImmFlot(a), ImmFlot(b), ExprOp::Equ) => Some(ImmBool(a == b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
 
         (ImmBool(a), ImmBool(b), ExprOp::And) => Some(ImmBool(*a && *b)),
-        (ImmBool(a), ImmBool(b), ExprOp::Or)  => Some(ImmBool(*a || *b)),
+        (ImmBool(a), ImmBool(b), ExprOp::Or) => Some(ImmBool(*a || *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Equ) => Some(ImmBool(a == b)),
         (ImmBool(a), ImmBool(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
 
-        (ImmStr(a), ImmStr(b), ExprOp::Equ)    => Some(ImmBool(a == b)),
+        (ImmStr(a), ImmStr(b), ExprOp::Equ) => Some(ImmBool(a == b)),
         (ImmStr(a), ImmStr(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
 
         // 赋值 / 复合赋值 / 引用 / 下标 —— 不做常量折叠

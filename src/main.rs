@@ -1,6 +1,6 @@
-pub mod compiler;
-pub mod library;
-pub mod runtime;
+mod compiler;
+mod library;
+mod runtime;
 
 use crate::compiler::file::SourceFile;
 use crate::compiler::{lints, Compiler};

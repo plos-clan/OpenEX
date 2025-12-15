@@ -103,3 +103,18 @@ pub enum ASTStmtTree {
     Continue(Token),
     Empty, // 空语句需要剔除
 }
+
+impl ASTExprTree {
+    pub fn token(&self) -> &Token {
+        match self {
+            ASTExprTree::Literal(token)
+            | ASTExprTree::Var(token)
+            | ASTExprTree::Ref(token)
+            | ASTExprTree::This(token) => token,
+
+            ASTExprTree::Expr { token, .. } => token,
+            ASTExprTree::Unary { token, .. } => token,
+            ASTExprTree::Call { name, .. } => name.token(),
+        }
+    }
+}

@@ -22,6 +22,7 @@ pub enum Operand {
     Call(SmolStr),
     Reference(SmolStr), // 对象引用
     Expression(Box<Operand>, Box<Operand>, Box<OpCode>),
+    ImmNumFlot, // 类型占位符
 }
 
 #[derive(Clone, Debug, PartialEq)]

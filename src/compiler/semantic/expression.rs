@@ -1,4 +1,5 @@
 use crate::compiler::ast::ssa_ir::OpCode::Push;
+use crate::compiler::ast::ssa_ir::Operand::ImmNumFlot;
 use crate::compiler::ast::ssa_ir::ValueGuessType::{Bool, Float, Null, Number, Ref, String, This, Unknown};
 use crate::compiler::ast::ssa_ir::{Code, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
@@ -279,8 +280,6 @@ fn lower_ref(
         unreachable!()
     }
 
-
-
     Ok((path.finish(), opcode_table))
 }
 
@@ -350,15 +349,17 @@ pub(crate) fn lower_expr(
             op: u_op,
             code: u_code,
         } => {
-            let mut a = lower_expr(semantic, u_code.as_ref(), code,None)?;
-            let g_type = guess_type_unary(u_token, a.1, u_op)?;
-            if let Some(operand) = unary_optimizer(u_op, &a.0) {
+            let mut load = lower_expr(semantic, u_code.as_ref(), code,None)?;
+            let mut store = lower_expr(semantic, u_code.as_ref(), code,Some(ImmNumFlot))?;
+            let g_type = guess_type_unary(u_token, store.1, u_op)?;
+            if let Some(operand) = unary_optimizer(u_op, &store.0) {
                 opcode_table.add_opcode(Push(None, operand));
             } else {
-                opcode_table.append_code(&mut a.2);
+                opcode_table.append_code(&mut load.2);
                 opcode_table.add_opcode(astop_to_opcode(u_op));
+                opcode_table.append_code(&mut store.2);
             }
-            Ok((a.0, g_type, opcode_table))
+            Ok((store.0, g_type, opcode_table))
         }
         ASTExprTree::Expr {
             token: e_token,
@@ -415,7 +416,10 @@ pub(crate) fn lower_expr(
                     }
                     _ => {
                         if let Some(operand) = store{
-                            value.type_ = operand_to_guess(operand);
+                            if let ImmNumFlot = operand {
+                            }else {
+                                value.type_ = operand_to_guess(operand);
+                            }
                             opcode_table.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
                         }else {
                             opcode_table.add_opcode(OpCode::StoreLocal(None, key, Operand::Val(key)));
@@ -478,6 +482,7 @@ pub fn check_expr_operand(operand: &Operand, op_code: &OpCode, call_count: i32) 
                 status
             }
         }
+        Operand::Call(_) | Operand::Val(_) => true,
         _ => false,
     }
 }

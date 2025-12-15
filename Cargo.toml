@@ -11,10 +11,6 @@ expect-test = "1.5.1"
 linked-hash-map = "0.5.6"
 crossbeam-channel = "0.5.15"
 
-[lib]
-name = "openex"
-path = "src/lib.rs"
-
 [profile.release]
 debug = false
 strip = true

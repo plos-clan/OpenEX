@@ -1,4 +1,4 @@
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lints::Lint::LoopNoExpr;
 use crate::compiler::parser::ParserError;
@@ -17,7 +17,11 @@ pub fn while_semantic(
     let mut exp = lower_expr(semantic, &expr, code, None)?;
     let mut code_table = OpCodeTable::new();
 
-    if exp.1 == ValueGuessType::Bool && !semantic.file.has_warnings(LoopNoExpr) {
+    if exp.1 != ValueGuessType::Bool {
+        return Err(ParserError::IllegalTypeCombination(expr.clone().token().clone()));
+    }
+
+    if matches!(exp.0,Operand::ImmBool(_)) && !semantic.file.has_warnings(LoopNoExpr) {
         Compiler::warning_info_expr(
             semantic.file,
             "'while(true)' can be written as 'while'.",

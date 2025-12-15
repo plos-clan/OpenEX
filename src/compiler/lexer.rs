@@ -269,10 +269,10 @@ impl LexerAnalysis {
 
         if first_char == '0' {
             let next = self.next_char();
-            data.push(next);
 
             match next {
                 'x' | 'X' => {
+                    data.push(next);
                     loop {
                         match self.next_char() {
                             c if c.is_ascii_hexdigit() => data.push(c),
@@ -292,6 +292,7 @@ impl LexerAnalysis {
                     ));
                 }
                 'b' | 'B' => {
+                    data.push(next);
                     loop {
                         match self.next_char() {
                             c if c == '0' || c == '1' => data.push(c),
@@ -310,11 +311,23 @@ impl LexerAnalysis {
                         TokenType::Number,
                     ));
                 }
-                c if c.is_ascii_digit() => {}
+                c if c.is_ascii_digit() => {
+                    data.push(next);
+                }
                 '.' => {
+                    data.push(next);
                     is_float = true;
                 }
-                _ => return Err(LexerError::IllegalLiteral),
+                _ => {
+                    self.cache = Some(next);
+                    return Ok(Token::new(
+                        data.finish(),
+                        line,
+                        column,
+                        data_index,
+                        TokenType::Number,
+                    ));
+                }
             }
         }
 
@@ -576,8 +589,12 @@ impl LexerAnalysis {
                                 c = self.next_char();
                                 if c == '/' {
                                     break;
-                                }else if c == '\0' { return Err(Eof); }
-                            }else if c == '\0' { return Err(Eof); }
+                                } else if c == '\0' {
+                                    return Err(Eof);
+                                }
+                            } else if c == '\0' {
+                                return Err(Eof);
+                            }
                         }
                         self.cache = Some(c);
                         self.next_token()

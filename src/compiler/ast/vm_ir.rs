@@ -10,6 +10,8 @@ pub enum ByteCode {
     Store(usize),       // 将局部变量加载到栈顶 (变量表索引)
     LoadGlobal(usize),  // 栈顶元素加载到全局变量表 (变量表索引)
     StoreGlobal(usize), // 将全局变量加载到栈顶 (变量表索引)
+    Jump(usize),        // 无条件跳转 (pc位置)
+    JumpTrue(usize),    // 栈顶条件跳转 (pc位置)
     Call,               // 函数调用 (要求栈上最少有两个引用)
     Nol,                // 空操作
     GetRef,             // 拼接引用路径
@@ -108,7 +110,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::Equ(_) => ByteCode::Equ,
         OpCode::Call(_, _imm) => ByteCode::Call,
         OpCode::Ref(_) => ByteCode::GetRef,
-
+        OpCode::Nop(_) => ByteCode::Nol,
         c => {
             dbg!(c);
             todo!()
@@ -128,7 +130,6 @@ impl IrFunction {
         }
     }
 
-    #[allow(dead_code)] // TODO
     pub fn append_code(
         &mut self,
         table: OpCodeTable,
@@ -162,6 +163,13 @@ impl IrFunction {
                 OpCode::StoreGlobal(_, key, _) => {
                     let index = locals.get_index(&key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
+                }
+                OpCode::Jump(_,addr) => {
+                    self.codes.push(ByteCode::Jump(addr.offset));
+                }
+                OpCode::JumpTrue(_,addr,_) => {
+                    let addr_some = addr.unwrap();
+                    self.codes.push(ByteCode::JumpTrue(addr_some.offset));
                 }
                 c => {
                     self.codes.push(opcode_to_vmir(c));
@@ -243,6 +251,13 @@ impl VMIRTable {
                 OpCode::StoreGlobal(_, key, _) => {
                     let index = locals.get_index(&key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
+                }
+                OpCode::Jump(_,addr) => {
+                    self.codes.push(ByteCode::Jump(addr.offset));
+                }
+                OpCode::JumpTrue(_,addr,_) => {
+                    let addr_some = addr.unwrap();
+                    self.codes.push(ByteCode::JumpTrue(addr_some.offset));
                 }
                 c => {
                     self.codes.push(opcode_to_vmir(c));

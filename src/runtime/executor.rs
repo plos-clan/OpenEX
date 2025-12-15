@@ -7,7 +7,7 @@ use smol_str::{SmolStr, ToSmolStr};
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
-use crate::runtime::operation::{add_value, sub_value};
+use crate::runtime::operation::{add_value, big_value, div_value, less_value, mul_value, self_add_value, self_sub_value, sub_value};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -332,6 +332,57 @@ pub(crate) fn run_executor(
                 } else {
                     Err(RuntimeError::VMError)
                 };
+            }
+            ByteCode::Mul => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(mul_value(value_1, value_0)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::Div => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(div_value(value_1, value_0)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::SAdd => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(self_add_value(value_0)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::SSub => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(self_sub_value(value_0)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::Jump(pc) => {
+                let jpc = *pc;
+                stack_frame.set_next_pc(jpc);
+            }
+            ByteCode::JumpTrue(pc) => {
+                let jpc = *pc;
+                let top = stack_frame.pop_op_stack().unwrap();
+                if let Value::Bool(value) = top {
+                    if value {
+                        stack_frame.set_next_pc(jpc);
+                    }else {
+                        stack_frame.next_pc();
+                    }
+                }else {
+                    unreachable!()
+                }
+            }
+            ByteCode::Big => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(big_value(value_0, value_1)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::Less => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(less_value(value_0, value_1)?);
+                stack_frame.next_pc();
             }
             _ => todo!(),
         }
