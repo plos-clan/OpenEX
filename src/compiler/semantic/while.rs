@@ -34,7 +34,7 @@ pub fn while_semantic(
 
     let mut blk_table = block_semantic(semantic, body, code, locals)?;
     code_table.append_code(&mut blk_table);
-    code_table.add_opcode(OpCode::Jump(None, start));
+    code_table.add_opcode(OpCode::Jump(None, Some(start)));
     let end_addr = code_table.add_opcode(OpCode::Nop(None));
 
     if let Some(jump_true_op) = code_table.find_code_mut(k)

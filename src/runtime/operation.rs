@@ -109,3 +109,34 @@ pub(crate) fn less_value(left: Value, right: Value) -> Result<Value, RuntimeErro
         )),
     }
 }
+
+pub(crate) fn equ_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Int(l), Int(r)) => Ok(Bool(l == r)),
+        (Float(l), Float(r)) => Ok(Bool(l == r)),
+        (String(l), String(r)) => Ok(Bool(l.as_str() == r.as_str())),
+        (Null, Null) => Ok(Bool(true)),
+        (Bool(l), Bool(r)) => Ok(Bool(l == r)),
+        _=> Ok(Bool(false)),
+    }
+}
+
+pub(crate) fn not_equ_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Int(l), Int(r)) => Ok(Bool(l != r)),
+        (Float(l), Float(r)) => Ok(Bool(l != r)),
+        (String(l), String(r)) => Ok(Bool(l.as_str() != r.as_str())),
+        (Null, Null) => Ok(Bool(false)),
+        (Bool(l), Bool(r)) => Ok(Bool(l != r)),
+        _=> Ok(Bool(true)),
+    }
+}
+
+pub(crate) fn not_value(var: Value) -> Result<Value, RuntimeError> {
+    match var { 
+        Bool(l) => Ok(Bool(!l)),
+        auto=> Err(RuntimeError::TypeException(
+            format!("{} to bool", auto).to_smolstr()
+        ))
+    }
+}

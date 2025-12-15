@@ -7,7 +7,7 @@ use smol_str::{SmolStr, ToSmolStr};
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
-use crate::runtime::operation::{add_value, big_value, div_value, less_value, mul_value, self_add_value, self_sub_value, sub_value};
+use crate::runtime::operation::{add_value, big_value, div_value, equ_value, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -382,6 +382,23 @@ pub(crate) fn run_executor(
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
                 stack_frame.push_op_stack(less_value(value_0, value_1)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::Equ => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(equ_value(value_0, value_1)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::NotEqu => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                let value_1 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(not_equ_value(value_0, value_1)?);
+                stack_frame.next_pc();
+            }
+            ByteCode::Not => {
+                let value_0 = stack_frame.pop_op_stack().unwrap();
+                stack_frame.push_op_stack(not_value(value_0)?);
                 stack_frame.next_pc();
             }
             _ => todo!(),

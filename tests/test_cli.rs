@@ -59,3 +59,16 @@ pub fn test_loop() {
         number: 5
     "#]]);
 }
+
+#[test]
+pub fn test_judgment() {
+    check(b"import system;\
+    var a = 3 + 1 - 4;\
+    if (a != 0) {\
+    system.println(\"Hello!\"); \
+    }elif (a == 0) {\
+    system.println(\"a is zero.\");\
+    }",expect![[r#"
+        > a is zero.
+    "#]]);
+}

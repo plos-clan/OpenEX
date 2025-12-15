@@ -57,6 +57,7 @@ fn astop_to_opcode(astop: &ExprOp) -> OpCode {
         ExprOp::Less => OpCode::Less(None),
         ExprOp::Big => OpCode::Big(None),
         ExprOp::Equ => OpCode::Equ(None),
+        ExprOp::NotEqu => OpCode::NotEqu(None),
         _ => todo!(),
     }
 }

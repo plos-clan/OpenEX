@@ -54,7 +54,7 @@ pub enum OpCode {
     StoreLocal(Option<LocalAddr>, DefaultKey, Operand), // 将一个变量加载到栈顶
     Push(Option<LocalAddr>, Operand),                   // 将值压入操作栈
     Call(Option<LocalAddr>, SmolStr),                   // 函数调用
-    Jump(Option<LocalAddr>, LocalAddr),                 // 无条件跳转
+    Jump(Option<LocalAddr>, Option<LocalAddr>),         // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
     Return(Option<LocalAddr>),                          // 栈顶结果返回
     Nop(Option<LocalAddr>),                             // 空操作
@@ -110,9 +110,11 @@ impl OpCode {
 
         // 重定位 Jump 和 JumpTrue 的跳转目标
         match self {
-            OpCode::Jump(_, target_addr) => {
-                if let Some(new_addr) = addr_map.get(target_addr) {
-                    *target_addr = *new_addr;
+            OpCode::Jump(_, target) => {
+                if let Some(j_target) = target
+                    && let Some(&new_target) = addr_map.get(j_target)
+                {
+                    *target = Some(new_target);
                 }
             }
             OpCode::JumpTrue(_, target, ..) => {
@@ -154,7 +156,7 @@ impl OpCodeTable {
         addr
     }
 
-    // 返回IR块最后一条IR的逻辑地址
+    // 返回IR块第一条和最后一条IR的逻辑地址
     pub fn append_code(&mut self, code: &mut OpCodeTable) -> (LocalAddr, Option<LocalAddr>) {
         let start_offset = self.alloc_addr.offset;
         if code.opcodes.is_empty() {

@@ -6,6 +6,8 @@ use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic};
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::semantic::Semantic;
 use crate::compiler::Compiler;
+use crate::compiler::semantic::judgment::judgment_semantic;
+use crate::compiler::semantic::r#while::while_semantic;
 
 pub fn block_semantic(
     semantic: &mut Semantic,
@@ -38,6 +40,18 @@ pub fn block_semantic(
                     );
                 }
                 opcodes.append_code(&mut ret_m.2);
+            }
+            ASTStmtTree::If {cond,then_body,else_body} => {
+                let mut ret_m = judgment_semantic(semantic,cond,then_body,else_body,code, locals)?;
+                code.get_code_table().append_code(&mut ret_m);
+            }
+            ASTStmtTree::Loop {
+                token: _token,
+                cond,
+                body,
+            } => {
+                let mut ret_m = while_semantic(semantic, cond, body, code, locals)?;
+                code.get_code_table().append_code(&mut ret_m);
             }
             _ => todo!(),
         }

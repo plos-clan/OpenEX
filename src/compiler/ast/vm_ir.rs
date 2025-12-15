@@ -165,7 +165,7 @@ impl IrFunction {
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }
                 OpCode::Jump(_,addr) => {
-                    self.codes.push(ByteCode::Jump(addr.offset));
+                    self.codes.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_,addr,_) => {
                     let addr_some = addr.unwrap();
@@ -253,7 +253,7 @@ impl VMIRTable {
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }
                 OpCode::Jump(_,addr) => {
-                    self.codes.push(ByteCode::Jump(addr.offset));
+                    self.codes.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_,addr,_) => {
                     let addr_some = addr.unwrap();

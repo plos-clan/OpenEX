@@ -4,6 +4,7 @@ mod function;
 mod optimizer;
 mod var;
 mod r#while;
+mod judgment;
 
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, ValueGuessType};
 use crate::compiler::ast::ASTStmtTree;
@@ -17,6 +18,7 @@ use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::{Compiler, CompilerData};
 use smol_str::SmolStr;
+use crate::compiler::semantic::judgment::judgment_semantic;
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,
@@ -80,6 +82,10 @@ impl<'a> Semantic<'a> {
                     }
                     ASTStmtTree::NativeFunction { name, args } => {
                         native_function_semantic(self, name, args,code)?;
+                    }
+                    ASTStmtTree::If {cond,then_body,else_body} => {
+                        let mut ret_m = judgment_semantic(self,cond,then_body,else_body,code, &mut global)?;
+                        code.get_code_table().append_code(&mut ret_m);
                     }
                     _ => todo!(),
                 }
