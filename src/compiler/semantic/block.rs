@@ -1,13 +1,14 @@
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable};
+use crate::compiler::ast::ssa_ir::OpCode::Push;
+use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
 use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::lints::Lint::UnusedExpression;
 use crate::compiler::parser::ParserError;
-use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic};
+use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic, lower_expr};
+use crate::compiler::semantic::judgment::judgment_semantic;
+use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::semantic::Semantic;
 use crate::compiler::Compiler;
-use crate::compiler::semantic::judgment::judgment_semantic;
-use crate::compiler::semantic::r#while::while_semantic;
 
 pub fn block_semantic(
     semantic: &mut Semantic,
@@ -43,7 +44,7 @@ pub fn block_semantic(
             }
             ASTStmtTree::If {cond,then_body,else_body} => {
                 let mut ret_m = judgment_semantic(semantic,cond,then_body,else_body,code, locals)?;
-                code.get_code_table().append_code(&mut ret_m);
+                opcodes.append_code(&mut ret_m);
             }
             ASTStmtTree::Loop {
                 token: _token,
@@ -51,7 +52,17 @@ pub fn block_semantic(
                 body,
             } => {
                 let mut ret_m = while_semantic(semantic, cond, body, code, locals)?;
-                code.get_code_table().append_code(&mut ret_m);
+                opcodes.append_code(&mut ret_m);
+            }
+            ASTStmtTree::Return(expr) => {
+                if let Some(expr) = expr {
+                    let mut ref_expr = lower_expr(semantic, &expr, code, None)?;
+                    opcodes.append_code(&mut ref_expr.2);
+                    opcodes.add_opcode(OpCode::Return(None));
+                }else {
+                    opcodes.add_opcode(Push(None,Operand::Null));
+                    opcodes.add_opcode(OpCode::Return(None));
+                }
             }
             _ => todo!(),
         }

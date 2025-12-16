@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 mod compiler;
 mod library;
 mod runtime;

@@ -4,7 +4,7 @@ use crate::library::find_library;
 use crate::runtime::executor::{run_executor, Executor, StackFrame};
 use crate::runtime::RuntimeError;
 use crossbeam_channel::{unbounded, Sender};
-use smol_str::{SmolStr, ToSmolStr};
+use smol_str::SmolStr;
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::thread;
 
@@ -74,7 +74,7 @@ impl OpenEXThread {
 
     fn run_exec(&mut self, executor: &mut Executor, tables: Arc<VMIRTable>, filename: SmolStr) {
         self.push_frame(StackFrame::new(
-            "root".to_smolstr(),
+            "root".to_string(),
             filename,
             tables.clone_codes(),
             tables.get_locals_len(),

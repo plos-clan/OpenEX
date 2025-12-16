@@ -1,6 +1,8 @@
 use crate::compiler::ast::ssa_ir::OpCode::Push;
 use crate::compiler::ast::ssa_ir::Operand::ImmNumFlot;
-use crate::compiler::ast::ssa_ir::ValueGuessType::{Bool, Float, Null, Number, Ref, String, This, Unknown};
+use crate::compiler::ast::ssa_ir::ValueGuessType::{
+    Bool, Float, Null, Number, Ref, String, This, Unknown,
+};
 use crate::compiler::ast::ssa_ir::{Code, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
@@ -114,6 +116,24 @@ fn guess_type(
     second: ValueGuessType,
     op: &ExprOp,
 ) -> Result<ValueGuessType, ParserError> {
+    if matches!(op, ExprOp::Equ) || matches!(op, ExprOp::NotEqu) {
+        return Ok(Bool);
+    }
+
+    if matches!(op, ExprOp::LesEqu)
+        || matches!(op, ExprOp::Less)
+        || matches!(op, ExprOp::BigEqu)
+        || matches!(op, ExprOp::Big)
+    {
+        return if guess_check_type(second, &[Number, Float, Unknown])
+            || guess_check_type(first, &[Number, Float, Unknown])
+        {
+            Ok(Bool)
+        } else {
+            Err(ParserError::IllegalTypeCombination(token.clone()))
+        };
+    }
+
     if first == Unknown || second == Unknown {
         return Ok(Unknown);
     }
@@ -244,8 +264,8 @@ fn lower_ref(
     let mut path = SmolStrBuilder::new();
 
     if let ASTExprTree::Expr {
-        token:_,
-        op:_op,
+        token: _,
+        op: _op,
         left,
         right,
     } = expr_tree
@@ -253,31 +273,31 @@ fn lower_ref(
         let left_tree = left.as_ref();
         let right_tree = right.as_ref();
 
-        if matches!(left_tree, ASTExprTree::Call { .. }) || matches!(left_tree, ASTExprTree::This(_token)) ||
-            matches!(left_tree, ASTExprTree::Var(_token)) {
+        if matches!(left_tree, ASTExprTree::Call { .. })
+            || matches!(left_tree, ASTExprTree::This(_token))
+            || matches!(left_tree, ASTExprTree::Var(_token))
+        {
             let mut table = lower_expr(semantic, left_tree, code, None)?.2;
             opcode_table.append_code(&mut table);
-        }else {
+        } else {
             unreachable!()
         }
 
-        if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree{
+        if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree {
             path.push_str(format!("/{}", token.text()).as_str());
             let code = match right_tree {
                 ASTExprTree::Var(token) => {
-                    Push(None,Operand::Reference(token.text().to_smolstr()))
-                },
-                ASTExprTree::This(_token) => {
-                    Push(None,Operand::This)
-                },
-                _ => unreachable!()
+                    Push(None, Operand::Reference(token.text().to_smolstr()))
+                }
+                ASTExprTree::This(_token) => Push(None, Operand::This),
+                _ => unreachable!(),
             };
             opcode_table.add_opcode(code);
-        }else {
+        } else {
             unreachable!()
         }
         opcode_table.add_opcode(OpCode::Ref(None));
-    }else {
+    } else {
         unreachable!()
     }
 
@@ -293,7 +313,7 @@ fn operand_to_guess(operand: Operand) -> ValueGuessType {
         Operand::ImmFlot(_) => Float,
         Operand::ImmStr(_) => String,
         Operand::Reference(_) => Ref,
-        _=> Unknown,
+        _ => Unknown,
     }
 }
 
@@ -339,7 +359,11 @@ pub(crate) fn lower_expr(
         }
         ASTExprTree::Ref(token) => {
             opcode_table.add_opcode(Push(None, Operand::Reference(token.text().to_smolstr())));
-            Ok((Operand::Reference(token.text().to_smolstr()), Ref, opcode_table))
+            Ok((
+                Operand::Reference(token.text().to_smolstr()),
+                Ref,
+                opcode_table,
+            ))
         }
         ASTExprTree::This(_token) => {
             opcode_table.add_opcode(Push(None, Operand::This));
@@ -350,8 +374,8 @@ pub(crate) fn lower_expr(
             op: u_op,
             code: u_code,
         } => {
-            let mut load = lower_expr(semantic, u_code.as_ref(), code,None)?;
-            let mut store = lower_expr(semantic, u_code.as_ref(), code,Some(ImmNumFlot))?;
+            let mut load = lower_expr(semantic, u_code.as_ref(), code, None)?;
+            let mut store = lower_expr(semantic, u_code.as_ref(), code, Some(ImmNumFlot))?;
             let g_type = guess_type_unary(u_token, store.1, u_op)?;
             if let Some(operand) = unary_optimizer(u_op, &store.0) {
                 opcode_table.add_opcode(Push(None, operand));
@@ -370,9 +394,9 @@ pub(crate) fn lower_expr(
         } => {
             let mut right = lower_expr(semantic, e_right.as_ref(), code, None)?;
             let right_opd = Box::new(right.0.clone());
-            let stores = if matches!(e_op,ExprOp::Store) {
+            let stores = if matches!(e_op, ExprOp::Store) {
                 Some(right.0.clone())
-            }else {
+            } else {
                 None
             };
             let mut left = lower_expr(semantic, e_left.as_ref(), code, stores)?;
@@ -386,10 +410,10 @@ pub(crate) fn lower_expr(
                 opcode_table.add_opcode(Push(None, operand));
             } else {
                 let opcode = astop_to_opcode(e_op);
-                if matches!(e_op,ExprOp::Store) {
+                if matches!(e_op, ExprOp::Store) {
                     opcode_table.append_code(&mut right.2);
                     opcode_table.append_code(&mut left.2);
-                }else {
+                } else {
                     opcode_table.append_code(&mut left.2);
                     opcode_table.append_code(&mut right.2);
                     opcode_table.add_opcode(opcode.clone());
@@ -416,14 +440,22 @@ pub(crate) fn lower_expr(
                         opcode_table.add_opcode(Push(None, Operand::Library(var_name)));
                     }
                     _ => {
-                        if let Some(operand) = store{
+                        if let Some(operand) = store {
                             if let ImmNumFlot = operand {
-                            }else {
+                            } else {
                                 value.type_ = operand_to_guess(operand);
                             }
-                            opcode_table.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
-                        }else {
-                            opcode_table.add_opcode(OpCode::StoreLocal(None, key, Operand::Val(key)));
+                            opcode_table.add_opcode(OpCode::LoadLocal(
+                                None,
+                                key,
+                                Operand::Val(key),
+                            ));
+                        } else {
+                            opcode_table.add_opcode(OpCode::StoreLocal(
+                                None,
+                                key,
+                                Operand::Val(key),
+                            ));
                         }
                     }
                 };
@@ -453,7 +485,7 @@ pub(crate) fn lower_expr(
                     let mut refs = lower_ref(semantic, name.as_ref(), code)?;
                     opcode_table.append_code(&mut refs.1);
                     let cl_str = refs.0.clone();
-                    opcode_table.add_opcode(OpCode::Call(None,refs.0));
+                    opcode_table.add_opcode(OpCode::Call(None, refs.0));
                     Ok((Operand::Call(cl_str), Unknown, opcode_table))
                 }
                 _ => {

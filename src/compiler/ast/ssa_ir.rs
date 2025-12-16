@@ -56,6 +56,7 @@ pub enum OpCode {
     Call(Option<LocalAddr>, SmolStr),                   // 函数调用
     Jump(Option<LocalAddr>, Option<LocalAddr>),         // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
+    JumpFalse(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结构为假则跳转
     Return(Option<LocalAddr>),                          // 栈顶结果返回
     Nop(Option<LocalAddr>),                             // 空操作
 
@@ -117,7 +118,7 @@ impl OpCode {
                     *target = Some(new_target);
                 }
             }
-            OpCode::JumpTrue(_, target, ..) => {
+            OpCode::JumpTrue(_, target, ..) | OpCode::JumpFalse(_, target, ..) => {
                 if let Some(j_target) = target
                     && let Some(&new_target) = addr_map.get(j_target)
                 {
@@ -316,6 +317,7 @@ macro_rules! mathch_opcodes {
             | OpCode::Call($slot, ..)
             | OpCode::Jump($slot, ..)
             | OpCode::JumpTrue($slot, ..)
+            | OpCode::JumpFalse($slot, ..)
             | OpCode::Return($slot)
             | OpCode::Add($slot)
             | OpCode::Sub($slot)

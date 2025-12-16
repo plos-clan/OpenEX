@@ -12,9 +12,11 @@ pub enum ByteCode {
     StoreGlobal(usize), // 将全局变量加载到栈顶 (变量表索引)
     Jump(usize),        // 无条件跳转 (pc位置)
     JumpTrue(usize),    // 栈顶条件跳转 (pc位置)
+    JumpFalse(usize),   // 栈顶反转条件跳转 (pc位置)
     Call,               // 函数调用 (要求栈上最少有两个引用)
     Nol,                // 空操作
     GetRef,             // 拼接引用路径
+    Return,             // 退出当前栈帧 (并将栈顶元素压入父栈帧操作栈)
     Add,
     Sub,
     Mul,
@@ -111,6 +113,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::Call(_, _imm) => ByteCode::Call,
         OpCode::Ref(_) => ByteCode::GetRef,
         OpCode::Nop(_) => ByteCode::Nol,
+        OpCode::Return(_) => ByteCode::Return,
         c => {
             dbg!(c);
             todo!()
@@ -135,6 +138,7 @@ impl IrFunction {
         table: OpCodeTable,
         code0: &mut Code,
         locals: &mut LocalMap,
+        globals: &mut LocalMap,
         constant_table: &mut ConstantTable,
     ) {
         for code in table.opcodes {
@@ -157,11 +161,11 @@ impl IrFunction {
                     self.codes.push(ByteCode::Store(*index));
                 }
                 OpCode::LoadGlobal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
+                    let index = globals.get_index(&key).unwrap();
                     self.codes.push(ByteCode::LoadGlobal(*index));
                 }
                 OpCode::StoreGlobal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
+                    let index = globals.get_index(&key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }
                 OpCode::Jump(_,addr) => {
@@ -170,6 +174,10 @@ impl IrFunction {
                 OpCode::JumpTrue(_,addr,_) => {
                     let addr_some = addr.unwrap();
                     self.codes.push(ByteCode::JumpTrue(addr_some.offset));
+                }
+                OpCode::JumpFalse(_,addr,_) => {
+                    let addr_some = addr.unwrap();
+                    self.codes.push(ByteCode::JumpFalse(addr_some.offset));
                 }
                 c => {
                     self.codes.push(opcode_to_vmir(c));
@@ -259,6 +267,10 @@ impl VMIRTable {
                     let addr_some = addr.unwrap();
                     self.codes.push(ByteCode::JumpTrue(addr_some.offset));
                 }
+                OpCode::JumpFalse(_,addr,_) => {
+                    let addr_some = addr.unwrap();
+                    self.codes.push(ByteCode::JumpFalse(addr_some.offset));
+                }
                 c => {
                     self.codes.push(opcode_to_vmir(c));
                 }
@@ -323,6 +335,7 @@ pub fn ssa_to_vm(mut code: Code, mut locals: LocalMap, filename: SmolStr) -> VMI
                 func.codes.unwrap(),
                 &mut code,
                 &mut func.locals,
+                &mut locals,
                 &mut vm_table.constant_table,
             );
         }

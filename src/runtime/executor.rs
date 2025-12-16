@@ -1,13 +1,15 @@
 use crate::compiler::ast::vm_ir::{ByteCode, ConstantTable, IrFunction, Types};
 use crate::compiler::file::SourceFile;
 use crate::compiler::Compiler;
+use crate::runtime::operation::{
+    add_value, big_value, div_value, equ_value, less_value, mul_value, not_equ_value, not_value,
+    self_add_value, self_sub_value, sub_value,
+};
 use crate::runtime::thread::{add_thread_join, OpenEXThread};
 use crate::runtime::RuntimeError;
 use smol_str::{SmolStr, ToSmolStr};
-use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
-use crate::runtime::operation::{add_value, big_value, div_value, equ_value, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -43,8 +45,8 @@ impl Display for Value {
 pub(crate) struct StackFrame {
     constant_table: ConstantTable,
     local_tables: Vec<Value>,
-    op_stack: VecDeque<Value>,
-    name: SmolStr,
+    op_stack: Vec<Value>,
+    name: String,
     file_name: SmolStr,
     pc: usize, // 指令执行索引(仅当前栈帧)
     codes: Vec<ByteCode>,
@@ -71,7 +73,7 @@ fn element_to_value(element: (Types, SmolStr)) -> Value {
 
 impl StackFrame {
     pub fn new(
-        name: SmolStr,
+        name: String,
         file_name: SmolStr,
         codes: Vec<ByteCode>,
         locals: usize,
@@ -83,7 +85,7 @@ impl StackFrame {
             constant_table,
             name,
             file_name,
-            op_stack: VecDeque::new(),
+            op_stack: Vec::new(),
             local_tables: vec![Value::Null; locals],
             pc: 0,
             codes,
@@ -116,18 +118,18 @@ impl StackFrame {
     }
 
     pub fn get_op_stack_top(&self) -> Option<Value> {
-        self.op_stack.back().cloned()
+        self.op_stack.last().cloned()
     }
 
     pub fn pop_op_stack(&mut self) -> Option<Value> {
-        self.op_stack.pop_back()
+        self.op_stack.pop()
     }
 
     pub fn push_op_stack(&mut self, value: Value) {
-        self.op_stack.push_back(value);
+        self.op_stack.push(value);
     }
 
-    pub fn get_frame_name(&self) -> (SmolStr, SmolStr) {
+    pub fn get_frame_name(&self) -> (String, SmolStr) {
         (self.name.clone(), self.file_name.clone())
     }
 
@@ -282,7 +284,7 @@ pub(crate) fn run_executor(
                 stack_frame.push_op_stack(add_value(value_1, value_0)?);
                 stack_frame.next_pc();
             }
-            ByteCode::Sub =>  {
+            ByteCode::Sub => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
                 stack_frame.push_op_stack(sub_value(value_1, value_0)?);
@@ -316,7 +318,7 @@ pub(crate) fn run_executor(
                         };
                         Ok((
                             Some(StackFrame::new(
-                                func.name.clone(),
+                                func.name.clone().to_string(),
                                 func.filename,
                                 codes,
                                 func.locals,
@@ -365,41 +367,57 @@ pub(crate) fn run_executor(
                 if let Value::Bool(value) = top {
                     if value {
                         stack_frame.set_next_pc(jpc);
-                    }else {
+                    } else {
                         stack_frame.next_pc();
                     }
-                }else {
+                } else {
+                    unreachable!()
+                }
+            }
+            ByteCode::JumpFalse(pc) => {
+                let jpc = *pc;
+                let top = stack_frame.pop_op_stack().unwrap();
+                if let Value::Bool(value) = top {
+                    if value {
+                        stack_frame.next_pc();
+                    } else {
+                        stack_frame.set_next_pc(jpc);
+                    }
+                } else {
                     unreachable!()
                 }
             }
             ByteCode::Big => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(big_value(value_0, value_1)?);
+                stack_frame.push_op_stack(big_value(value_1, value_0)?);
                 stack_frame.next_pc();
             }
             ByteCode::Less => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(less_value(value_0, value_1)?);
+                stack_frame.push_op_stack(less_value(value_1, value_0)?);
                 stack_frame.next_pc();
             }
             ByteCode::Equ => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(equ_value(value_0, value_1)?);
+                stack_frame.push_op_stack(equ_value(value_1, value_0)?);
                 stack_frame.next_pc();
             }
             ByteCode::NotEqu => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(not_equ_value(value_0, value_1)?);
+                stack_frame.push_op_stack(not_equ_value(value_1, value_0)?);
                 stack_frame.next_pc();
             }
             ByteCode::Not => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 stack_frame.push_op_stack(not_value(value_0)?);
                 stack_frame.next_pc();
+            }
+            ByteCode::Return => {
+                return Ok((None, true));
             }
             _ => todo!(),
         }
