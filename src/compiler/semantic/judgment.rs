@@ -27,7 +27,6 @@ pub fn judgment_semantic(
 
     let blk_table = block_semantic(semantic, then_body, code, locals)?;
     code_table.append_code(&blk_table);
-    let jump_else = code_table.add_opcode(OpCode::Jump(None, None));
 
     if else_body.is_empty() {
         let end_addr = code_table.add_opcode(OpCode::Nop(None));
@@ -36,12 +35,8 @@ pub fn judgment_semantic(
         {
             *target = Some(end_addr);
         }
-        if let Some(jump_op) = code_table.find_code_mut(jump_else)
-            && let OpCode::Jump(_, target) = jump_op
-        {
-            *target = Some(end_addr);
-        }
     } else {
+        let jump_else = code_table.add_opcode(OpCode::Jump(None, None));
         let else_table = block_semantic(semantic, else_body, code, locals)?;
         let end_addr = code_table.append_code(&else_table).0;
         let end_else = code_table.add_opcode(OpCode::Nop(None));

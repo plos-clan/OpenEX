@@ -250,11 +250,11 @@ impl VMIRTable {
                         self.codes.push(ByteCode::Push(index));
                     }
                 }
-                OpCode::LoadLocal(_, key, _) => {
+                OpCode::LoadLocal(_, key, _) | OpCode::LoadGlobal(_, key, _) => {
                     let index = locals.get_index(key).unwrap();
                     self.codes.push(ByteCode::LoadGlobal(*index));
                 }
-                OpCode::StoreLocal(_, key, _) => {
+                OpCode::StoreLocal(_, key, _) | OpCode::StoreGlobal(_, key, _) => {
                     let index = locals.get_index(key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }
