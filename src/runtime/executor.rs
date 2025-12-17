@@ -7,7 +7,7 @@ use crate::runtime::operation::{
 };
 use crate::runtime::thread::{add_thread_join, OpenEXThread};
 use crate::runtime::RuntimeError;
-use smol_str::{SmolStr, ToSmolStr};
+use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
 
@@ -17,7 +17,7 @@ pub enum Value {
     Bool(bool),
     Float(f64),
     String(String),
-    Ref(String),
+    Ref(SmolStr),
     Null,
 }
 
@@ -54,19 +54,17 @@ pub(crate) struct StackFrame {
     args: usize,             // 从父栈帧提取的参数个数
 }
 
-fn element_to_value(element: (Types, SmolStr)) -> Value {
-    match element.0 {
-        Types::String => Value::String(element.1.to_string()),
+fn element_to_value((types, value): (Types, SmolStr)) -> Value {
+    match types {
+        Types::String => Value::String(value.to_string()),
         Types::Number => {
-            let str = element.1.to_string();
-            Value::Int(str.parse::<i64>().unwrap())
+            Value::Int(value.parse::<i64>().unwrap())
         }
         Types::Float => {
-            let str = element.1.to_string();
-            Value::Float(str.parse::<f64>().unwrap())
+            Value::Float(value.parse::<f64>().unwrap())
         }
-        Types::Bool => Value::Bool(element.1 == "true"),
-        Types::Ref => Value::Ref(element.1.to_string()),
+        Types::Bool => Value::Bool(value == "true"),
+        Types::Ref => Value::Ref(value.to_smolstr()),
         Types::Null => Value::Null,
     }
 }
@@ -98,8 +96,8 @@ impl StackFrame {
         self.local_tables[index] = value;
     }
 
-    pub fn get_var_table(&self, index: usize) -> Value {
-        self.local_tables.get(index).unwrap().clone()
+    pub fn get_var_table(&self, index: usize) -> &Value {
+        self.local_tables.get(index).unwrap()
     }
 
     pub fn is_native(&self) -> Option<SmolStr> {
@@ -129,8 +127,8 @@ impl StackFrame {
         self.op_stack.push(value);
     }
 
-    pub fn get_frame_name(&self) -> (String, SmolStr) {
-        (self.name.clone(), self.file_name.clone())
+    pub fn get_frame_name(&self) -> (&str, &str) {
+        (&self.name, &self.file_name)
     }
 
     pub fn fetch_current(&self) -> Option<&ByteCode> {
@@ -166,7 +164,7 @@ impl Executor {
         self.threads.last_mut().unwrap()
     }
 
-    pub fn get_path_func(&mut self, path: String) -> Option<(ConstantTable, IrFunction)> {
+    pub fn get_path_func(&mut self, path: &str) -> Option<(ConstantTable, IrFunction)> {
         let mut sp = path.split('/');
         let file = sp.next().unwrap();
         let func = sp.next().unwrap();
@@ -235,11 +233,11 @@ pub(crate) fn run_executor(
                 let const_index = *const_index0;
 
                 if let Some(value) = stack_frame.get_const(const_index) {
-                    if let Value::Ref(path) = value.clone()
+                    if let Value::Ref(path) = &value
                         && path.as_str() == "this"
                     {
                         let path = stack_frame.file_name.split(".").next().unwrap();
-                        stack_frame.push_op_stack(Value::Ref(path.to_string()));
+                        stack_frame.push_op_stack(Value::Ref(path.to_smolstr()));
                     } else {
                         stack_frame.push_op_stack(value);
                     }
@@ -264,7 +262,7 @@ pub(crate) fn run_executor(
                 } else {
                     stack_frame.get_var_table(index)
                 };
-                stack_frame.push_op_stack(result);
+                stack_frame.push_op_stack(result.clone());
                 stack_frame.next_pc();
             }
             ByteCode::Load(var_index) => {
@@ -275,7 +273,7 @@ pub(crate) fn run_executor(
             }
             ByteCode::Store(var_index) => {
                 let value = stack_frame.get_var_table(*var_index);
-                stack_frame.push_op_stack(value);
+                stack_frame.push_op_stack(value.clone());
                 stack_frame.next_pc();
             }
             ByteCode::Add => {
@@ -297,7 +295,7 @@ pub(crate) fn run_executor(
                 if let Value::Ref(ref_top) = ref1
                     && let Value::Ref(ref_bak) = ref2
                 {
-                    let all_ref = format!("{}/{}", ref_bak, ref_top);
+                    let all_ref = format_smolstr!("{}/{}", ref_bak, ref_top);
                     stack_frame.push_op_stack(Value::Ref(all_ref));
                 } else {
                     unreachable!()
@@ -307,18 +305,18 @@ pub(crate) fn run_executor(
             ByteCode::Call => {
                 let result = stack_frame.pop_op_stack().unwrap();
                 return if let Value::Ref(path) = result {
-                    let panic_path = path.clone().to_smolstr();
-                    if let Some(function) = executor.get_path_func(path) {
+                    let panic_path = path.clone();
+                    if let Some(function) = executor.get_path_func(&path) {
                         let func = function.1;
                         let codes = func.clone_codes();
                         stack_frame.next_pc();
                         let native = match func.is_native {
-                            true => Some(panic_path.clone()),
+                            true => Some(panic_path),
                             false => None,
                         };
                         Ok((
                             Some(StackFrame::new(
-                                func.name.clone().to_string(),
+                                func.name.to_string(),
                                 func.filename,
                                 codes,
                                 func.locals,
