@@ -9,12 +9,12 @@ use crate::compiler::Compiler;
 
 pub fn while_semantic(
     semantic: &mut Semantic,
-    expr: ASTExprTree,
+    expr: &ASTExprTree,
     body: Vec<ASTStmtTree>,
     code: &mut Code,
     locals:&mut LocalMap
 ) -> Result<OpCodeTable, ParserError> {
-    let mut exp = lower_expr(semantic, &expr, code, None)?;
+    let exp = lower_expr(semantic, expr, code, None)?;
     let mut code_table = OpCodeTable::new();
 
     if exp.1 != ValueGuessType::Bool {
@@ -25,15 +25,15 @@ pub fn while_semantic(
         Compiler::warning_info_expr(
             semantic.file,
             "'while(true)' can be written as 'while'.",
-            &expr,
+            expr,
             LoopNoExpr,
         );
     }
-    let start = code_table.append_code(&mut exp.2).0;
+    let start = code_table.append_code(&exp.2).0;
     let k = code_table.add_opcode(OpCode::JumpTrue(None,None, exp.0));
 
-    let mut blk_table = block_semantic(semantic, body, code, locals)?;
-    code_table.append_code(&mut blk_table);
+    let blk_table = block_semantic(semantic, body, code, locals)?;
+    code_table.append_code(&blk_table);
     code_table.add_opcode(OpCode::Jump(None, Some(start)));
     let end_addr = code_table.add_opcode(OpCode::Nop(None));
 

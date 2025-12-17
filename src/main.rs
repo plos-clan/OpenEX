@@ -114,7 +114,7 @@ fn main() -> io::Result<()> {
     let mut compiler = Compiler::new();
 
     if args.version {
-        println!("OpenEX RustEdition v{}", compiler.get_version());
+        println!("OpenEX RustEdition v{}", Compiler::get_version());
         println!("Copyright 2023-2026 by MCPPL,DotCS");
         return Ok(());
     }
@@ -138,7 +138,7 @@ fn main() -> io::Result<()> {
         for file in args.input {
             let file_name = file.clone();
             let data =
-                fs::read_to_string(file).unwrap_or_else(|e| panic!("error: cannot read file{}", e));
+                fs::read_to_string(file).unwrap_or_else(|e| panic!("error: cannot read file{e}"));
             compiler.add_file(SourceFile::new(file_name, data, args.allow.clone(), false));
         }
     }

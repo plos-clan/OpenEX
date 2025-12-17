@@ -40,7 +40,7 @@ pub fn test_var_define() {
     system.println(b);",expect![[r#"
         > 3.1415926535
         12
-    "#]])
+    "#]]);
 }
 
 #[test]
@@ -77,5 +77,5 @@ pub fn test_fib() {
     }}\
     system.println(this.fib(30));",expect![[r#"
         > 832040
-    "#]])
+    "#]]);
 }

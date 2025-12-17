@@ -12,15 +12,15 @@ use smol_str::SmolStr;
 
 pub fn native_function_semantic(
     semantic: &mut Semantic,
-    mut name: Token,
-    arguments: Vec<ASTExprTree>,
+    name: Token,
+    arguments: &[ASTExprTree],
     code: &mut Code,
 ) -> Result<(), ParserError> {
     let mut lib_name = semantic.file.name.clone();
     lib_name = lib_name.split('.').next().unwrap().to_string();
-    let func_name = name.value::<SmolStr>().clone().unwrap();
+    let func_name = name.value::<SmolStr>().unwrap();
 
-    if code.find_function(func_name.clone()).is_some() {
+    if code.find_function(&func_name).is_some() {
         return Err(ParserError::SymbolDefined(name));
     }
 
@@ -49,13 +49,13 @@ pub fn native_function_semantic(
 
 pub fn function_semantic(
     semantic: &mut Semantic,
-    mut name: Token,
+    name: Token,
     arguments: Vec<ASTExprTree>,
     body: Vec<ASTStmtTree>,
     code: &mut Code,
 ) -> Result<(), ParserError> {
-    let func_name = name.value::<SmolStr>().clone().unwrap();
-    if code.find_function(func_name.clone()).is_some() {
+    let func_name = name.value::<SmolStr>().unwrap();
+    if code.find_function(&func_name).is_some() {
         return Err(ParserError::SymbolDefined(name));
     }
     semantic
@@ -68,7 +68,7 @@ pub fn function_semantic(
     let args_len = arguments.len();
     for i in arguments {
         if let ASTExprTree::Var(token) = i {
-            let mut token_c = token.clone();
+            let token_c = token.clone();
             let key = code.alloc_value(token, ValueGuessType::Unknown);
             locals.add_local(key);
             semantic
@@ -79,8 +79,8 @@ pub fn function_semantic(
         }
     }
 
-    let mut blk = block_semantic(semantic, body, code, &mut locals)?;
-    tables.append_code(&mut blk);
+    let blk = block_semantic(semantic, body, code, &mut locals)?;
+    tables.append_code(&blk);
 
     semantic.compiler_data().symbol_table.exit_context();
 

@@ -17,7 +17,7 @@ pub struct ThreadPool {
 static THREAD_POOL: LazyLock<ThreadPool> = LazyLock::new(|| ThreadPool::new(4));
 
 impl ThreadPool {
-    pub fn new(size: usize) -> ThreadPool {
+    pub fn new(size: usize) -> Self {
         let (sender, receiver) = unbounded::<Job>();
 
         for _ in 0..size {
@@ -30,7 +30,7 @@ impl ThreadPool {
             });
         }
 
-        ThreadPool { sender }
+        Self { sender }
     }
 
     pub fn submit<F>(&self, job: F)
@@ -40,7 +40,7 @@ impl ThreadPool {
         self.sender.send(Box::new(job)).unwrap();
     }
 
-    pub fn submit_with_join<F, R>(&self, job: F) -> thread::JoinHandle<R>
+    pub fn submit_with_join<F, R>(job: F) -> thread::JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -57,7 +57,7 @@ pub struct OpenEXThread {
 }
 
 impl OpenEXThread {
-    pub fn new(name: String) -> OpenEXThread {
+    pub const fn new(name: String) -> Self {
         Self {
             name,
             call_stack: vec![],
@@ -72,7 +72,7 @@ impl OpenEXThread {
         self.call_stack.push(stack_frame);
     }
 
-    fn run_exec(&mut self, executor: &mut Executor, tables: Arc<VMIRTable>, filename: SmolStr) {
+    fn run_exec(&mut self, executor: &mut Executor, tables: &Arc<VMIRTable>, filename: SmolStr) {
         self.push_frame(StackFrame::new(
             "root".to_string(),
             filename,
@@ -100,11 +100,11 @@ impl OpenEXThread {
                     argument.push(stack_frame.pop_op_stack().unwrap());
                 }
 
-                match find_library(file, |f| {
+                if let Ok(_lib) = find_library(file, |f| {
                     if let Some(lib) = f
                         && let Some(func) = lib.find_func(&SmolStr::new(func))
                     {
-                        match (func.func)(argument) {
+                        match (func.func)(&argument) {
                             Ok(value) => {
                                 self.call_stack.last_mut().unwrap().push_op_stack(value);
                                 self.call_stack.pop().unwrap();
@@ -115,19 +115,16 @@ impl OpenEXThread {
                     } else {
                         Err(ParserError::Empty)
                     }
-                }) {
-                    Ok(_lib) => {}
-                    Err(_) => {
-                        eprintln!(
-                            "RuntimeError: {:?}",
-                            RuntimeError::NoSuchFunctionException(path)
-                        );
-                        for frame in self.call_stack.iter_mut() {
-                            let name = frame.get_frame_name();
-                            eprintln!("\t at <{}>::{}", name.1, name.0)
-                        }
-                        break;
+                }) {} else {
+                    eprintln!(
+                        "RuntimeError: {:?}",
+                        RuntimeError::NoSuchFunctionException(path)
+                    );
+                    for frame in &mut self.call_stack {
+                        let name = frame.get_frame_name();
+                        eprintln!("\t at <{}>::{}", name.1, name.0);
                     }
+                    break;
                 }
             } else {
 
@@ -158,10 +155,10 @@ impl OpenEXThread {
                         }
                     }
                     Err(error) => {
-                        eprintln!("RuntimeError: {:?}", error);
-                        for frame in self.call_stack.iter_mut() {
+                        eprintln!("RuntimeError: {error:?}");
+                        for frame in &mut self.call_stack {
                             let name = frame.get_frame_name();
-                            eprintln!("\t at <{}>::{}", name.1, name.0)
+                            eprintln!("\t at <{}>::{}", name.1, name.0);
                         }
                         break;
                     }
@@ -182,7 +179,7 @@ fn make_executor_job(
         let mut ex_rd = executor.read().unwrap().clone();
         let mut exec = executor.write().unwrap();
         let thread = exec.add_thread(OpenEXThread::new(sync_n.to_string()));
-        thread.run_exec(&mut ex_rd, table_l.clone(), filename.clone());
+        thread.run_exec(&mut ex_rd, &table_l, filename.clone());
     }
 }
 
@@ -207,6 +204,6 @@ pub fn add_thread_join(
     let name_l = Mutex::new(name);
     let table_l = Arc::new(table.clone());
     let handle =
-        THREAD_POOL.submit_with_join(make_executor_job(executor, name_l, table_l, filename));
+       ThreadPool::submit_with_join(make_executor_job(executor, name_l, table_l, filename));
     handle.join().unwrap();
 }

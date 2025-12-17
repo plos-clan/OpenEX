@@ -12,6 +12,6 @@ linked-hash-map = "0.5.6"
 crossbeam-channel = "0.5.15"
 
 [profile.release]
-debug = false
-strip = true
-lto = true
+debug = true
+strip = false
+lto = false

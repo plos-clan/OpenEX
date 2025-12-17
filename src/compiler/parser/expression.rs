@@ -3,11 +3,11 @@ use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError::{IllegalExpression, IllegalKey, MissingCondition};
-use crate::compiler::parser::{Parser, ParserError};
+use crate::compiler::parser::{check_char, Parser, ParserError};
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-fn prefix_binding_power(token: &mut Token) -> ((), u8) {
+fn prefix_binding_power(token: &Token) -> ((), u8) {
     match token.text() {
         "++" | "--" => ((), 21),
         "!" => ((), 23),
@@ -15,7 +15,7 @@ fn prefix_binding_power(token: &mut Token) -> ((), u8) {
     }
 }
 
-fn postfix_binding_power(token: &mut Token) -> Option<(u8, ())> {
+fn postfix_binding_power(token: &Token) -> Option<(u8, ())> {
     match token.text() {
         "++" | "--" => Some((21, ())),
         "[" | "(" => Some((27, ())),
@@ -23,7 +23,7 @@ fn postfix_binding_power(token: &mut Token) -> Option<(u8, ())> {
     }
 }
 
-fn binding_power(token: &mut Token) -> Option<(u8, u8)> {
+fn binding_power(token: &Token) -> Option<(u8, u8)> {
     match token.text() {
         "=" | "|=" | "&=" | "^=" | "+=" | "-=" | "*=" | "/=" | "%=" => Some((2, 1)),
         "&&" | "||" => Some((3, 4)),
@@ -45,27 +45,21 @@ fn expr_bp(
     tokens: &mut Peekable<IntoIter<Token>>,
     min_bp: u8,
 ) -> Result<ASTExprTree, ParserError> {
-    let mut token = match tokens.next() {
-        Some(token) => token,
-        None => return Err(IllegalExpression(parser.last.take().unwrap())),
-    };
+    let Some(mut token) = tokens.next() else { return Err(IllegalExpression(parser.last.take().unwrap())) };
 
     let mut expr_tree: ASTExprTree = match token.t_type {
         LP => {
-            let t = token.clone();
+            let t = token;
             if t.text() != "(" {
-                return Err(IllegalExpression(token));
+                return Err(IllegalExpression(t));
             }
             let lhs = expr_bp(parser, tokens, 0);
-            let mut n_token = match tokens.next() {
-                Some(token) => token,
-                None => return Err(MissingCondition(token)),
-            };
-            parser.check_char(&mut n_token, TokenType::LR, ')')?;
+            let Some(n_token) = tokens.next() else { return Err(MissingCondition(t)) };
+            check_char(&n_token, TokenType::LR, ')')?;
             lhs?
         }
         TokenType::Operator => {
-            let ((), r_bp) = prefix_binding_power(&mut token);
+            let ((), r_bp) = prefix_binding_power(&token);
             let op = match token.text() {
                 "++" => ExprOp::SAdd,
                 "--" => ExprOp::SSub,
@@ -93,7 +87,7 @@ fn expr_bp(
 
     loop {
         token = match tokens.peek().cloned() {
-            Some(token0) => token0,
+            Some(token) => token,
             None => break,
         };
 
@@ -104,67 +98,64 @@ fn expr_bp(
             return Err(IllegalExpression(token));
         }
 
-        if let Some((l_bp, ())) = postfix_binding_power(&mut token) {
+        if let Some((l_bp, ())) = postfix_binding_power(&token) {
             if l_bp < min_bp {
                 break;
             }
 
             tokens.next();
             if token.t_type == LP {
-                match parser.check_char(&mut token, LP, '[') {
-                    Ok(_) => {
-                        let rhs = expr_bp(parser, tokens, 0)?;
-                        match tokens.next() {
-                            Some(mut tk) => {
-                                parser.check_char(&mut tk, TokenType::LR, ']')?;
-                                expr_tree = Expr {
-                                    token,
-                                    op: ExprOp::AIndex,
-                                    left: Box::new(expr_tree),
-                                    right: Box::new(rhs),
-                                };
-                            }
-                            None => {
-                                return Err(MissingCondition(token));
-                            }
+                if matches!(check_char(&token, LP, '['), Ok(())) {
+                    let rhs = expr_bp(parser, tokens, 0)?;
+                    match tokens.next() {
+                        Some(tk) => {
+                            check_char(&tk, TokenType::LR, ']')?;
+                            expr_tree = Expr {
+                                token,
+                                op: ExprOp::AIndex,
+                                left: Box::new(expr_tree),
+                                right: Box::new(rhs),
+                            };
+                        }
+                        None => {
+                            return Err(MissingCondition(token));
                         }
                     }
-                    Err(_) => {
-                        parser.check_char(&mut token, LP, '(')?;
-                        let mut arguments: Vec<ASTExprTree> = vec![];
+                } else {
+                    check_char(&token, LP, '(')?;
+                    let mut arguments: Vec<ASTExprTree> = vec![];
+                    loop {
+                        let mut sub_tokens: Vec<Token> = vec![];
+                        token = tokens.next().ok_or(MissingCondition(token))?;
+                        let mut p_count: u64 = 0;
+                        let mut done: bool = false;
                         loop {
-                            let mut sub_tokens: Vec<Token> = vec![];
-                            token = tokens.next().ok_or(MissingCondition(token))?;
-                            let mut p_count: u64 = 0;
-                            let mut done: bool = false;
-                            loop {
-                                if token.t_type == TokenType::Operator && token.text() == "," {
-                                    break;
-                                }
-                                if token.t_type == LP && token.text() == "(" {
-                                    p_count += 1;
-                                }
-                                if token.t_type == TokenType::LR && token.text() == ")" {
-                                    if p_count == 0 {
-                                        done = true;
-                                        break;
-                                    }
-                                    p_count -= 1;
-                                }
-                                sub_tokens.push(token.clone());
-                                token = tokens.next().ok_or(MissingCondition(token))?;
-                            }
-                            if let Some(expr) = expr_eval(parser, sub_tokens)? {
-                                arguments.push(expr);
-                            }
-                            if done {
+                            if token.t_type == TokenType::Operator && token.text() == "," {
                                 break;
                             }
+                            if token.t_type == LP && token.text() == "(" {
+                                p_count += 1;
+                            }
+                            if token.t_type == TokenType::LR && token.text() == ")" {
+                                if p_count == 0 {
+                                    done = true;
+                                    break;
+                                }
+                                p_count -= 1;
+                            }
+                            sub_tokens.push(token.clone());
+                            token = tokens.next().ok_or(MissingCondition(token))?;
                         }
-                        expr_tree = Call {
-                            name: Box::new(expr_tree),
-                            args: arguments,
+                        if let Some(expr) = expr_eval(parser, sub_tokens)? {
+                            arguments.push(expr);
                         }
+                        if done {
+                            break;
+                        }
+                    }
+                    expr_tree = Call {
+                        name: Box::new(expr_tree),
+                        args: arguments,
                     }
                 }
             } else {
@@ -183,7 +174,7 @@ fn expr_bp(
             continue;
         }
 
-        if let Some((l_bp, r_bp)) = binding_power(&mut token) {
+        if let Some((l_bp, r_bp)) = binding_power(&token) {
             if l_bp < min_bp {
                 break;
             }

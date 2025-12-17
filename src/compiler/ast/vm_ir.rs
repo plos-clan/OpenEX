@@ -2,7 +2,7 @@ use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand}
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
 use smol_str::{SmolStr, ToSmolStr};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)] //TODO
 pub enum ByteCode {
     Push(usize),        // 将常量表中的元素压入操作栈 (常量表索引)
@@ -60,14 +60,14 @@ pub enum Types {
 }
 
 // 常量表, 每一个源文件都有一个
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ConstantTable {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConstantTable {
     table_size: usize,
     element: Vec<(Types, SmolStr)>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct IrFunction {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrFunction {
     pub codes: Vec<ByteCode>,
     pub name: SmolStr,
     pub filename: SmolStr,
@@ -122,7 +122,13 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
 }
 
 impl IrFunction {
-    pub fn new(name: SmolStr, args: usize, locals: usize, filename: SmolStr,is_native:bool) -> IrFunction {
+    pub const fn new(
+        name: SmolStr,
+        args: usize,
+        locals: usize,
+        filename: SmolStr,
+        is_native: bool,
+    ) -> Self {
         Self {
             codes: vec![],
             name,
@@ -137,15 +143,15 @@ impl IrFunction {
         &mut self,
         table: OpCodeTable,
         code0: &mut Code,
-        locals: &mut LocalMap,
-        globals: &mut LocalMap,
+        locals: &LocalMap,
+        globals: &LocalMap,
         constant_table: &mut ConstantTable,
     ) {
         for code in table.opcodes {
             match code.1 {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
-                        let index = locals.get_index(&key).unwrap();
+                        let index = locals.get_index(key).unwrap();
                         self.codes.push(ByteCode::StoreGlobal(*index));
                     } else {
                         let index = constant_table.add_operand(imm, code0);
@@ -153,29 +159,29 @@ impl IrFunction {
                     }
                 }
                 OpCode::LoadLocal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
+                    let index = locals.get_index(key).unwrap();
                     self.codes.push(ByteCode::Load(*index));
                 }
                 OpCode::StoreLocal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
+                    let index = locals.get_index(key).unwrap();
                     self.codes.push(ByteCode::Store(*index));
                 }
                 OpCode::LoadGlobal(_, key, _) => {
-                    let index = globals.get_index(&key).unwrap();
+                    let index = globals.get_index(key).unwrap();
                     self.codes.push(ByteCode::LoadGlobal(*index));
                 }
                 OpCode::StoreGlobal(_, key, _) => {
-                    let index = globals.get_index(&key).unwrap();
+                    let index = globals.get_index(key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }
-                OpCode::Jump(_,addr) => {
+                OpCode::Jump(_, addr) => {
                     self.codes.push(ByteCode::Jump(addr.unwrap().offset));
                 }
-                OpCode::JumpTrue(_,addr,_) => {
+                OpCode::JumpTrue(_, addr, _) => {
                     let addr_some = addr.unwrap();
                     self.codes.push(ByteCode::JumpTrue(addr_some.offset));
                 }
-                OpCode::JumpFalse(_,addr,_) => {
+                OpCode::JumpFalse(_, addr, _) => {
                     let addr_some = addr.unwrap();
                     self.codes.push(ByteCode::JumpFalse(addr_some.offset));
                 }
@@ -189,7 +195,7 @@ impl IrFunction {
 
 #[allow(dead_code)] // TODO
 #[derive(Debug, Clone)]
-pub(crate) struct VMIRTable {
+pub struct VMIRTable {
     constant_table: ConstantTable,
     functions: Vec<IrFunction>,
     codes: Vec<ByteCode>,
@@ -197,7 +203,7 @@ pub(crate) struct VMIRTable {
 }
 
 impl VMIRTable {
-    pub fn new() -> VMIRTable {
+    pub const fn new() -> Self {
         Self {
             constant_table: ConstantTable::new(),
             functions: vec![],
@@ -214,7 +220,7 @@ impl VMIRTable {
         self.constant_table.clone()
     }
 
-    pub fn get_locals_len(&self) -> usize {
+    pub const fn get_locals_len(&self) -> usize {
         self.globals
     }
 
@@ -224,9 +230,9 @@ impl VMIRTable {
 
     pub fn append_code(
         &mut self,
-        table: &mut OpCodeTable,
+        table: &OpCodeTable,
         code0: &mut Code,
-        locals: &mut LocalMap,
+        locals: &LocalMap,
     ) {
         let opcodes = table.opcodes.clone();
         self.globals = locals.now_index;
@@ -234,8 +240,8 @@ impl VMIRTable {
             match code.1 {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
-                        if let Some(index) = locals.get_index(&key) {
-                            self.codes.push(ByteCode::StoreGlobal(*index))
+                        if let Some(index) = locals.get_index(key) {
+                            self.codes.push(ByteCode::StoreGlobal(*index));
                         } else {
                             unreachable!()
                         }
@@ -245,29 +251,21 @@ impl VMIRTable {
                     }
                 }
                 OpCode::LoadLocal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
+                    let index = locals.get_index(key).unwrap();
                     self.codes.push(ByteCode::LoadGlobal(*index));
                 }
                 OpCode::StoreLocal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
+                    let index = locals.get_index(key).unwrap();
                     self.codes.push(ByteCode::StoreGlobal(*index));
                 }
-                OpCode::LoadGlobal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
-                    self.codes.push(ByteCode::LoadGlobal(*index));
-                }
-                OpCode::StoreGlobal(_, key, _) => {
-                    let index = locals.get_index(&key).unwrap();
-                    self.codes.push(ByteCode::StoreGlobal(*index));
-                }
-                OpCode::Jump(_,addr) => {
+                OpCode::Jump(_, addr) => {
                     self.codes.push(ByteCode::Jump(addr.unwrap().offset));
                 }
-                OpCode::JumpTrue(_,addr,_) => {
+                OpCode::JumpTrue(_, addr, _) => {
                     let addr_some = addr.unwrap();
                     self.codes.push(ByteCode::JumpTrue(addr_some.offset));
                 }
-                OpCode::JumpFalse(_,addr,_) => {
+                OpCode::JumpFalse(_, addr, _) => {
                     let addr_some = addr.unwrap();
                     self.codes.push(ByteCode::JumpFalse(addr_some.offset));
                 }
@@ -280,7 +278,7 @@ impl VMIRTable {
 }
 
 impl ConstantTable {
-    pub fn new() -> ConstantTable {
+    pub const fn new() -> Self {
         Self {
             table_size: 0,
             element: Vec::new(),
@@ -311,31 +309,26 @@ impl ConstantTable {
         };
         self.add_const(types.0, types.1)
     }
-
-    #[allow(dead_code)] // TODO
-    pub fn find_const(&mut self, index: usize) -> Option<&mut (Types, SmolStr)> {
-        self.element.get_mut(index)
-    }
 }
 
-pub fn ssa_to_vm(mut code: Code, mut locals: LocalMap, filename: SmolStr) -> VMIRTable {
+pub fn ssa_to_vm(mut code: Code, locals: &LocalMap, filename: &SmolStr) -> VMIRTable {
     let mut vm_table = VMIRTable::new();
-    vm_table.append_code(code.clone().get_code_table(), &mut code, &mut locals);
+    vm_table.append_code(code.clone().get_code_table(), &mut code, locals);
 
-    for mut func in code.clone().funcs {
+    for func in code.clone().funcs {
         let mut ir_func = IrFunction::new(
             func.name,
             func.args,
             func.locals.now_index,
             filename.clone(),
-            func.codes.is_none()
+            func.codes.is_none(),
         );
         if func.codes.is_some() {
             ir_func.append_code(
                 func.codes.unwrap(),
                 &mut code,
-                &mut func.locals,
-                &mut locals,
+                &func.locals,
+                locals,
                 &mut vm_table.constant_table,
             );
         }

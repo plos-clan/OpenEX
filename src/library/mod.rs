@@ -18,7 +18,7 @@ pub mod output_capture;
 static MODULES: LazyLock<RwLock<BTreeMap<SmolStr, LibModule>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
-pub type NativeFunc = fn(Vec<Value>) -> Result<Value, RuntimeError>;
+pub type NativeFunc = fn(&[Value]) -> Result<Value, RuntimeError>;
 
 #[derive(Debug, Clone, Hash)]
 pub struct ModuleFunc {
@@ -60,16 +60,12 @@ pub fn find_library(
     f(ret_m)
 }
 
-pub(crate) fn load_libraries(
+pub fn load_libraries(
     compiler: &mut Compiler,
     path: Option<SmolStr>,
     lints: &HashSet<Lint>,
 ) -> std::io::Result<()> {
-    let lib_path = if let Some(path) = path {
-        path
-    } else {
-        SmolStr::new("./lib")
-    };
+    let lib_path = path.map_or_else(|| SmolStr::new("./lib"), |path| path);
     for entry in fs::read_dir(lib_path)? {
         let entry = entry?;
         let path = entry.path();
@@ -84,7 +80,7 @@ pub(crate) fn load_libraries(
                 .unwrap_or("<invalid>")
                 .to_string();
             let data = SmolStr::new(std::str::from_utf8(&buf).expect("error: file not UTF-8"));
-            compiler.add_file(SourceFile::new(name, data.to_string(), lints.clone(), true))
+            compiler.add_file(SourceFile::new(name, data.to_string(), lints.clone(), true));
         }
     }
 

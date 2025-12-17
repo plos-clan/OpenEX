@@ -22,10 +22,10 @@ pub struct SourceFile {
 }
 
 impl SourceFile {
-    pub fn new(name: String, data: String, lints: HashSet<Lint>, is_library: bool) -> SourceFile {
+    pub fn new(name: String, data: String, lints: HashSet<Lint>, is_library: bool) -> Self {
         let data0 = data.clone();
 
-        SourceFile {
+        Self {
             name,
             data,
             lexer: LexerAnalysis::new(data0),
@@ -53,7 +53,7 @@ impl SourceFile {
         }
     }
 
-    pub fn has_warnings(&mut self, lint: Lint) -> bool {
+    pub fn has_warnings(&self, lint: Lint) -> bool {
         self.c_data.lints.contains(&lint)
     }
 
@@ -66,7 +66,7 @@ impl SourceFile {
         let ast_tree = parser.parser()?;
         let mut semantic = Semantic::new(self,compiler);
         let ssa_ir = semantic.semantic(ast_tree)?;
-        let vm_ir = ssa_to_vm(ssa_ir.0,ssa_ir.1,self.name.to_smolstr());
+        let vm_ir = ssa_to_vm(ssa_ir.0, &ssa_ir.1, &self.name.to_smolstr());
         Ok(vm_ir)
     }
 }

@@ -9,6 +9,7 @@ mod operation;
 pub enum RuntimeError {
     NoSuchFunctionException(SmolStr),
     TypeException(SmolStr),
+    PrecisionLoss(SmolStr),
     VMError,
 }
 

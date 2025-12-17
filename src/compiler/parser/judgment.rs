@@ -17,7 +17,7 @@ fn next_parser_if(parser: &mut Parser,else_body:&mut Vec<ASTStmtTree>) -> Result
                 _ => return Err(parser_error),
             }
         },
-    };
+    }
 
     match parser_else(parser){
         Ok(else_stmt) => {

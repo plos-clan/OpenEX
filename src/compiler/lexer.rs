@@ -14,7 +14,7 @@ pub struct LexerAnalysis {
     now_column: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub line: usize,
     pub column: usize,
@@ -31,7 +31,7 @@ pub enum LexerError {
     Eof,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     Number,
     Float,
@@ -81,56 +81,45 @@ const KEYWORDS: [(&str, TokenType); 16] = [
 ];
 
 impl Token {
-    pub fn new(
+    pub const fn new(
         data: SmolStr,
         line: usize,
         column: usize,
         index: usize,
         t_type: TokenType,
-    ) -> Token {
-        Token {
+    ) -> Self {
+        Self {
             line,
             column,
-            data,
             t_type,
             index,
+            data,
         }
     }
 
-    pub fn value_float(&mut self) -> f64 {
+    pub fn value_float(&self) -> f64 {
         f64::from_str(&self.data).unwrap_or(0.0)
     }
 
-    pub fn value_number(&mut self) -> i64 {
-        if let Some(hex) = self
+    pub fn value_number(&self) -> i64 {
+        self
             .data
             .strip_prefix("0x")
-            .or_else(|| self.data.strip_prefix("0X"))
-        {
-            i64::from_str_radix(hex, 16).unwrap()
-        } else if let Some(bin) = self
+            .or_else(|| self.data.strip_prefix("0X")).map_or_else(|| self
             .data
             .strip_prefix("0b")
-            .or_else(|| self.data.strip_prefix("0B"))
-        {
-            i64::from_str_radix(bin, 2).unwrap()
-        } else if let Some(oct) = self
+            .or_else(|| self.data.strip_prefix("0B")).map_or_else(|| self
             .data
             .strip_prefix("0o")
-            .or_else(|| self.data.strip_prefix("0O"))
-        {
-            i64::from_str_radix(oct, 8).unwrap()
-        } else {
-            self.data.parse::<i64>().unwrap()
-        }
+            .or_else(|| self.data.strip_prefix("0O")).map_or_else(|| self.data.parse::<i64>().unwrap(), |oct| i64::from_str_radix(oct, 8).unwrap()), |bin| i64::from_str_radix(bin, 2).unwrap()), |hex| i64::from_str_radix(hex, 16).unwrap())
     }
 
-    pub fn value<T>(&mut self) -> Option<T>
+    pub fn value<T>(&self) -> Option<T>
     where
         T: FromStr,
         <T as FromStr>::Err: Debug,
     {
-        Some(self.data.parse::<T>().unwrap())
+        self.data.parse::<T>().ok()
     }
 
     pub fn text(&self) -> &str {
@@ -138,9 +127,17 @@ impl Token {
     }
 }
 
+const fn is_lp(c: char) -> bool {
+    c == '(' || c == '[' || c == '{'
+}
+
+const fn is_lr(c: char) -> bool {
+    c == ')' || c == ']' || c == '}'
+}
+
 impl LexerAnalysis {
-    pub(crate) fn new(p0: String) -> Self {
-        LexerAnalysis {
+    pub(crate) const fn new(p0: String) -> Self {
+        Self {
             data: p0,
             now_line: 0,
             now_column: 0,
@@ -162,16 +159,8 @@ impl LexerAnalysis {
         })
     }
 
-    fn is_lp(&self, c: char) -> bool {
-        c == '(' || c == '[' || c == '{'
-    }
-
-    fn is_lr(&self, c: char) -> bool {
-        c == ')' || c == ']' || c == '}'
-    }
-
-    fn match_keyword(&self, identifier_name: String) -> TokenType {
-        for (keyword, token_type) in KEYWORDS.iter() {
+    fn match_keyword(identifier_name: &str) -> TokenType {
+        for (keyword, token_type) in &KEYWORDS {
             if identifier_name == *keyword {
                 return *token_type;
             }
@@ -184,16 +173,13 @@ impl LexerAnalysis {
             match self.next_char() {
                 '\0' => return Err(Eof),
                 ' ' | '\t' => {
-                    continue;
                 }
                 '\r' => {
                     self.now_column -= 1;
-                    continue;
                 }
                 '\n' => {
                     self.now_line += 1;
                     self.now_column = 0;
-                    continue;
                 }
                 c => {
                     self.cache = Some(c);
@@ -208,7 +194,7 @@ impl LexerAnalysis {
         line: usize,
         column: usize,
         data_index: usize,
-    ) -> Result<Token, LexerError> {
+    ) -> Token {
         let mut data = String::new();
         loop {
             match self.next_char() {
@@ -222,15 +208,15 @@ impl LexerAnalysis {
             }
         }
 
-        let t_type = self.match_keyword(data.clone());
+        let t_type = Self::match_keyword(data.as_str());
 
-        Ok(Token::new(
+        Token::new(
             SmolStr::new(data),
             line,
             column,
             data_index,
             t_type,
-        ))
+        )
     }
 
     fn build_number(
@@ -435,7 +421,7 @@ impl LexerAnalysis {
         column: usize,
         data_index: usize,
         c: char,
-    ) -> Result<Token, LexerError> {
+    ) -> Token {
         let c0 = self.next_char();
         let mut data = SmolStrBuilder::new();
         match c0 {
@@ -452,13 +438,13 @@ impl LexerAnalysis {
                 data.push(c);
             }
         }
-        Ok(Token::new(
+        Token::new(
             data.finish(),
             line,
             column,
             data_index,
             TokenType::Operator,
-        ))
+        )
     }
 
     fn build_semicolon_op_double(
@@ -467,7 +453,7 @@ impl LexerAnalysis {
         column: usize,
         data_index: usize,
         c: char,
-    ) -> Result<Token, LexerError> {
+    ) -> Token {
         let c0 = self.next_char();
         let mut data = SmolStrBuilder::new();
         match c0 {
@@ -480,13 +466,13 @@ impl LexerAnalysis {
                 data.push(c);
             }
         }
-        Ok(Token::new(
+        Token::new(
             data.finish(),
             line,
             column,
             data_index,
             TokenType::Operator,
-        ))
+        )
     }
 
     fn build_semicolon_op_easy(
@@ -495,37 +481,34 @@ impl LexerAnalysis {
         column: usize,
         data_index: usize,
         c: char,
-    ) -> Result<Token, LexerError> {
+    ) -> Token {
         let c0 = self.next_char();
         let mut data = SmolStrBuilder::new();
-        match c0 {
-            '=' => {
-                data.push(c);
-                data.push('=');
-            }
-            _ => {
-                self.cache = Some(c0);
-                data.push(c);
-            }
+        if c0 == '=' {
+            data.push(c);
+            data.push('=');
+        } else {
+            self.cache = Some(c0);
+            data.push(c);
         }
-        Ok(Token::new(
+        Token::new(
             data.finish(),
             line,
             column,
             data_index,
             TokenType::Operator,
-        ))
+        )
     }
 
-    fn is_sem(&self, c: char) -> bool {
+    const fn is_sem( c: char) -> bool {
         c == ',' || c == ':' || c == '?'
     }
 
-    pub fn get_now_line(&self) -> usize {
+    pub const fn get_now_line(&self) -> usize {
         self.now_line
     }
 
-    pub fn get_now_column(&self) -> usize {
+    pub const fn get_now_column(&self) -> usize {
         self.now_column
     }
 
@@ -542,27 +525,27 @@ impl LexerAnalysis {
             '\0' => Err(Eof),
             c if c.is_alphabetic() || c == '_' => {
                 self.cache = Some(c);
-                self.build_identifier(line, column, data_index)
+                Ok(self.build_identifier(line, column, data_index))
             }
             c if c.is_ascii_digit() || c == '.' => {
                 self.cache = Some(c);
                 self.build_number(line, column, data_index)
             }
-            c if self.is_lp(c) => Ok(Token::new(
+            c if is_lp(c) => Ok(Token::new(
                 str_builder.finish(),
                 line,
                 column,
                 data_index,
                 TokenType::LP,
             )),
-            c if self.is_lr(c) => Ok(Token::new(
+            c if is_lr(c) => Ok(Token::new(
                 str_builder.finish(),
                 line,
                 column,
                 data_index,
                 TokenType::LR,
             )),
-            c if self.is_sem(c) => Ok(Token::new(
+            c if Self::is_sem(c) => Ok(Token::new(
                 str_builder.finish(),
                 line,
                 column,
@@ -622,15 +605,15 @@ impl LexerAnalysis {
                 }
             }
             '"' => self.build_string(line, column, data_index),
-            '+' => self.build_semicolon_op_in(line, column, data_index, '+'),
-            '-' => self.build_semicolon_op_in(line, column, data_index, '-'),
-            '*' => self.build_semicolon_op_easy(line, column, data_index, '*'),
-            '>' => self.build_semicolon_op_in(line, column, data_index, '>'),
-            '<' => self.build_semicolon_op_in(line, column, data_index, '<'),
-            '=' => self.build_semicolon_op_easy(line, column, data_index, '='),
-            '!' => self.build_semicolon_op_easy(line, column, data_index, '!'),
-            '&' => self.build_semicolon_op_double(line, column, data_index, '&'),
-            '|' => self.build_semicolon_op_double(line, column, data_index, '|'),
+            '+' => Ok(self.build_semicolon_op_in(line, column, data_index, '+')),
+            '-' => Ok(self.build_semicolon_op_in(line, column, data_index, '-')),
+            '*' => Ok(self.build_semicolon_op_easy(line, column, data_index, '*')),
+            '>' => Ok(self.build_semicolon_op_in(line, column, data_index, '>')),
+            '<' => Ok(self.build_semicolon_op_in(line, column, data_index, '<')),
+            '=' => Ok(self.build_semicolon_op_easy(line, column, data_index, '=')),
+            '!' => Ok(self.build_semicolon_op_easy(line, column, data_index, '!')),
+            '&' => Ok(self.build_semicolon_op_double(line, column, data_index, '&')),
+            '|' => Ok(self.build_semicolon_op_double(line, column, data_index, '|')),
             ';' => Ok(Token::new(
                 str_builder.finish(),
                 line,

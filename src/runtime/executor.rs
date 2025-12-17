@@ -24,25 +24,25 @@ pub enum Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Int(i) => write!(f, "{}", i),
-            Value::Bool(b) => write!(f, "{}", b),
-            Value::Float(x) => {
+            Self::Int(i) => write!(f, "{i}"),
+            Self::Bool(b) => write!(f, "{b}"),
+            Self::Float(x) => {
                 // 避免科学计数法，保留合理精度
                 if x.fract() == 0.0 {
-                    write!(f, "{:.1}", x)
+                    write!(f, "{x:.1}")
                 } else {
-                    write!(f, "{}", x)
+                    write!(f, "{x}")
                 }
             }
-            Value::String(s) => write!(f, "{}", s),
-            Value::Ref(r) => write!(f, "{}", r),
-            Value::Null => write!(f, "null"),
+            Self::String(s) => write!(f, "{s}"),
+            Self::Ref(r) => write!(f, "{r}"),
+            Self::Null => write!(f, "null"),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct StackFrame {
+pub struct StackFrame {
     constant_table: ConstantTable,
     local_tables: Vec<Value>,
     op_stack: Vec<Value>,
@@ -78,7 +78,7 @@ impl StackFrame {
         constant_table: ConstantTable,
         native: Option<SmolStr>,
         args: usize,
-    ) -> StackFrame {
+    ) -> Self {
         Self {
             constant_table,
             name,
@@ -111,7 +111,7 @@ impl StackFrame {
         None
     }
 
-    pub fn get_args(&self) -> usize {
+    pub const fn get_args(&self) -> usize {
         self.args
     }
 
@@ -135,24 +135,23 @@ impl StackFrame {
         self.codes.get(self.pc)
     }
 
-    pub fn next_pc(&mut self) {
+    pub const fn next_pc(&mut self) {
         self.pc += 1;
     }
 
-    #[allow(dead_code)] // TODO
-    pub fn set_next_pc(&mut self, next_pc: usize) {
+    pub const fn set_next_pc(&mut self, next_pc: usize) {
         self.pc = next_pc;
     }
 }
 
 #[derive(Clone)]
-pub(crate) struct Executor {
+pub struct Executor {
     threads: Vec<OpenEXThread>,
     files: Vec<SourceFile>,
 }
 
 impl Executor {
-    pub fn new() -> Executor {
+    pub const fn new() -> Self {
         Self {
             threads: Vec::new(),
             files: Vec::new(),
@@ -170,7 +169,7 @@ impl Executor {
         let func = sp.next().unwrap();
 
         for i in 0..self.files.len() {
-            if self.files[i].name.split(".").next().unwrap() == file {
+            if self.files[i].name.split('.').next().unwrap() == file {
                 let t = self.files.get_mut(i).unwrap();
                 let r_table = t.get_vmir_table().unwrap();
                 for ir_func in r_table.get_functions() {
@@ -207,7 +206,7 @@ impl Executor {
     }
 }
 
-pub(crate) fn run_executor(
+pub fn run_executor(
     frame_index: usize,
     executor: &mut Executor,
     thread: &mut OpenEXThread,
@@ -215,17 +214,13 @@ pub(crate) fn run_executor(
 // Option<StackFrame> 不为 None 代表是函数调用请求
 // bool 为 true 代表操作栈栈顶作为返回值压入父栈帧
 {
-    let mut root_frame;
-    let stack_frame;
-    if frame_index == 0 {
-        root_frame = None;
-        stack_frame = thread.get_mut_frame(frame_index);
+    let (mut root_frame, stack_frame) = if frame_index == 0 {
+        (None, thread.get_mut_frame(0))
     } else {
-        let call_stack = &mut thread.call_stack;
-        let (left, right) = call_stack.split_at_mut(frame_index);
-        root_frame = Some(&mut left[0]);
-        stack_frame = &mut right[0];
-    }
+        let (left, right) = thread.call_stack.split_at_mut(frame_index);
+        // 使用 .get_mut(0) 代替 [0] 更加安全，防止潜在的越界 panic
+        (left.get_mut(0), right.get_mut(0).unwrap())
+    };
 
     while let Some(instr) = stack_frame.fetch_current() {
         match instr {
@@ -236,7 +231,7 @@ pub(crate) fn run_executor(
                     if let Value::Ref(path) = &value
                         && path.as_str() == "this"
                     {
-                        let path = stack_frame.file_name.split(".").next().unwrap();
+                        let path = stack_frame.file_name.split('.').next().unwrap();
                         stack_frame.push_op_stack(Value::Ref(path.to_smolstr()));
                     } else {
                         stack_frame.push_op_stack(value);
@@ -257,11 +252,7 @@ pub(crate) fn run_executor(
             ByteCode::StoreGlobal(var_index) => {
                 let index = *var_index;
 
-                let result = if let Some(ref root) = root_frame {
-                    root.get_var_table(index)
-                } else {
-                    stack_frame.get_var_table(index)
-                };
+                let result = root_frame.as_ref().map_or_else(|| stack_frame.get_var_table(index), |root| root.get_var_table(index));
                 stack_frame.push_op_stack(result.clone());
                 stack_frame.next_pc();
             }
@@ -310,10 +301,7 @@ pub(crate) fn run_executor(
                         let func = function.1;
                         let codes = func.clone_codes();
                         stack_frame.next_pc();
-                        let native = match func.is_native {
-                            true => Some(panic_path),
-                            false => None,
-                        };
+                        let native = if func.is_native { Some(panic_path) } else { None };
                         Ok((
                             Some(StackFrame::new(
                                 func.name.to_string(),
@@ -400,13 +388,13 @@ pub(crate) fn run_executor(
             ByteCode::Equ => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(equ_value(value_1, value_0)?);
+                stack_frame.push_op_stack(equ_value(value_1, value_0));
                 stack_frame.next_pc();
             }
             ByteCode::NotEqu => {
                 let value_0 = stack_frame.pop_op_stack().unwrap();
                 let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(not_equ_value(value_1, value_0)?);
+                stack_frame.push_op_stack(not_equ_value(value_1, value_0));
                 stack_frame.next_pc();
             }
             ByteCode::Not => {

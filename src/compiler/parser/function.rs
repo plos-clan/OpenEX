@@ -3,17 +3,17 @@ use crate::compiler::lexer::TokenType;
 use crate::compiler::lexer::TokenType::{LP, LR};
 use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::ParserError::{Expected, IdentifierExpected, IllegalArgument};
-use crate::compiler::parser::{Parser, ParserError};
+use crate::compiler::parser::{check_char, Parser, ParserError};
 
 fn parser_argument(parser: &mut Parser) -> Result<Vec<ASTExprTree>, ParserError> {
     let mut token = parser.next_parser_token()?;
-    parser.check_char(&mut token, LP, '(')?;
+    check_char(&token, LP, '(')?;
     let mut is_split = false;
     let mut arguments: Vec<ASTExprTree> = Vec::new();
     loop {
         token = parser.next_parser_token()?;
-        match parser.check_char(&mut token, LR, ')') {
-            Ok(_) => break,
+        match check_char(&token, LR, ')') {
+            Ok(()) => break,
             Err(_) => match token.t_type {
                 TokenType::Identifier => {
                     if is_split {
@@ -68,7 +68,7 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
         LP => {
             if token.text() == "{" {
                 parser.cache = Some(token);
-                args = vec![]
+                args = vec![];
             } else {
                 parser.cache = Some(token);
                 args = parser_argument(parser)?;
@@ -82,12 +82,12 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
         }
         _ => {
             parser.cache = Some(token);
-            args = vec![]
+            args = vec![];
         }
-    };
+    }
 
     let result = parser.next_parser_token();
-    if let Err(ParserError::Eof) = result {
+    if matches!(result, Err(ParserError::Eof)) {
         return Err(ParserError::MissingFunctionBody(parser.get_last().unwrap()));
     }
     token = result?;

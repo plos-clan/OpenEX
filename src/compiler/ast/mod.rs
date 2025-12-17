@@ -1,5 +1,5 @@
 pub mod ssa_ir;
-pub(crate) mod vm_ir;
+pub mod vm_ir;
 
 use crate::compiler::lexer::Token;
 
@@ -107,14 +107,13 @@ pub enum ASTStmtTree {
 impl ASTExprTree {
     pub fn token(&self) -> &Token {
         match self {
-            ASTExprTree::Literal(token)
-            | ASTExprTree::Var(token)
-            | ASTExprTree::Ref(token)
-            | ASTExprTree::This(token) => token,
-
-            ASTExprTree::Expr { token, .. } => token,
-            ASTExprTree::Unary { token, .. } => token,
-            ASTExprTree::Call { name, .. } => name.token(),
+            Self::Call { name, .. } => name.token(),
+            Self::Literal(token)
+            | Self::Var(token)
+            | Self::Ref(token)
+            | Self::This(token)
+            | Self::Expr { token, .. }
+            | Self::Unary { token, .. }=> token,
         }
     }
 }

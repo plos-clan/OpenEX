@@ -2,7 +2,7 @@ use crate::compiler::ast::ssa_ir::Operand;
 use crate::compiler::ast::ssa_ir::Operand::{ImmBool, ImmFlot, ImmNum, ImmStr};
 use crate::compiler::ast::ExprOp;
 
-pub fn unary_optimizer(op: &ExprOp, operand: &Operand) -> Option<Operand> {
+pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
     match op {
         ExprOp::Not => {
             if let ImmBool(b) = operand {
@@ -33,7 +33,7 @@ pub fn unary_optimizer(op: &ExprOp, operand: &Operand) -> Option<Operand> {
     }
 }
 
-pub fn expr_optimizer(left: &Operand, right: &Operand, op: &ExprOp) -> Option<Operand> {
+pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Operand> {
     match (left, right, op) {
         (ImmNum(a), ImmNum(b), ExprOp::Add) => Some(ImmNum(a + b)),
         (ImmNum(a), ImmNum(b), ExprOp::Sub) => Some(ImmNum(a - b)),
@@ -90,18 +90,6 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: &ExprOp) -> Option<Op
         (ImmStr(a), ImmStr(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
 
         // 赋值 / 复合赋值 / 引用 / 下标 —— 不做常量折叠
-        (_, _, ExprOp::Store)
-        | (_, _, ExprOp::AddS)
-        | (_, _, ExprOp::SubS)
-        | (_, _, ExprOp::MulS)
-        | (_, _, ExprOp::DivS)
-        | (_, _, ExprOp::RmdS)
-        | (_, _, ExprOp::BAndS)
-        | (_, _, ExprOp::BOrS)
-        | (_, _, ExprOp::BXorS)
-        | (_, _, ExprOp::Ref)
-        | (_, _, ExprOp::AIndex) => None,
-
         _ => None,
     }
 }

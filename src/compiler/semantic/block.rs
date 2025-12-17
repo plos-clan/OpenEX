@@ -23,15 +23,15 @@ pub fn block_semantic(
                 unreachable!()
             }
             ASTStmtTree::Block(stmts) => {
-                opcodes.append_code(&mut block_semantic(semantic, stmts, code,locals)?);
+                opcodes.append_code(&block_semantic(semantic, stmts, code,locals)?);
             }
             ASTStmtTree::Var { name, value } => {
-                let mut opcode = var_semantic(semantic, name, value, code, false,locals)?;
-                opcodes.append_code(&mut opcode);
+                let opcode = var_semantic(semantic, name, value, code, false,locals)?;
+                opcodes.append_code(&opcode);
             }
             ASTStmtTree::Expr(expr) => {
                 let ref_expr = expr.clone();
-                let mut ret_m = expr_semantic(semantic, Some(expr), code)?;
+                let ret_m = expr_semantic(semantic, Some(expr), code)?;
                 if !check_expr_operand(&ret_m.0, &OpCode::Store(None), 0) {
                     Compiler::warning_info_expr(
                         semantic.file,
@@ -40,24 +40,24 @@ pub fn block_semantic(
                         UnusedExpression,
                     );
                 }
-                opcodes.append_code(&mut ret_m.2);
+                opcodes.append_code(&ret_m.2);
             }
             ASTStmtTree::If {cond,then_body,else_body} => {
-                let mut ret_m = judgment_semantic(semantic,cond,then_body,else_body,code, locals)?;
-                opcodes.append_code(&mut ret_m);
+                let ret_m = judgment_semantic(semantic, &cond, then_body, else_body, code, locals)?;
+                opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Loop {
                 token: _token,
                 cond,
                 body,
             } => {
-                let mut ret_m = while_semantic(semantic, cond, body, code, locals)?;
-                opcodes.append_code(&mut ret_m);
+                let ret_m = while_semantic(semantic, &cond, body, code, locals)?;
+                opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Return(expr) => {
                 if let Some(expr) = expr {
-                    let mut ref_expr = lower_expr(semantic, &expr, code, None)?;
-                    opcodes.append_code(&mut ref_expr.2);
+                    let ref_expr = lower_expr(semantic, &expr, code, None)?;
+                    opcodes.append_code(&ref_expr.2);
                     opcodes.add_opcode(OpCode::Return(None));
                 }else {
                     opcodes.add_opcode(Push(None,Operand::Null));

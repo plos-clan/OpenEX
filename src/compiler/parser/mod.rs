@@ -23,7 +23,7 @@ use crate::compiler::parser::r#while::while_eval;
 use crate::compiler::parser::var::var_eval;
 
 #[derive(Debug)]
-pub(crate) enum ParserError {
+pub enum ParserError {
     NotAStatement(Token),          // 不是一个语句
     LexError(LexerError),          // 词法分析错误
     IdentifierExpected(Token),     // 需要标识符
@@ -50,25 +50,24 @@ pub struct Parser<'a> {
     file: &'a mut SourceFile,
 }
 
+pub fn check_char(
+    token: &Token,
+    type_: TokenType,
+    c: char,
+) -> Result<(), ParserError> {
+    if !(token.t_type == type_ && token.text() == c.encode_utf8(&mut [0; 4])) {
+        return Err(ParserError::Expected(token.clone(), c));
+    }
+    Ok(())
+}
+
 impl<'a> Parser<'a> {
-    pub fn new(file: &'a mut SourceFile) -> Parser<'a> {
+    pub const fn new(file: &'a mut SourceFile) -> Self {
         Parser {
             cache: None,
             last: None,
             file,
         }
-    }
-
-    pub fn check_char(
-        &mut self,
-        token: &mut Token,
-        type_: TokenType,
-        c: char,
-    ) -> Result<(), ParserError> {
-        if !(token.t_type == type_ && token.text() == c.encode_utf8(&mut [0; 4])) {
-            return Err(ParserError::Expected(token.clone(), c));
-        }
-        Ok(())
     }
 
     fn next_parser_token(&mut self) -> Result<Token, ParserError> {
@@ -81,7 +80,7 @@ impl<'a> Parser<'a> {
     // 解析 () 括号内的表达式 - 需要括号
     pub fn parser_cond(&mut self) -> Result<ASTExprTree, ParserError> {
         let mut token = self.next_parser_token()?;
-        self.check_char(&mut token, LP, '(')?;
+        check_char(&token, LP, '(')?;
         let last_token = token;
         let mut parentheses_count: usize = 0;
         let mut cond: Vec<Token> = Vec::new();
@@ -110,11 +109,7 @@ impl<'a> Parser<'a> {
             }
         }
         self.last = Some(last_token.clone());
-        if let Some(expr) = expr_eval(self, cond)? {
-            Ok(expr)
-        } else {
-            Err(ParserError::MissingCondition(last_token))
-        }
+        expr_eval(self, cond)?.ok_or(ParserError::MissingCondition(last_token))
     }
 
     fn parse_step(&mut self) -> Result<ASTStmtTree, ParserError> {
@@ -130,28 +125,28 @@ impl<'a> Parser<'a> {
                 })?)
             }
             TokenType::Import => {
-                let saved_token = root_token.clone();
+                let saved_token = root_token;
                 Ok(import_eval(self).map_err(|e| match e {
                     ParserError::Eof => ParserError::MissingStatement(saved_token),
                     _ => e,
                 })?)
             }
             TokenType::If => {
-                let saved_token = root_token.clone();
+                let saved_token = root_token;
                 Ok(if_eval(self).map_err(|e| match e {
                     ParserError::Eof => ParserError::MissingStatement(saved_token),
                     _ => e,
                 })?)
             }
             TokenType::Var => {
-                let saved_token = root_token.clone();
+                let saved_token = root_token;
                 Ok(var_eval(self).map_err(|e| match e {
                     ParserError::Eof => ParserError::MissingStatement(saved_token),
                     _ => e,
                 })?)
             }
             TokenType::While => {
-                let saved_token = root_token.clone();
+                let saved_token = root_token;
                 Ok(while_eval(self).map_err(|e| match e {
                     ParserError::Eof => ParserError::MissingStatement(saved_token),
                     _ => e,
@@ -161,7 +156,7 @@ impl<'a> Parser<'a> {
             TokenType::Continue | TokenType::Break => Err(ParserError::BackOutsideLoop(root_token)),
             _ => {
                 let mut token;
-                let mut tokens: Vec<Token> = vec![root_token.clone()];
+                let mut tokens: Vec<Token> = vec![root_token];
                 loop {
                     token = self.next_parser_token()?;
                     if token.t_type == TokenType::End {
@@ -169,16 +164,12 @@ impl<'a> Parser<'a> {
                     }
                     tokens.push(token);
                 }
-                if let Some(expr) = expr_eval(self, tokens)? {
-                    Ok(ASTStmtTree::Expr(expr))
-                } else {
-                    Ok(ASTStmtTree::Empty)
-                }
+                expr_eval(self, tokens)?.map_or(Ok(ASTStmtTree::Empty), |expr| Ok(ASTStmtTree::Expr(expr)))
             }
         }
     }
 
-    pub fn get_last(&mut self) -> Option<Token> {
+    pub fn get_last(&self) -> Option<Token> {
         self.last.clone()
     }
 
@@ -187,7 +178,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.parse_step() {
                 Ok(node) => {
-                    if let ASTStmtTree::Empty = node {
+                    if matches!(node, ASTStmtTree::Empty) {
                     } else {
                         root_tree.push(node);
                     }

@@ -17,7 +17,7 @@ fn check(src: &str, expect: Expect) {
 #[test]
 fn basic_work() {
     check(
-        r#"import system; system.println() + 3;"#,
+        "import system; system.println() + 3;",
         expect![[r#"
             Root(
                 [
@@ -91,12 +91,12 @@ fn basic_work() {
 #[test]
 fn vars() {
     check(
-        r#"
+        "
 var num = .5138;
 var num1 = 1.2e-3;
 var num2 = 10.;
 var num3 = 3.14159265358979;
-num + 34;"#,
+num + 34;",
         expect![[r#"
         Root(
             [

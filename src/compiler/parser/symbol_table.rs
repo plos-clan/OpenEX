@@ -1,7 +1,7 @@
 use smol_str::SmolStr;
 use std::cmp::PartialEq;
 
-#[derive(PartialEq,Debug, Clone)]
+#[derive(PartialEq, Eq,Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub enum ContextType {
     Loop,
@@ -11,7 +11,7 @@ pub enum ContextType {
     Root,
 }
 
-#[derive(PartialEq,Debug, Clone)]
+#[derive(PartialEq, Eq,Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub enum ElementType {
     Argument,
@@ -41,8 +41,8 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    pub fn new() -> SymbolTable {
-        let mut table = SymbolTable {
+    pub fn new() -> Self {
+        let mut table = Self {
             contexts: vec![]
         };
         table.contexts.push(Context {
@@ -53,10 +53,10 @@ impl SymbolTable {
     }
 
     // 验证名称是否存在
-    pub fn check_element(&self,name: SmolStr) -> bool {
+    pub fn check_element(&self, name: &str) -> bool {
         for context in &self.contexts {
-            for el in context.elements.iter() {
-                if el.name == name {
+            for el in &context.elements {
+                if el.name.as_str() == name {
                     return true;
                 }
             }
@@ -84,9 +84,9 @@ impl SymbolTable {
     }
 
     #[allow(dead_code)] //TODO
-    pub fn in_context(&self, ctxt_type: ContextType) -> bool {
+    pub fn in_context(&self, ctxt_type: &ContextType) -> bool {
         for context in &self.contexts {
-            if context.ctxt_type == ctxt_type {
+            if context.ctxt_type == *ctxt_type {
                 return true;
             }
         }

@@ -7,12 +7,12 @@ use crate::compiler::parser::ParserError;
 use std::collections::HashSet;
 use std::process::exit;
 
-pub(crate) mod ast;
+pub mod ast;
 pub mod file;
 pub mod lexer;
 #[allow(unused)]
 pub mod lints;
-pub(crate) mod parser;
+pub mod parser;
 mod semantic;
 
 #[derive(Debug, Clone)]
@@ -27,11 +27,11 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new() -> Compiler {
-        Compiler { files: vec![] }
+    pub const fn new() -> Self {
+        Self { files: vec![] }
     }
 
-    pub fn get_version(&self) -> &str {
+    pub const fn get_version() -> &'static str {
         env!("CARGO_PKG_VERSION")
     }
 
@@ -39,13 +39,13 @@ impl Compiler {
         self.files.push(file);
     }
 
-    pub fn get_files(&mut self) -> &mut Vec<SourceFile> {
+    pub const fn get_files(&mut self) -> &mut Vec<SourceFile> {
         &mut self.files
     }
 
     pub fn find_file(&self, path: &str) -> Option<&SourceFile> {
         for file in &self.files {
-            if file.name.as_str().split(".").next().unwrap() == path {
+            if file.name.as_str().split('.').next().unwrap() == path {
                 return Some(file)
             }
         }
@@ -54,13 +54,10 @@ impl Compiler {
 
     fn highlight_line_and_column(data: &str, target_line: usize, target_column: usize) -> String {
         let target_line_content = data.lines().nth(target_line);
-        let line_content = match target_line_content {
-            Some(s) => s,
-            None => return format!("error: unknown line {}", target_line),
-        };
+        let Some(line_content) = target_line_content else { return format!("error: unknown line {target_line}") };
         let line_number_str = format!("{}", target_line + 1);
-        let line_prefix = format!("{:<4} | ", line_number_str);
-        let mut output = format!("{}{}\n", line_prefix, line_content);
+        let line_prefix = format!("{line_number_str:<4} | ");
+        let mut output = format!("{line_prefix}{line_content}\n");
         let indicator_prefix_len = line_prefix.len();
 
         let mut padding = line_content
@@ -72,12 +69,14 @@ impl Compiler {
         padding = if padding > 0 { padding - 1 } else { padding };
         let column_padding = " ".repeat(padding);
 
-        output.push_str(&format!("{}{}^\n", indicator_spaces, column_padding));
+        output.push_str(indicator_spaces.as_str());
+        output.push_str(column_padding.as_str());
+        output.push('^');
 
         output
     }
 
-    fn dump_error_info(message: String, line: usize, column: usize, file: &SourceFile) {
+    fn dump_error_info(message: &str, line: usize, column: usize, file: &SourceFile) {
         eprintln!(
             "SyntaxError({}-line: {} column: {}): {}",
             file.name,
@@ -91,19 +90,19 @@ impl Compiler {
         );
     }
 
-    fn dump_lexer_error(lex_error: LexerError, file: &SourceFile) {
+    fn dump_lexer_error(lex_error: &LexerError, file: &SourceFile) {
         let message: String = match lex_error {
             LexerError::UnexpectedCharacter(c) => {
                 format!("unexpected character {}", c.unwrap())
             }
             LexerError::IllegalLiteral => String::from("illegal literal"),
             LexerError::IllegalEscapeChar(char) => {
-                format!("illegal escape character {}", char)
+                format!("illegal escape character {char}")
             }
             LexerError::Eof => String::from("EOF"),
         };
         Self::dump_error_info(
-            message,
+            &message,
             file.lexer.get_now_line(),
             file.lexer.get_now_column(),
             file,
@@ -117,7 +116,7 @@ impl Compiler {
 
         match error {
             ParserError::LexError(lex_error) => {
-                Self::dump_lexer_error(lex_error, file);
+                Self::dump_lexer_error(&lex_error, file);
                 return;
             }
             ParserError::Eof | ParserError::Empty => {
@@ -136,7 +135,7 @@ impl Compiler {
             ParserError::Expected(token, c) => {
                 line = token.line;
                 column = token.column;
-                message = format!("'{}' expected.", c);
+                message = format!("'{c}' expected.");
             }
             ParserError::MissingStatement(token) => {
                 line = token.line;
@@ -200,10 +199,10 @@ impl Compiler {
             }
         }
 
-        Self::dump_error_info(message, line, column, file);
+        Self::dump_error_info(&message, line, column, file);
     }
 
-    pub fn warning_info_expr(source_file: &mut SourceFile, msg: &str, expr: &ASTExprTree,lint: Lint) {
+    pub fn warning_info_expr(source_file: &SourceFile, msg: &str, expr: &ASTExprTree,lint: Lint) {
         if !source_file.has_warnings(lint) {
             let token: &Token = match expr {
                 ASTExprTree::Var(token)
@@ -221,7 +220,7 @@ impl Compiler {
                 ASTExprTree::Unary { token: u_token, .. } => u_token,
                 ASTExprTree::Expr { token: e_token, .. } => e_token,
             };
-            println!("warning: {}", msg);
+            println!("warning: {msg}");
             println!(
                 "{}",
                 Self::highlight_line_and_column(source_file.get_data(), token.line, token.column)

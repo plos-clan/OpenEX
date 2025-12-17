@@ -26,11 +26,11 @@ pub struct Semantic<'a> {
 }
 
 impl<'a> Semantic<'a> {
-    pub fn new(file: &'a mut SourceFile, compiler:&'a mut Compiler) -> Semantic<'a> {
+    pub const fn new(file: &'a mut SourceFile, compiler:&'a mut Compiler) -> Self {
         Self { file,compiler }
     }
 
-    pub fn compiler_data(&mut self) -> &mut CompilerData {
+    pub const fn compiler_data(&mut self) -> &mut CompilerData {
         &mut self.file.c_data
     }
 
@@ -42,13 +42,13 @@ impl<'a> Semantic<'a> {
             for stmt in stmts {
                 match stmt {
                     ASTStmtTree::Var { name, value } => {
-                        let mut opcode = var_semantic(self, name, value, code, true, &mut global)?;
-                        code.get_code_table().append_code(&mut opcode);
+                        let opcode = var_semantic(self, name, value, code, true, &mut global)?;
+                        code.get_code_table().append_code(&opcode);
                     }
                     ASTStmtTree::Expr(expr) => {
                         let ref_expr = expr.clone();
-                        let mut ret_m = expr_semantic(self, Some(expr), code)?;
-                        code.get_code_table().append_code(&mut ret_m.2);
+                        let ret_m = expr_semantic(self, Some(expr), code)?;
+                        code.get_code_table().append_code(&ret_m.2);
                         if !check_expr_operand(&ret_m.0, &OpCode::Store(None), 0) {
                             Compiler::warning_info_expr(
                                 self.file,
@@ -74,18 +74,18 @@ impl<'a> Semantic<'a> {
                         cond,
                         body,
                     } => {
-                        let mut ret_m = while_semantic(self, cond, body, code, &mut global)?;
-                        code.get_code_table().append_code(&mut ret_m);
+                        let ret_m = while_semantic(self, &cond, body, code, &mut global)?;
+                        code.get_code_table().append_code(&ret_m);
                     }
                     ASTStmtTree::Function { name, args, body } => {
                         function_semantic(self, name, args,body,code)?;
                     }
                     ASTStmtTree::NativeFunction { name, args } => {
-                        native_function_semantic(self, name, args,code)?;
+                        native_function_semantic(self, name, &args, code)?;
                     }
                     ASTStmtTree::If {cond,then_body,else_body} => {
-                        let mut ret_m = judgment_semantic(self,cond,then_body,else_body,code, &mut global)?;
-                        code.get_code_table().append_code(&mut ret_m);
+                        let ret_m = judgment_semantic(self, &cond, then_body, else_body, code, &mut global)?;
+                        code.get_code_table().append_code(&ret_m);
                     }
                     _ => todo!(),
                 }

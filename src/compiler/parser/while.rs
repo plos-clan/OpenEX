@@ -22,17 +22,17 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
                     tk_b.column,
                     tk_b.index,
                     TokenType::True,
-                ))
+                ));
             } else {
                 parser.cache = Some(token);
                 cond = parser.parser_cond()?;
             }
         }
         _ => return Err(ParserError::Expected(token, '(')),
-    };
+    }
 
     let result = parser.next_parser_token();
-    if let Err(ParserError::Eof) = result {
+    if matches!(result, Err(ParserError::Eof)) {
         return Err(ParserError::MissingFunctionBody(parser.get_last().unwrap()));
     }
     token = result?;

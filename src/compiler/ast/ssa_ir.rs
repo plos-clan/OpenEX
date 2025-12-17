@@ -25,7 +25,7 @@ pub enum Operand {
     ImmNumFlot, // 类型占位符
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueGuessType {
     Bool,
     Number,
@@ -37,7 +37,7 @@ pub enum ValueGuessType {
     Unknown,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Value {
     pub(crate) variable: bool,        // 是否被重赋值
     pub(crate) type_: ValueGuessType, // 猜测类型
@@ -111,14 +111,7 @@ impl OpCode {
 
         // 重定位 Jump 和 JumpTrue 的跳转目标
         match self {
-            OpCode::Jump(_, target) => {
-                if let Some(j_target) = target
-                    && let Some(&new_target) = addr_map.get(j_target)
-                {
-                    *target = Some(new_target);
-                }
-            }
-            OpCode::JumpTrue(_, target, ..) | OpCode::JumpFalse(_, target, ..) => {
+            Self::JumpTrue(_, target, ..) | Self::JumpFalse(_, target, ..) => {
                 if let Some(j_target) = target
                     && let Some(&new_target) = addr_map.get(j_target)
                 {
@@ -139,7 +132,7 @@ pub struct OpCodeTable {
 
 impl OpCodeTable {
     pub fn new() -> Self {
-        OpCodeTable {
+        Self {
             opcodes: LinkedHashMap::new(),
             alloc_addr: LocalAddr { offset: 0 },
         }
@@ -158,7 +151,7 @@ impl OpCodeTable {
     }
 
     // 返回IR块第一条和最后一条IR的逻辑地址
-    pub fn append_code(&mut self, code: &mut OpCodeTable) -> (LocalAddr, Option<LocalAddr>) {
+    pub fn append_code(&mut self, code: &Self) -> (LocalAddr, Option<LocalAddr>) {
         let start_offset = self.alloc_addr.offset;
         if code.opcodes.is_empty() {
             return (
@@ -211,14 +204,14 @@ impl OpCodeTable {
 }
 
 // SSA_IR 局部变量映射表
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalMap {
     pub(crate) locals: BTreeMap<DefaultKey, usize>, // 局部变量表映射
     pub(crate) now_index: usize,
 }
 
 impl LocalMap {
-    pub fn new() -> LocalMap {
+    pub const fn new() -> Self {
         Self {
             locals: BTreeMap::new(),
             now_index: 0,
@@ -232,8 +225,8 @@ impl LocalMap {
         ret_m
     }
 
-    pub fn get_index(&self, key: &DefaultKey) -> Option<&usize> {
-        self.locals.get(key)
+    pub fn get_index(&self, key: DefaultKey) -> Option<&usize> {
+        self.locals.get(&key)
     }
 }
 
@@ -255,7 +248,7 @@ pub struct Code {
 }
 
 impl Code {
-    pub fn new(root: bool) -> Code {
+    pub fn new(root: bool) -> Self {
         Self {
             codes: OpCodeTable::new(),
             values: SlotMap::new(),
@@ -264,12 +257,12 @@ impl Code {
         }
     }
 
-    pub fn get_code_table(&mut self) -> &mut OpCodeTable {
+    pub const fn get_code_table(&mut self) -> &mut OpCodeTable {
         &mut self.codes
     }
 
-    pub fn find_value_key(&mut self, name: SmolStr) -> Option<DefaultKey> {
-        for (key, value) in self.values.iter_mut() {
+    pub fn find_value_key(&mut self, name: &SmolStr) -> Option<DefaultKey> {
+        for (key, value) in &mut self.values {
             if value.token.text() == name {
                 return Some(key);
             }
@@ -294,10 +287,10 @@ impl Code {
         self.funcs.push(func);
     }
 
-    pub fn find_function(&mut self, key: SmolStr) -> Option<&mut Function> {
+    pub fn find_function(&mut self, key: &SmolStr) -> Option<&mut Function> {
         let mut ret_m = None;
         for i in 0..self.funcs.len() {
-            if self.funcs.get_mut(i)?.name == key {
+            if self.funcs.get_mut(i)?.name == *key {
                 ret_m = Some(self.funcs.get_mut(i)?);
                 break;
             }
@@ -357,11 +350,11 @@ macro_rules! mathch_opcodes {
 }
 
 impl OpCode {
-    pub fn get_id(&self) -> LocalAddr {
+    pub const fn get_id(&self) -> LocalAddr {
         mathch_opcodes!(self, slot, slot).unwrap()
     }
 
-    pub fn set_id(&mut self, id: LocalAddr) {
+    pub const fn set_id(&mut self, id: LocalAddr) {
         mathch_opcodes!(self, slot, *slot = Some(id));
     }
 }
