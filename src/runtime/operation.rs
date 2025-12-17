@@ -1,15 +1,10 @@
 use crate::runtime::executor::Value;
 use crate::runtime::executor::Value::{String, Int, Float, Bool, Null};
 use crate::runtime::RuntimeError;
-use smol_str::ToSmolStr;
+use smol_str::format_smolstr;
+use std::fmt::Write;
 
 pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
-    if matches!(left, String(_)) || matches!(right, String(_)) {
-        let left_str = left.to_string();
-        let right_str = right.to_string();
-        return Ok(String(left_str + &right_str));
-    }
-
     match (left, right) {
         // Int + Int → Int
         (Int(l), Int(r)) => Ok(Int(l + r)),
@@ -23,7 +18,7 @@ pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{l} not in safe int.").to_smolstr(),
+                    format_smolstr!("{l} not in safe int."),
                 ));
             }
 
@@ -38,7 +33,7 @@ pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{r} not in safe int.").to_smolstr(),
+                    format_smolstr!("{r} not in safe int."),
                 ));
             }
 
@@ -50,8 +45,15 @@ pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
         (Float(l), Float(r)) => Ok(Float(l + r)),
 
         (String(l), String(r)) => Ok(String(l + &r)),
+        // any + String → String
+        (lhs, String(r)) => Ok(String(format!("{lhs}{r}"))),
+        // String + any → String
+        (String(mut l), rhs) => {
+            write!(l, "{rhs}").unwrap();
+            Ok(String(l))
+        },
         (auto, auto1) => Err(RuntimeError::TypeException(
-            format!("{auto} to {auto1}").to_smolstr(),
+            format_smolstr!("{auto} to {auto1}"),
         )),
     }
 }
@@ -65,7 +67,7 @@ pub fn sub_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{l} not in safe int.").to_smolstr(),
+                    format_smolstr!("{l} not in safe int."),
                 ));
             }
 
@@ -78,7 +80,7 @@ pub fn sub_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{r} not in safe int.").to_smolstr(),
+                    format_smolstr!("{r} not in safe int."),
                 ));
             }
 
@@ -87,7 +89,7 @@ pub fn sub_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
         },
         (Float(l), Float(r)) => Ok(Float(l - r)),
         (auto, auto1) => Err(RuntimeError::TypeException(
-            format!("{auto} to {auto1}").to_smolstr(),
+            format_smolstr!("{auto} to {auto1}"),
         )),
     }
 }
@@ -101,7 +103,7 @@ pub fn mul_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{l} not in safe int.").to_smolstr(),
+                    format_smolstr!("{l} not in safe int."),
                 ));
             }
 
@@ -114,7 +116,7 @@ pub fn mul_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{r} not in safe int.").to_smolstr(),
+                    format_smolstr!("{r} not in safe int."),
                 ));
             }
 
@@ -123,7 +125,7 @@ pub fn mul_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
         },
         (Float(l), Float(r)) => Ok(Float(l * r)),
         (auto, auto1) => Err(RuntimeError::TypeException(
-            format!("{auto} to {auto1}").to_smolstr(),
+            format_smolstr!("{auto} to {auto1}"),
         )),
     }
 }
@@ -137,7 +139,7 @@ pub fn div_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{l} not in safe int.").to_smolstr(),
+                    format_smolstr!("{l} not in safe int."),
                 ));
             }
 
@@ -150,7 +152,7 @@ pub fn div_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{r} not in safe int.").to_smolstr(),
+                    format_smolstr!("{r} not in safe int."),
                 ));
             }
 
@@ -159,7 +161,7 @@ pub fn div_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
         },
         (Float(l), Float(r)) => Ok(Float(l / r)),
         (auto, auto1) => Err(RuntimeError::TypeException(
-            format!("{auto} to {auto1}").to_smolstr(),
+            format_smolstr!("{auto} to {auto1}"),
         )),
     }
 }
@@ -169,7 +171,7 @@ pub fn self_add_value(var: Value) -> Result<Value, RuntimeError> {
         Int(i) => Ok(Int(i + 1)),
         Float(f) => Ok(Float(f + 1.0)),
         auto => Err(RuntimeError::TypeException(
-            format!("{auto} to int or float").to_smolstr(),
+            format_smolstr!("{auto} to int or float"),
         )),
     }
 }
@@ -179,7 +181,7 @@ pub fn self_sub_value(var: Value) -> Result<Value, RuntimeError> {
         Int(i) => Ok(Int(i - 1)),
         Float(f) => Ok(Float(f - 1.0)),
         auto => Err(RuntimeError::TypeException(
-            format!("{auto} to int or float").to_smolstr(),
+            format_smolstr!("{auto} to int or float"),
         )),
     }
 }
@@ -193,7 +195,7 @@ pub fn big_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{l} not in safe int.").to_smolstr(),
+                    format_smolstr!("{l} not in safe int."),
                 ));
             }
 
@@ -206,7 +208,7 @@ pub fn big_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{r} not in safe int.").to_smolstr(),
+                    format_smolstr!("{r} not in safe int."),
                 ));
             }
 
@@ -215,7 +217,7 @@ pub fn big_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
         },
         (Float(l), Float(r)) => Ok(Bool(l > r)),
         (auto, auto1) => Err(RuntimeError::TypeException(
-            format!("{auto} to {auto1}").to_smolstr(),
+            format_smolstr!("{auto} to {auto1}"),
         )),
     }
 }
@@ -229,7 +231,7 @@ pub fn less_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{l} not in safe int.").to_smolstr(),
+                    format_smolstr!("{l} not in safe int."),
                 ));
             }
 
@@ -242,7 +244,7 @@ pub fn less_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
                 return Err(RuntimeError::PrecisionLoss(
-                    format_args!("{r} not in safe int.").to_smolstr(),
+                    format_smolstr!("{r} not in safe int."),
                 ));
             }
 
@@ -251,7 +253,7 @@ pub fn less_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
         },
         (Float(l), Float(r)) => Ok(Bool(l < r)),
         (auto, auto1) => Err(RuntimeError::TypeException(
-            format!("{auto} to {auto1}").to_smolstr(),
+            format_smolstr!("{auto} to {auto1}"),
         )),
     }
 }
@@ -285,7 +287,7 @@ pub fn not_value(var: Value) -> Result<Value, RuntimeError> {
     match var {
         Bool(l) => Ok(Bool(!l)),
         auto => Err(RuntimeError::TypeException(
-            format!("{auto} to bool").to_smolstr(),
+            format_smolstr!("{auto} to bool"),
         )),
     }
 }
