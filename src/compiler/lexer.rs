@@ -579,7 +579,6 @@ impl LexerAnalysis {
                                 return Err(Eof);
                             }
                         }
-                        self.cache = Some(c);
                         self.next_token()
                     }
                     '=' => {

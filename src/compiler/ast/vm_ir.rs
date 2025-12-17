@@ -68,7 +68,7 @@ pub struct ConstantTable {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrFunction {
-    pub codes: Vec<ByteCode>,
+    pub codes: &'static [ByteCode],
     pub name: SmolStr,
     pub filename: SmolStr,
     pub args: usize,
@@ -77,8 +77,8 @@ pub struct IrFunction {
 }
 
 impl IrFunction {
-    pub fn clone_codes(&self) -> Vec<ByteCode> {
-        self.codes.clone()
+    pub const fn clone_codes(&self) -> &'static [ByteCode] {
+        self.codes
     }
 }
 
@@ -130,7 +130,7 @@ impl IrFunction {
         is_native: bool,
     ) -> Self {
         Self {
-            codes: vec![],
+            codes: &[],
             name,
             args,
             locals,
@@ -147,49 +147,52 @@ impl IrFunction {
         globals: &LocalMap,
         constant_table: &mut ConstantTable,
     ) {
+        let mut codes_builder:Vec<ByteCode> = Vec::new();
         for code in table.opcodes {
             match code.1 {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
                         let index = locals.get_index(key).unwrap();
-                        self.codes.push(ByteCode::StoreGlobal(*index));
+                        codes_builder.push(ByteCode::StoreGlobal(*index));
                     } else {
                         let index = constant_table.add_operand(imm, code0);
-                        self.codes.push(ByteCode::Push(index));
+                        codes_builder.push(ByteCode::Push(index));
                     }
                 }
                 OpCode::LoadLocal(_, key, _) => {
                     let index = locals.get_index(key).unwrap();
-                    self.codes.push(ByteCode::Load(*index));
+                    codes_builder.push(ByteCode::Load(*index));
                 }
                 OpCode::StoreLocal(_, key, _) => {
                     let index = locals.get_index(key).unwrap();
-                    self.codes.push(ByteCode::Store(*index));
+                    codes_builder.push(ByteCode::Store(*index));
                 }
                 OpCode::LoadGlobal(_, key, _) => {
                     let index = globals.get_index(key).unwrap();
-                    self.codes.push(ByteCode::LoadGlobal(*index));
+                    codes_builder.push(ByteCode::LoadGlobal(*index));
                 }
                 OpCode::StoreGlobal(_, key, _) => {
                     let index = globals.get_index(key).unwrap();
-                    self.codes.push(ByteCode::StoreGlobal(*index));
+                    codes_builder.push(ByteCode::StoreGlobal(*index));
                 }
                 OpCode::Jump(_, addr) => {
-                    self.codes.push(ByteCode::Jump(addr.unwrap().offset));
+                    codes_builder.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_, addr, _) => {
                     let addr_some = addr.unwrap();
-                    self.codes.push(ByteCode::JumpTrue(addr_some.offset));
+                    codes_builder.push(ByteCode::JumpTrue(addr_some.offset));
                 }
                 OpCode::JumpFalse(_, addr, _) => {
                     let addr_some = addr.unwrap();
-                    self.codes.push(ByteCode::JumpFalse(addr_some.offset));
+                    codes_builder.push(ByteCode::JumpFalse(addr_some.offset));
                 }
                 c => {
-                    self.codes.push(opcode_to_vmir(c));
+                    codes_builder.push(opcode_to_vmir(c));
                 }
             }
         }
+        let static_codes: &'static [ByteCode] = Box::leak(codes_builder.into_boxed_slice());
+        self.codes = static_codes;
     }
 }
 
@@ -198,7 +201,7 @@ impl IrFunction {
 pub struct VMIRTable {
     constant_table: ConstantTable,
     functions: Vec<IrFunction>,
-    codes: Vec<ByteCode>,
+    codes: &'static [ByteCode],
     globals: usize, // 全局变量表大小
 }
 
@@ -207,7 +210,7 @@ impl VMIRTable {
         Self {
             constant_table: ConstantTable::new(),
             functions: vec![],
-            codes: vec![],
+            codes: &[],
             globals: 0,
         }
     }
@@ -224,8 +227,8 @@ impl VMIRTable {
         self.globals
     }
 
-    pub fn clone_codes(&self) -> Vec<ByteCode> {
-        self.codes.clone()
+    pub const fn clone_codes(&self) -> &'static [ByteCode] {
+        self.codes
     }
 
     pub fn append_code(
@@ -235,45 +238,48 @@ impl VMIRTable {
         locals: &LocalMap,
     ) {
         let opcodes = table.opcodes.clone();
+        let mut codes_builder:Vec<ByteCode> = Vec::new();
         self.globals = locals.now_index;
         for code in opcodes {
             match code.1 {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
                         if let Some(index) = locals.get_index(key) {
-                            self.codes.push(ByteCode::StoreGlobal(*index));
+                            codes_builder.push(ByteCode::StoreGlobal(*index));
                         } else {
                             unreachable!()
                         }
                     } else {
                         let index = self.constant_table.add_operand(imm, code0);
-                        self.codes.push(ByteCode::Push(index));
+                        codes_builder.push(ByteCode::Push(index));
                     }
                 }
                 OpCode::LoadLocal(_, key, _) | OpCode::LoadGlobal(_, key, _) => {
                     let index = locals.get_index(key).unwrap();
-                    self.codes.push(ByteCode::LoadGlobal(*index));
+                    codes_builder.push(ByteCode::LoadGlobal(*index));
                 }
                 OpCode::StoreLocal(_, key, _) | OpCode::StoreGlobal(_, key, _) => {
                     let index = locals.get_index(key).unwrap();
-                    self.codes.push(ByteCode::StoreGlobal(*index));
+                    codes_builder.push(ByteCode::StoreGlobal(*index));
                 }
                 OpCode::Jump(_, addr) => {
-                    self.codes.push(ByteCode::Jump(addr.unwrap().offset));
+                    codes_builder.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_, addr, _) => {
                     let addr_some = addr.unwrap();
-                    self.codes.push(ByteCode::JumpTrue(addr_some.offset));
+                    codes_builder.push(ByteCode::JumpTrue(addr_some.offset));
                 }
                 OpCode::JumpFalse(_, addr, _) => {
                     let addr_some = addr.unwrap();
-                    self.codes.push(ByteCode::JumpFalse(addr_some.offset));
+                    codes_builder.push(ByteCode::JumpFalse(addr_some.offset));
                 }
                 c => {
-                    self.codes.push(opcode_to_vmir(c));
+                    codes_builder.push(opcode_to_vmir(c));
                 }
             }
         }
+        let static_codes: &'static [ByteCode] = Box::leak(codes_builder.into_boxed_slice());
+        self.codes = static_codes;
     }
 }
 

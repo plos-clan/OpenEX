@@ -48,7 +48,7 @@ pub struct StackFrame {
     name: String,
     file_name: SmolStr,
     pc: usize, // 指令执行索引(仅当前栈帧)
-    codes: Vec<ByteCode>,
+    codes: &'static [ByteCode],
     native: Option<SmolStr>, // 本地函数栈帧路径
     args: usize,             // 从父栈帧提取的参数个数
 }
@@ -68,7 +68,7 @@ impl StackFrame {
     pub fn new(
         name: String,
         file_name: SmolStr,
-        codes: Vec<ByteCode>,
+        codes: &'static [ByteCode],
         locals: usize,
         constant_table: ConstantTable,
         native: Option<SmolStr>,
