@@ -8,7 +8,7 @@ use crate::compiler::parser::ParserError::NoNativeImplement;
 use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::Semantic;
 use crate::library::find_library;
-use smol_str::SmolStr;
+use smol_str::{SmolStr, ToSmolStr};
 
 pub fn native_function_semantic(
     semantic: &mut Semantic,
@@ -16,9 +16,8 @@ pub fn native_function_semantic(
     arguments: &[ASTExprTree],
     code: &mut Code,
 ) -> Result<(), ParserError> {
-    let mut lib_name = semantic.file.name.clone();
-    lib_name = lib_name.split('.').next().unwrap().to_string();
-    let func_name = name.value::<SmolStr>().unwrap();
+    let lib_name = semantic.file.name.split('.').next().unwrap().to_smolstr();
+    let func_name = name.text().to_smolstr();
 
     if code.find_function(&func_name).is_some() {
         return Err(ParserError::SymbolDefined(name));

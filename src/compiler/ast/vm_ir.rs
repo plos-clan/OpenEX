@@ -299,8 +299,8 @@ impl ConstantTable {
     pub fn add_operand(&mut self, operand: Operand, _code: &mut Code) -> usize {
         let types: (Types, SmolStr) = match operand {
             Operand::Call(path) | Operand::Reference(path) | Operand::Library(path) => (Ref, path),
-            Operand::Null => (Null, "null".to_smolstr()),
-            Operand::This => (Ref, "this".to_smolstr()),
+            Operand::Null => (Null, SmolStr::new_static("null")),
+            Operand::This => (Ref, SmolStr::new_static("this")),
             Operand::ImmStr(imm) => (String, imm),
             Operand::ImmNum(imm) => (Number, imm.to_smolstr()),
             Operand::ImmFlot(imm) => (Float, imm.to_smolstr()),
