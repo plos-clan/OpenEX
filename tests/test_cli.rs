@@ -78,4 +78,6 @@ pub fn test_fib() {
     system.println(this.fib(30));",expect![[r#"
         > 832040
     "#]]);
+    // fib(30) == 832040
+    // fib(35) == 9227465
 }

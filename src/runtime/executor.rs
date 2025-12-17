@@ -1,13 +1,12 @@
 use crate::compiler::ast::vm_ir::{ByteCode, ConstantTable, IrFunction, Types};
 use crate::compiler::file::SourceFile;
 use crate::compiler::Compiler;
-use crate::runtime::operation::{
-    add_value, big_value, div_value, equ_value, less_value, mul_value, not_equ_value, not_value,
-    self_add_value, self_sub_value, sub_value,
-};
+use crate::runtime::control_flow::{call_func, jump, jump_false, jump_true};
+use crate::runtime::operation::{add_value, big_value, div_value, equ_value, get_ref, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
 use crate::runtime::thread::{add_thread_join, OpenEXThread};
+use crate::runtime::value_table::{load_local, store_local};
 use crate::runtime::RuntimeError;
-use smol_str::{SmolStr, ToSmolStr, format_smolstr};
+use smol_str::{SmolStr, ToSmolStr};
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
 
@@ -57,12 +56,8 @@ pub struct StackFrame {
 fn element_to_value((types, value): (Types, SmolStr)) -> Value {
     match types {
         Types::String => Value::String(value.to_string()),
-        Types::Number => {
-            Value::Int(value.parse::<i64>().unwrap())
-        }
-        Types::Float => {
-            Value::Float(value.parse::<f64>().unwrap())
-        }
+        Types::Number => Value::Int(value.parse::<i64>().unwrap()),
+        Types::Float => Value::Float(value.parse::<f64>().unwrap()),
         Types::Bool => Value::Bool(value == "true"),
         Types::Ref => Value::Ref(value.to_smolstr()),
         Types::Null => Value::Null,
@@ -206,6 +201,15 @@ impl Executor {
     }
 }
 
+macro_rules! do_bin_op {
+    ($frame:expr, $op_func:expr) => {{
+        let v_right = $frame.pop_op_stack().unwrap();
+        let v_left = $frame.pop_op_stack().unwrap();
+        $frame.push_op_stack($op_func(v_left, v_right)?);
+        $frame.next_pc();
+    }};
+}
+
 pub fn run_executor(
     frame_index: usize,
     executor: &mut Executor,
@@ -251,160 +255,33 @@ pub fn run_executor(
             }
             ByteCode::StoreGlobal(var_index) => {
                 let index = *var_index;
-
-                let result = root_frame.as_ref().map_or_else(|| stack_frame.get_var_table(index), |root| root.get_var_table(index));
+                let result = root_frame.as_ref().map_or_else(
+                    || stack_frame.get_var_table(index),
+                    |root| root.get_var_table(index),
+                );
                 stack_frame.push_op_stack(result.clone());
                 stack_frame.next_pc();
             }
-            ByteCode::Load(var_index) => {
-                let index = *var_index;
-                let result = stack_frame.pop_op_stack().unwrap();
-                stack_frame.set_var_table(index, result);
-                stack_frame.next_pc();
-            }
-            ByteCode::Store(var_index) => {
-                let value = stack_frame.get_var_table(*var_index);
-                stack_frame.push_op_stack(value.clone());
-                stack_frame.next_pc();
-            }
-            ByteCode::Add => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(add_value(value_1, value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::Sub => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(sub_value(value_1, value_0)?);
-                stack_frame.next_pc();
-            }
+            ByteCode::Load(var_index) => load_local(stack_frame,*var_index),
+            ByteCode::Store(var_index) => store_local(stack_frame,*var_index),
+            ByteCode::Add => do_bin_op!(stack_frame, add_value),
+            ByteCode::Sub => do_bin_op!(stack_frame, sub_value),
             ByteCode::Nol => stack_frame.next_pc(),
-            ByteCode::GetRef => {
-                let ref1 = stack_frame.pop_op_stack().unwrap();
-                let ref2 = stack_frame.pop_op_stack().unwrap();
-                if let Value::Ref(ref_top) = ref1
-                    && let Value::Ref(ref_bak) = ref2
-                {
-                    let all_ref = format_smolstr!("{}/{}", ref_bak, ref_top);
-                    stack_frame.push_op_stack(Value::Ref(all_ref));
-                } else {
-                    unreachable!()
-                }
-                stack_frame.next_pc();
-            }
-            ByteCode::Call => {
-                let result = stack_frame.pop_op_stack().unwrap();
-                return if let Value::Ref(path) = result {
-                    let panic_path = path.clone();
-                    if let Some(function) = executor.get_path_func(&path) {
-                        let func = function.1;
-                        let codes = func.clone_codes();
-                        stack_frame.next_pc();
-                        let native = if func.is_native { Some(panic_path) } else { None };
-                        Ok((
-                            Some(StackFrame::new(
-                                func.name.to_string(),
-                                func.filename,
-                                codes,
-                                func.locals,
-                                function.0,
-                                native,
-                                func.args,
-                            )),
-                            false,
-                        ))
-                    } else {
-                        Err(RuntimeError::NoSuchFunctionException(panic_path))
-                    }
-                } else {
-                    Err(RuntimeError::VMError)
-                };
-            }
-            ByteCode::Mul => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(mul_value(value_1, value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::Div => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(div_value(value_1, value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::SAdd => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(self_add_value(value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::SSub => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(self_sub_value(value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::Jump(pc) => {
-                let jpc = *pc;
-                stack_frame.set_next_pc(jpc);
-            }
-            ByteCode::JumpTrue(pc) => {
-                let jpc = *pc;
-                let top = stack_frame.pop_op_stack().unwrap();
-                if let Value::Bool(value) = top {
-                    if value {
-                        stack_frame.set_next_pc(jpc);
-                    } else {
-                        stack_frame.next_pc();
-                    }
-                } else {
-                    unreachable!()
-                }
-            }
-            ByteCode::JumpFalse(pc) => {
-                let jpc = *pc;
-                let top = stack_frame.pop_op_stack().unwrap();
-                if let Value::Bool(value) = top {
-                    if value {
-                        stack_frame.next_pc();
-                    } else {
-                        stack_frame.set_next_pc(jpc);
-                    }
-                } else {
-                    unreachable!()
-                }
-            }
-            ByteCode::Big => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(big_value(value_1, value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::Less => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(less_value(value_1, value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::Equ => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(equ_value(value_1, value_0));
-                stack_frame.next_pc();
-            }
-            ByteCode::NotEqu => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                let value_1 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(not_equ_value(value_1, value_0));
-                stack_frame.next_pc();
-            }
-            ByteCode::Not => {
-                let value_0 = stack_frame.pop_op_stack().unwrap();
-                stack_frame.push_op_stack(not_value(value_0)?);
-                stack_frame.next_pc();
-            }
-            ByteCode::Return => {
-                return Ok((None, true));
-            }
+            ByteCode::GetRef => get_ref(stack_frame),
+            ByteCode::Call => return call_func(stack_frame, executor),
+            ByteCode::Mul => do_bin_op!(stack_frame, mul_value),
+            ByteCode::Div => do_bin_op!(stack_frame, div_value),
+            ByteCode::SAdd => self_add_value(stack_frame)?,
+            ByteCode::SSub => self_sub_value(stack_frame)?,
+            ByteCode::Jump(pc) => jump(stack_frame, *pc),
+            ByteCode::JumpTrue(pc) => jump_true(stack_frame, *pc),
+            ByteCode::JumpFalse(pc) => jump_false(stack_frame, *pc),
+            ByteCode::Big => do_bin_op!(stack_frame, big_value),
+            ByteCode::Less => do_bin_op!(stack_frame, less_value),
+            ByteCode::Equ => equ_value(stack_frame),
+            ByteCode::NotEqu => not_equ_value(stack_frame),
+            ByteCode::Not => not_value(stack_frame)?,
+            ByteCode::Return => return Ok((None, true)),
             _ => todo!(),
         }
     }

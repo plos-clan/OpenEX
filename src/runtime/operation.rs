@@ -1,4 +1,4 @@
-use crate::runtime::executor::Value;
+use crate::runtime::executor::{StackFrame, Value};
 use crate::runtime::executor::Value::{String, Int, Float, Bool, Null};
 use crate::runtime::RuntimeError;
 use smol_str::format_smolstr;
@@ -166,24 +166,30 @@ pub fn div_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
     }
 }
 
-pub fn self_add_value(var: Value) -> Result<Value, RuntimeError> {
+pub fn self_add_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack().unwrap();
     match var {
-        Int(i) => Ok(Int(i + 1)),
-        Float(f) => Ok(Float(f + 1.0)),
-        auto => Err(RuntimeError::TypeException(
+        Int(i) => stack_frame.push_op_stack(Int(i + 1)),
+        Float(f) => stack_frame.push_op_stack(Float(f + 1.0)),
+        auto => return Err(RuntimeError::TypeException(
             format_smolstr!("{auto} to int or float"),
         )),
     }
+    stack_frame.next_pc();
+    Ok(())
 }
 
-pub fn self_sub_value(var: Value) -> Result<Value, RuntimeError> {
+pub fn self_sub_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack().unwrap();
     match var {
-        Int(i) => Ok(Int(i - 1)),
-        Float(f) => Ok(Float(f - 1.0)),
-        auto => Err(RuntimeError::TypeException(
+        Int(i) => stack_frame.push_op_stack(Int(i - 1)),
+        Float(f) => stack_frame.push_op_stack(Float(f - 1.0)),
+        auto => return Err(RuntimeError::TypeException(
             format_smolstr!("{auto} to int or float"),
         )),
     }
+    stack_frame.next_pc();
+    Ok(())
 }
 
 pub fn big_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
@@ -258,19 +264,25 @@ pub fn less_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
     }
 }
 
-pub fn equ_value(left: Value, right: Value) -> Value {
-    match (left, right) {
+pub fn equ_value(stack_frame: &mut StackFrame) {
+    let right = stack_frame.pop_op_stack().unwrap();
+    let left = stack_frame.pop_op_stack().unwrap();
+    let value = match (left, right) {
         (Int(l), Int(r)) => Bool(l == r),
         (Float(l), Float(r)) => Bool((l - r).abs() < f64::EPSILON),
         (String(l), String(r)) => Bool(l.as_str() == r.as_str()),
         (Null, Null) => Bool(true),
         (Bool(l), Bool(r)) => Bool(l == r),
         _ => Bool(false),
-    }
+    };
+    stack_frame.push_op_stack(value);
+    stack_frame.next_pc();
 }
 
-pub fn not_equ_value(left: Value, right: Value) -> Value {
-    match (left, right) {
+pub fn not_equ_value(stack_frame:&mut StackFrame) {
+    let right = stack_frame.pop_op_stack().unwrap();
+    let left = stack_frame.pop_op_stack().unwrap();
+    let value = match (left, right) {
         (Int(l), Int(r)) => Bool(l != r),
         (Float(l), Float(r)) => {
             let is_equal = (l - r).abs() < f64::EPSILON;
@@ -280,14 +292,34 @@ pub fn not_equ_value(left: Value, right: Value) -> Value {
         (Null, Null) => Bool(false),
         (Bool(l), Bool(r)) => Bool(l != r),
         _ => Bool(true),
-    }
+    };
+    stack_frame.push_op_stack(value);
+    stack_frame.next_pc();
 }
 
-pub fn not_value(var: Value) -> Result<Value, RuntimeError> {
-    match var {
-        Bool(l) => Ok(Bool(!l)),
-        auto => Err(RuntimeError::TypeException(
+pub fn not_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack().unwrap();
+    let value = match var {
+        Bool(l) => Bool(!l),
+        auto => return Err(RuntimeError::TypeException(
             format_smolstr!("{auto} to bool"),
         )),
+    };
+    stack_frame.push_op_stack(value);
+    stack_frame.next_pc();
+    Ok(())
+}
+
+pub fn get_ref(stack_frame: &mut StackFrame) {
+    let ref1 = stack_frame.pop_op_stack().unwrap();
+    let ref2 = stack_frame.pop_op_stack().unwrap();
+    if let Value::Ref(ref_top) = ref1
+        && let Value::Ref(ref_bak) = ref2
+    {
+        let all_ref = format_smolstr!("{}/{}", ref_bak, ref_top);
+        stack_frame.push_op_stack(Value::Ref(all_ref));
+    } else {
+        unreachable!()
     }
+    stack_frame.next_pc();
 }

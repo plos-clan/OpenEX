@@ -40,6 +40,14 @@ fn check_not_sflnum(num: i64) -> bool {
     (MIN_SAFE_INT..=MAX_SAFE_INT).contains(&num)
 }
 
+macro_rules! float_safe_check {
+    ($a:expr) => {
+        if check_not_sflnum(*$a) {
+            return None
+        }
+    };
+}
+
 pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Operand> {
     match (left, right, op) {
         (ImmNum(a), ImmNum(b), ExprOp::Add) => Some(ImmNum(a + b)),
@@ -49,72 +57,52 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
         (ImmNum(a), ImmNum(b), ExprOp::Rmd) => Some(ImmNum(a % b)),
 
         (ImmNum(a), ImmFlot(b), ExprOp::Add) => {
-            if check_not_sflnum(*a) {
-                return None
-            }
+            float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot((*a as f64) + b))
         },
         (ImmNum(a), ImmFlot(b), ExprOp::Sub) => {
-            if check_not_sflnum(*a) {
-                return None
-            }
+            float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 - b))},
         (ImmNum(a), ImmFlot(b), ExprOp::Mul) =>{
-            if check_not_sflnum(*a) {
-                return None
-            }
+            float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 * b))
         },
         (ImmNum(a), ImmFlot(b), ExprOp::Div) =>{
-            if check_not_sflnum(*a) {
-                return None
-            }
+            float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 / b))
         },
         (ImmNum(a), ImmFlot(b), ExprOp::Rmd) => {
-            if check_not_sflnum(*a) {
-                return None
-            }
+            float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 % b))
         },
 
         (ImmFlot(a), ImmNum(b), ExprOp::Add) => {
-            if check_not_sflnum(*b) {
-                return None
-            }
+            float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a + *b as f64))
         },
         (ImmFlot(a), ImmNum(b), ExprOp::Sub) => {
-            if check_not_sflnum(*b) {
-                return None
-            }
+            float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a - *b as f64))
         },
         (ImmFlot(a), ImmNum(b), ExprOp::Mul) => {
-            if check_not_sflnum(*b) {
-                return None
-            }
+            float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a * *b as f64))
         },
         (ImmFlot(a), ImmNum(b), ExprOp::Div) => {
-            if check_not_sflnum(*b) {
-                return None
-            }
+            float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a / *b as f64))
         },
         (ImmFlot(a), ImmNum(b), ExprOp::Rmd) => {
-            if check_not_sflnum(*b) {
-                return None
-            }
+            float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a % *b as f64))
         },
@@ -144,8 +132,10 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
         (ImmFlot(a), ImmFlot(b), ExprOp::BigEqu) => Some(ImmBool(a >= b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::LesEqu) => Some(ImmBool(a <= b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::Equ) => Some(ImmBool((a - b).abs() < f64::EPSILON)),
-        (ImmFlot(a), ImmFlot(b), ExprOp::NotEqu) => Some(ImmBool(!((a - b).abs() < f64::EPSILON))),
-
+        (ImmFlot(a), ImmFlot(b), ExprOp::NotEqu) => {
+            let result = (a - b).abs() < f64::EPSILON;
+            Some(ImmBool(!result))
+        },
         (ImmBool(a), ImmBool(b), ExprOp::And) => Some(ImmBool(*a && *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Or) => Some(ImmBool(*a || *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Equ) => Some(ImmBool(a == b)),

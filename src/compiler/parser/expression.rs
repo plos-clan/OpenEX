@@ -40,14 +40,10 @@ fn binding_power(token: &Token) -> Option<(u8, u8)> {
     }
 }
 
-fn expr_bp(
-    parser: &mut Parser,
-    tokens: &mut Peekable<IntoIter<Token>>,
-    min_bp: u8,
-) -> Result<ASTExprTree, ParserError> {
-    let Some(mut token) = tokens.next() else { return Err(IllegalExpression(parser.last.take().unwrap())) };
-
-    let mut expr_tree: ASTExprTree = match token.t_type {
+fn build_head_ast_tree(parser: &mut Parser,
+                       tokens: &mut Peekable<IntoIter<Token>>,
+                       token: Token) -> Result<ASTExprTree, ParserError> {
+    match token.t_type {
         LP => {
             let t = token;
             if t.text() != "(" {
@@ -56,7 +52,7 @@ fn expr_bp(
             let lhs = expr_bp(parser, tokens, 0);
             let Some(n_token) = tokens.next() else { return Err(MissingCondition(t)) };
             check_char(&n_token, TokenType::LR, ')')?;
-            lhs?
+            lhs
         }
         TokenType::Operator => {
             let ((), r_bp) = prefix_binding_power(&token);
@@ -68,22 +64,32 @@ fn expr_bp(
             };
             parser.last = Some(token.clone());
             let rhs = expr_bp(parser, tokens, r_bp)?;
-            ASTExprTree::Unary {
+            Ok(ASTExprTree::Unary {
                 token,
                 op,
                 code: Box::new(rhs),
-            }
+            })
         }
         TokenType::Number
         | TokenType::True
         | TokenType::False
         | TokenType::LiteralString
         | TokenType::Float
-        | TokenType::Null => ASTExprTree::Literal(token),
-        TokenType::This => ASTExprTree::This(token),
-        TokenType::Identifier => Var(token),
-        _ => return Err(IllegalKey(token)),
-    };
+        | TokenType::Null => Ok(ASTExprTree::Literal(token)),
+        TokenType::This => Ok(ASTExprTree::This(token)),
+        TokenType::Identifier => Ok(Var(token)),
+        _ => Err(IllegalKey(token)),
+    }
+}
+
+fn expr_bp(
+    parser: &mut Parser,
+    tokens: &mut Peekable<IntoIter<Token>>,
+    min_bp: u8,
+) -> Result<ASTExprTree, ParserError> {
+    let Some(mut token) = tokens.next() else { return Err(IllegalExpression(parser.last.take().unwrap())) };
+
+    let mut expr_tree: ASTExprTree = build_head_ast_tree(parser, tokens, token)?;
 
     loop {
         token = match tokens.peek().cloned() {
