@@ -1,16 +1,16 @@
-use crate::compiler::ast::vm_ir::{ByteCode, ConstantTable, IrFunction, Types};
+use crate::compiler::ast::vm_ir::{ByteCode, IrFunction};
 use crate::compiler::file::SourceFile;
 use crate::compiler::Compiler;
 use crate::runtime::control_flow::{call_func, jump, jump_false, jump_true};
 use crate::runtime::operation::{add_value, big_value, div_value, equ_value, get_ref, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
 use crate::runtime::thread::{add_thread_join, OpenEXThread};
-use crate::runtime::value_table::{load_local, store_local};
+use crate::runtime::value_table::{load_local, push_stack, store_local};
 use crate::runtime::RuntimeError;
 use smol_str::{SmolStr, ToSmolStr};
 use std::fmt::Display;
 use std::sync::{Arc, RwLock};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,PartialEq)]
 pub enum Value {
     Int(i64),
     Bool(bool),
@@ -42,26 +42,15 @@ impl Display for Value {
 
 #[derive(Debug, Clone)]
 pub struct StackFrame {
-    constant_table: ConstantTable,
+    constant_table: &'static [Value],
     local_tables: Vec<Value>,
     op_stack: Vec<Value>,
     name: String,
-    file_name: SmolStr,
+    pub(crate) file_name: SmolStr,
     pc: usize, // 指令执行索引(仅当前栈帧)
     codes: &'static [ByteCode],
     native: Option<SmolStr>, // 本地函数栈帧路径
     args: usize,             // 从父栈帧提取的参数个数
-}
-
-fn element_to_value((types, value): (Types, SmolStr)) -> Value {
-    match types {
-        Types::String => Value::String(value.to_string()),
-        Types::Number => Value::Int(value.parse::<i64>().unwrap()),
-        Types::Float => Value::Float(value.parse::<f64>().unwrap()),
-        Types::Bool => Value::Bool(value == "true"),
-        Types::Ref => Value::Ref(value.to_smolstr()),
-        Types::Null => Value::Null,
-    }
 }
 
 impl StackFrame {
@@ -70,7 +59,7 @@ impl StackFrame {
         file_name: SmolStr,
         codes: &'static [ByteCode],
         locals: usize,
-        constant_table: ConstantTable,
+        constant_table: &'static [Value],
         native: Option<SmolStr>,
         args: usize,
     ) -> Self {
@@ -99,11 +88,8 @@ impl StackFrame {
         self.native.clone()
     }
 
-    pub fn get_const(&self, index: usize) -> Option<Value> {
-        if let Some(element) = self.constant_table.get_const(index) {
-            return Some(element_to_value(element));
-        }
-        None
+    pub fn get_const(&self, index: usize) -> Option<&Value> {
+        self.constant_table.get(index)
     }
 
     pub const fn get_args(&self) -> usize {
@@ -158,7 +144,7 @@ impl Executor {
         self.threads.last_mut().unwrap()
     }
 
-    pub fn get_path_func(&mut self, path: &str) -> Option<(ConstantTable, IrFunction)> {
+    pub fn get_path_func(&mut self, path: &str) -> Option<(&'static [Value], IrFunction)> {
         let mut sp = path.split('/');
         let file = sp.next().unwrap();
         let func = sp.next().unwrap();
@@ -228,21 +214,7 @@ pub fn run_executor(
 
     while let Some(instr) = stack_frame.fetch_current() {
         match instr {
-            ByteCode::Push(const_index0) => {
-                let const_index = *const_index0;
-
-                if let Some(value) = stack_frame.get_const(const_index) {
-                    if let Value::Ref(path) = &value
-                        && path.as_str() == "this"
-                    {
-                        let path = stack_frame.file_name.split('.').next().unwrap();
-                        stack_frame.push_op_stack(Value::Ref(path.to_smolstr()));
-                    } else {
-                        stack_frame.push_op_stack(value);
-                    }
-                }
-                stack_frame.next_pc();
-            }
+            ByteCode::Push(const_index) => push_stack(stack_frame,*const_index),
             ByteCode::LoadGlobal(var_index) => {
                 let index = *var_index;
                 let result = stack_frame.pop_op_stack().unwrap();

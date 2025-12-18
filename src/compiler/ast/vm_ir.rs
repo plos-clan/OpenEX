@@ -1,8 +1,10 @@
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
+use crate::runtime::executor::Value;
 use smol_str::{SmolStr, ToSmolStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 #[allow(dead_code)] //TODO
 pub enum ByteCode {
     Push(usize),        // 将常量表中的元素压入操作栈 (常量表索引)
@@ -60,10 +62,10 @@ pub enum Types {
 }
 
 // 常量表, 每一个源文件都有一个
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConstantTable {
     table_size: usize,
-    element: Vec<(Types, SmolStr)>,
+    element: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,7 +149,7 @@ impl IrFunction {
         globals: &LocalMap,
         constant_table: &mut ConstantTable,
     ) {
-        let mut codes_builder:Vec<ByteCode> = Vec::new();
+        let mut codes_builder: Vec<ByteCode> = Vec::new();
         for code in table.opcodes {
             match code.1 {
                 OpCode::Push(_, imm) => {
@@ -199,7 +201,7 @@ impl IrFunction {
 #[allow(dead_code)] // TODO
 #[derive(Debug, Clone)]
 pub struct VMIRTable {
-    constant_table: ConstantTable,
+    constant_table: &'static [Value],
     functions: Vec<IrFunction>,
     codes: &'static [ByteCode],
     globals: usize, // 全局变量表大小
@@ -208,7 +210,7 @@ pub struct VMIRTable {
 impl VMIRTable {
     pub const fn new() -> Self {
         Self {
-            constant_table: ConstantTable::new(),
+            constant_table: &[],
             functions: vec![],
             codes: &[],
             globals: 0,
@@ -219,8 +221,8 @@ impl VMIRTable {
         self.functions.clone()
     }
 
-    pub fn get_constant_table(&self) -> ConstantTable {
-        self.constant_table.clone()
+    pub fn get_constant_table(&self) -> &'static [Value] {
+        self.constant_table
     }
 
     pub const fn get_locals_len(&self) -> usize {
@@ -231,14 +233,19 @@ impl VMIRTable {
         self.codes
     }
 
+    pub fn set_constant_table(&mut self, constant_table: &'static [Value]) {
+        self.constant_table = constant_table;
+    }
+
     pub fn append_code(
         &mut self,
         table: &OpCodeTable,
         code0: &mut Code,
         locals: &LocalMap,
+        const_table: &mut ConstantTable,
     ) {
         let opcodes = table.opcodes.clone();
-        let mut codes_builder:Vec<ByteCode> = Vec::new();
+        let mut codes_builder: Vec<ByteCode> = Vec::new();
         self.globals = locals.now_index;
         for code in opcodes {
             match code.1 {
@@ -250,7 +257,7 @@ impl VMIRTable {
                             unreachable!()
                         }
                     } else {
-                        let index = self.constant_table.add_operand(imm, code0);
+                        let index = const_table.add_operand(imm, code0);
                         codes_builder.push(ByteCode::Push(index));
                     }
                 }
@@ -291,12 +298,19 @@ impl ConstantTable {
         }
     }
 
-    pub fn get_const(&self, index: usize) -> Option<(Types, SmolStr)> {
-        self.element.get(index).cloned()
+    fn element_to_value((types, value): (Types, SmolStr)) -> Value {
+        match types {
+            String => Value::String(value.to_string()),
+            Number => Value::Int(value.parse::<i64>().unwrap()),
+            Float => Value::Float(value.parse::<f64>().unwrap()),
+            Bool => Value::Bool(value == "true"),
+            Ref => Value::Ref(value.to_smolstr()),
+            Null => Value::Null,
+        }
     }
 
     pub fn add_const(&mut self, types: Types, data: SmolStr) -> usize {
-        self.element.push((types, data));
+        self.element.push(Self::element_to_value((types, data)));
         let rets = self.table_size;
         self.table_size += 1;
         rets
@@ -319,7 +333,13 @@ impl ConstantTable {
 
 pub fn ssa_to_vm(mut code: Code, locals: &LocalMap, filename: &SmolStr) -> VMIRTable {
     let mut vm_table = VMIRTable::new();
-    vm_table.append_code(code.clone().get_code_table(), &mut code, locals);
+    let mut const_table = ConstantTable::new();
+    vm_table.append_code(
+        code.clone().get_code_table(),
+        &mut code,
+        locals,
+        &mut const_table,
+    );
 
     for func in code.clone().funcs {
         let mut ir_func = IrFunction::new(
@@ -335,10 +355,12 @@ pub fn ssa_to_vm(mut code: Code, locals: &LocalMap, filename: &SmolStr) -> VMIRT
                 &mut code,
                 &func.locals,
                 locals,
-                &mut vm_table.constant_table,
+                &mut const_table,
             );
         }
         vm_table.functions.push(ir_func);
     }
+    let static_codes: &'static [Value] = Box::leak(const_table.element.into_boxed_slice());
+    vm_table.set_constant_table(static_codes);
     vm_table
 }
