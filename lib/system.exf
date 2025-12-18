@@ -1,5 +1,6 @@
 
 function native print(output);
+function native exit(code);
 
 function println(output) {
     this.print(output + "\n");

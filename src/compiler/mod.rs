@@ -234,10 +234,9 @@ impl Compiler {
             if file.compiled {
                 continue;
             }
-            let mut failed = false;
+            let failed = false;
             let vm_ir = file.compiler(&mut compiler).unwrap_or_else(|error| {
                 Self::dump_parser_error(error, file);
-                failed = true;
                 exit(-1);
             });
             if failed {

@@ -1,17 +1,15 @@
 use smol_str::SmolStr;
 
-pub mod executor;
-mod thread;
-mod operation;
 mod control_flow;
+pub mod executor;
+mod operation;
+mod thread;
 mod value_table;
 
-#[allow(dead_code)] // TODO
-#[derive(Debug)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum RuntimeError {
-    NoSuchFunctionException(SmolStr),
-    TypeException(SmolStr),
-    PrecisionLoss(SmolStr),
-    VMError,
+    NoSuchFunctionException(SmolStr), // 找不到函数
+    TypeException(SmolStr),           // 类型检查错误
+    PrecisionLoss(SmolStr),           // 精度转换损失
+    VMError,                          // 解释器内部错误
 }
-

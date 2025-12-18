@@ -14,6 +14,10 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
 use crate::runtime::executor::Executor;
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 struct Args {
     input: Vec<String>,

@@ -1,8 +1,10 @@
-use crate::library::{register_library, LibModule, ModuleFunc, output_capture::print};
+use crate::library::{output_capture::print, register_library, LibModule, ModuleFunc};
 use crate::runtime::executor::Value;
 use crate::runtime::RuntimeError;
-use smol_str::SmolStr;
+use smol_str::{SmolStr, ToSmolStr};
+use std::process::exit;
 
+#[allow(clippy::unnecessary_wraps)]
 fn system_print(args:&[Value]) -> Result<Value,RuntimeError> {
     let output = args.first().unwrap().clone();
     match output {
@@ -23,11 +25,34 @@ fn reg_println() -> ModuleFunc{
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
+fn system_exit(args:&[Value]) -> Result<Value,RuntimeError> {
+    let output = args.first().unwrap().clone();
+    if let Value::Int(i) = output {
+        let i32_code:i32 = if i > i64::from(i32::MAX) {
+            return Err(RuntimeError::PrecisionLoss("exit: exit_code > MAX_INT32".to_smolstr()))
+        }else {
+            i32::try_from(i).unwrap()
+        };
+        exit(i32_code);
+    }else {
+        Err(RuntimeError::TypeException("exit: exit_code not a number.".to_smolstr()))
+    }
+}
+fn reg_exit() -> ModuleFunc{
+    ModuleFunc {
+        name: SmolStr::new("exit"),
+        arity: 1,
+        func: system_exit,
+    }
+}
+
 pub fn register_system_lib() {
     let mut system_lib = LibModule {
         name: SmolStr::new("system"),
         functions: vec![]
     };
     system_lib.functions.push(reg_println());
+    system_lib.functions.push(reg_exit());
     register_library(system_lib);
 }
