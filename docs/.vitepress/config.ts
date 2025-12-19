@@ -24,6 +24,9 @@ export default defineConfig({
                 items: [
                     {text: '第一个程序', link: '/example'},
                     {text: '表达式', link: '/example/expression'},
+                    {text: '函数', link: '/example/function'},
+                    {text: '判断语句', link: '/example/conditional'},
+                    {text: '循环语句', link: '/example/loop'},
                 ]
             },
             {
