@@ -322,4 +322,38 @@ pub fn self_sub_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> 
     Ok(())
 }
 
+pub fn less_equ_value(left: Value, right: Value)-> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Int(l), Int(r)) => Ok(Bool(l <= r)),
+        (Int(l), Float(r)) => {
+            const MAX_SAFE_INT: i64 = (1i64 << 53) - 1;
+            const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
 
+            if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
+                return Err(RuntimeError::PrecisionLoss(
+                    format_smolstr!("{l} not in safe int."),
+                ));
+            }
+
+            #[allow(clippy::cast_precision_loss)]
+            Ok(Bool((l as f64) <= r))
+        },
+        (Float(l), Int(r)) => {
+            const MAX_SAFE_INT: i64 = (1i64 << 53) - 1;
+            const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
+
+            if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
+                return Err(RuntimeError::PrecisionLoss(
+                    format_smolstr!("{r} not in safe int."),
+                ));
+            }
+
+            #[allow(clippy::cast_precision_loss)]
+            Ok(Bool(l <= r as f64))
+        },
+        (Float(l), Float(r)) => Ok(Bool(l <= r)),
+        (auto, auto1) => Err(RuntimeError::TypeException(
+            format_smolstr!("{auto} to {auto1}"),
+        )),
+    }
+}

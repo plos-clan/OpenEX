@@ -12,16 +12,18 @@ pub fn while_semantic(
     expr: &ASTExprTree,
     body: Vec<ASTStmtTree>,
     code: &mut Code,
-    locals:&mut LocalMap
+    locals: &mut LocalMap,
 ) -> Result<OpCodeTable, ParserError> {
     let exp = lower_expr(semantic, expr, code, None)?;
     let mut code_table = OpCodeTable::new();
 
     if exp.1 != ValueGuessType::Bool {
-        return Err(ParserError::IllegalTypeCombination(expr.clone().token().clone()));
+        return Err(ParserError::IllegalTypeCombination(
+            expr.clone().token().clone(),
+        ));
     }
 
-    if matches!(exp.0,Operand::ImmBool(_)) && !semantic.file.has_warnings(LoopNoExpr) {
+    if matches!(exp.0, Operand::ImmBool(_)) && !semantic.file.has_warnings(LoopNoExpr) {
         Compiler::warning_info_expr(
             semantic.file,
             "'while(true)' can be written as 'while'.",
@@ -29,8 +31,10 @@ pub fn while_semantic(
             LoopNoExpr,
         );
     }
-    let start = code_table.append_code(&exp.2).0;
-    let k = code_table.add_opcode(OpCode::JumpTrue(None,None, exp.0));
+
+    let start = code_table.add_opcode(OpCode::Nop(None));
+    code_table.append_code(&exp.2);
+    let k = code_table.add_opcode(OpCode::JumpFalse(None, None, exp.0));
 
     let blk_table = block_semantic(semantic, body, code, locals)?;
     code_table.append_code(&blk_table);
@@ -38,7 +42,7 @@ pub fn while_semantic(
     let end_addr = code_table.add_opcode(OpCode::Nop(None));
 
     if let Some(jump_true_op) = code_table.find_code_mut(k)
-        && let OpCode::JumpTrue(_,target, _) = jump_true_op
+        && let OpCode::JumpFalse(_, target, _) = jump_true_op
     {
         *target = Some(end_addr);
     }

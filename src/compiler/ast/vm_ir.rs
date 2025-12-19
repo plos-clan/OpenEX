@@ -366,6 +366,7 @@ impl ConstantTable {
 pub fn ssa_to_vm(mut code: Code, locals: &LocalMap, filename: &SmolStr) -> VMIRTable {
     let mut vm_table = VMIRTable::new();
     let mut const_table = ConstantTable::new();
+
     vm_table.append_code(
         code.clone().get_code_table(),
         &mut code,

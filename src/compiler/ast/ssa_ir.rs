@@ -111,7 +111,9 @@ impl OpCode {
 
         // 重定位 Jump 和 JumpTrue 的跳转目标
         match self {
-            Self::JumpTrue(_, target, ..) | Self::JumpFalse(_, target, ..) => {
+            Self::JumpTrue(_, target, ..)
+            | Self::JumpFalse(_, target, ..)
+            | Self::Jump(_, target) => {
                 if let Some(j_target) = target
                     && let Some(&new_target) = addr_map.get(j_target)
                 {

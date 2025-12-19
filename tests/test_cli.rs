@@ -50,7 +50,13 @@ pub fn test_loop() {
     while(a < 5) {\
     system.println(\"number: \" + a);\
     a++;\
-    }",expect!["> "]);
+    }",expect![[r#"
+        > number: 0
+        number: 1
+        number: 2
+        number: 3
+        number: 4
+    "#]]);
 }
 
 #[test]
@@ -80,4 +86,27 @@ pub fn test_fib() {
     "#]]);
     // fib(30) == 832040
     // fib(35) == 9227465
+}
+
+#[test]
+pub fn test_fib_2() {
+    check(b"import system;\
+     function fib(n) {\
+    if (n < 2) {\
+    return n;\
+    }\
+    var a = 0;\
+    var b = 1;\
+    var i = 2;\
+    while (i <= n) {\
+        var next = a + b;\
+        a = b;\
+        b = next;\
+        i++;\
+    }\
+    return b;\
+    }\
+    system.println(this.fib(30));", expect![[r#"
+        > 832040
+    "#]])
 }

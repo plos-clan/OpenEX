@@ -1,7 +1,7 @@
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
-use crate::runtime::vm_operation::{add_value, big_value, div_value, equ_value, get_ref, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
+use crate::runtime::vm_operation::{add_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
 use crate::runtime::vm_table_opt::{
     call_func, jump, jump_false, jump_true, load_local, push_stack, store_local,
 };
@@ -173,6 +173,7 @@ fn run_code<'a>(
             ByteCode::SSub => self_sub_value(stack_frame)?,
             ByteCode::Big => do_bin_op!(stack_frame, big_value),
             ByteCode::Less => do_bin_op!(stack_frame, less_value),
+            ByteCode::LesEqu => do_bin_op!(stack_frame, less_equ_value),
             ByteCode::LoadGlobal(var_index) => {
                 let index = *var_index;
                 let result = stack_frame.pop_op_stack();
