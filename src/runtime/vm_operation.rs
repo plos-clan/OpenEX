@@ -1,8 +1,22 @@
-use crate::runtime::executor::{StackFrame, Value};
-use crate::runtime::executor::Value::{String, Int, Float, Bool, Null};
+use crate::compiler::ast::vm_ir::Value;
+use crate::compiler::ast::vm_ir::Value::{Bool, Float, Int, String, Null};
+use crate::runtime::executor::StackFrame;
 use crate::runtime::RuntimeError;
 use smol_str::format_smolstr;
-use std::fmt::Write;
+
+pub fn get_ref(stack_frame: &mut StackFrame) {
+    let ref1 = stack_frame.pop_op_stack();
+    let ref2 = stack_frame.pop_op_stack();
+    if let Value::Ref(ref_top) = ref1
+        && let Value::Ref(ref_bak) = ref2
+    {
+        let all_ref = format_smolstr!("{}/{}", ref_bak, ref_top);
+        stack_frame.push_op_stack(Value::Ref(all_ref));
+    } else {
+        unreachable!()
+    }
+    stack_frame.next_pc();
+}
 
 pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
     match (left, right) {
@@ -17,9 +31,9 @@ pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
             const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
-                return Err(RuntimeError::PrecisionLoss(
-                    format_smolstr!("{l} not in safe int."),
-                ));
+                return Err(RuntimeError::PrecisionLoss(format_smolstr!(
+                    "{l} not in safe int."
+                )));
             }
 
             #[allow(clippy::cast_precision_loss)]
@@ -32,29 +46,26 @@ pub fn add_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
             const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
 
             if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
-                return Err(RuntimeError::PrecisionLoss(
-                    format_smolstr!("{r} not in safe int."),
-                ));
+                return Err(RuntimeError::PrecisionLoss(format_smolstr!(
+                    "{r} not in safe int."
+                )));
             }
 
             #[allow(clippy::cast_precision_loss)]
             Ok(Float(l + r as f64))
-        },
+        }
 
         // Float + Float → Float
         (Float(l), Float(r)) => Ok(Float(l + r)),
 
-        (String(l), String(r)) => Ok(String(l + &r)),
+        (String(l), String(r)) => Ok(String(format_smolstr!("{l}{r}"))),
         // any + String → String
-        (lhs, String(r)) => Ok(String(format!("{lhs}{r}"))),
+        (lhs, String(r)) => Ok(String(format_smolstr!("{lhs}{r}"))),
         // String + any → String
-        (String(mut l), rhs) => {
-            write!(l, "{rhs}").unwrap();
-            Ok(String(l))
-        },
-        (auto, auto1) => Err(RuntimeError::TypeException(
-            format_smolstr!("{auto} to {auto1}"),
-        )),
+        (String(l), rhs) => Ok(String(format_smolstr!("{l}{rhs}"))),
+        (auto, auto1) => Err(RuntimeError::TypeException(format_smolstr!(
+            "{auto} to {auto1}"
+        ))),
     }
 }
 
@@ -166,28 +177,49 @@ pub fn div_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
     }
 }
 
-pub fn self_add_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
-    let var = stack_frame.pop_op_stack().unwrap();
-    match var {
-        Int(i) => stack_frame.push_op_stack(Int(i + 1)),
-        Float(f) => stack_frame.push_op_stack(Float(f + 1.0)),
-        auto => return Err(RuntimeError::TypeException(
-            format_smolstr!("{auto} to int or float"),
-        )),
-    }
+
+pub fn equ_value(stack_frame: &mut StackFrame) {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    let value = match (left, right) {
+        (Int(l), Int(r)) => Bool(l == r),
+        (Float(l), Float(r)) => Bool((l - r).abs() < f64::EPSILON),
+        (String(l), String(r)) => Bool(l.as_str() == r.as_str()),
+        (Null, Null) => Bool(true),
+        (Bool(l), Bool(r)) => Bool(l == r),
+        _ => Bool(false),
+    };
+    stack_frame.push_op_stack(value);
     stack_frame.next_pc();
-    Ok(())
 }
 
-pub fn self_sub_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
-    let var = stack_frame.pop_op_stack().unwrap();
-    match var {
-        Int(i) => stack_frame.push_op_stack(Int(i - 1)),
-        Float(f) => stack_frame.push_op_stack(Float(f - 1.0)),
+pub fn not_equ_value(stack_frame:&mut StackFrame) {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    let value = match (left, right) {
+        (Int(l), Int(r)) => Bool(l != r),
+        (Float(l), Float(r)) => {
+            let is_equal = (l - r).abs() < f64::EPSILON;
+            Bool(!is_equal)
+        },
+        (String(l), String(r)) => Bool(l.as_str() != r.as_str()),
+        (Null, Null) => Bool(false),
+        (Bool(l), Bool(r)) => Bool(l != r),
+        _ => Bool(true),
+    };
+    stack_frame.push_op_stack(value);
+    stack_frame.next_pc();
+}
+
+pub fn not_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack();
+    let value = match var {
+        Bool(l) => Bool(!l),
         auto => return Err(RuntimeError::TypeException(
-            format_smolstr!("{auto} to int or float"),
+            format_smolstr!("{auto} to bool"),
         )),
-    }
+    };
+    stack_frame.push_op_stack(value);
     stack_frame.next_pc();
     Ok(())
 }
@@ -264,62 +296,30 @@ pub fn less_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
     }
 }
 
-pub fn equ_value(stack_frame: &mut StackFrame) {
-    let right = stack_frame.pop_op_stack().unwrap();
-    let left = stack_frame.pop_op_stack().unwrap();
-    let value = match (left, right) {
-        (Int(l), Int(r)) => Bool(l == r),
-        (Float(l), Float(r)) => Bool((l - r).abs() < f64::EPSILON),
-        (String(l), String(r)) => Bool(l.as_str() == r.as_str()),
-        (Null, Null) => Bool(true),
-        (Bool(l), Bool(r)) => Bool(l == r),
-        _ => Bool(false),
-    };
-    stack_frame.push_op_stack(value);
-    stack_frame.next_pc();
-}
-
-pub fn not_equ_value(stack_frame:&mut StackFrame) {
-    let right = stack_frame.pop_op_stack().unwrap();
-    let left = stack_frame.pop_op_stack().unwrap();
-    let value = match (left, right) {
-        (Int(l), Int(r)) => Bool(l != r),
-        (Float(l), Float(r)) => {
-            let is_equal = (l - r).abs() < f64::EPSILON;
-            Bool(!is_equal)
-        },
-        (String(l), String(r)) => Bool(l.as_str() != r.as_str()),
-        (Null, Null) => Bool(false),
-        (Bool(l), Bool(r)) => Bool(l != r),
-        _ => Bool(true),
-    };
-    stack_frame.push_op_stack(value);
-    stack_frame.next_pc();
-}
-
-pub fn not_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
-    let var = stack_frame.pop_op_stack().unwrap();
-    let value = match var {
-        Bool(l) => Bool(!l),
+pub fn self_add_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack();
+    match var {
+        Int(i) => stack_frame.push_op_stack(Int(i + 1)),
+        Float(f) => stack_frame.push_op_stack(Float(f + 1.0)),
         auto => return Err(RuntimeError::TypeException(
-            format_smolstr!("{auto} to bool"),
+            format_smolstr!("{auto} to int or float"),
         )),
-    };
-    stack_frame.push_op_stack(value);
+    }
     stack_frame.next_pc();
     Ok(())
 }
 
-pub fn get_ref(stack_frame: &mut StackFrame) {
-    let ref1 = stack_frame.pop_op_stack().unwrap();
-    let ref2 = stack_frame.pop_op_stack().unwrap();
-    if let Value::Ref(ref_top) = ref1
-        && let Value::Ref(ref_bak) = ref2
-    {
-        let all_ref = format_smolstr!("{}/{}", ref_bak, ref_top);
-        stack_frame.push_op_stack(Value::Ref(all_ref));
-    } else {
-        unreachable!()
+pub fn self_sub_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack();
+    match var {
+        Int(i) => stack_frame.push_op_stack(Int(i - 1)),
+        Float(f) => stack_frame.push_op_stack(Float(f - 1.0)),
+        auto => return Err(RuntimeError::TypeException(
+            format_smolstr!("{auto} to int or float"),
+        )),
     }
     stack_frame.next_pc();
+    Ok(())
 }
+
+

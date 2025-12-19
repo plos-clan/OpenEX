@@ -9,6 +9,7 @@ use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::Semantic;
 use crate::library::find_library;
 use smol_str::{SmolStr, ToSmolStr};
+use crate::compiler::ast::vm_ir::Value;
 
 pub fn native_function_semantic(
     semantic: &mut Semantic,
@@ -39,11 +40,12 @@ pub fn native_function_semantic(
                 codes: None,
                 locals: LocalMap::new(),
             });
-            Ok(())
+            Ok(Value::Null)
         } else {
             Err(NoNativeImplement(name))
         }
-    })
+    })?;
+    Ok(())
 }
 
 pub fn function_semantic(

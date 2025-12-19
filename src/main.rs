@@ -13,8 +13,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
-use crate::runtime::executor::Executor;
 use mimalloc::MiMalloc;
+use crate::runtime::initialize_executor;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -148,7 +148,6 @@ fn main() -> io::Result<()> {
     }
 
     compiler.compile();
-    let executor = Executor::new();
-    executor.run(compiler);
+    initialize_executor(&mut compiler);
     Ok(())
 }

@@ -38,10 +38,6 @@ impl SourceFile {
             compiled: false,
         }
     }
-    
-    pub fn get_vmir_table(&mut self) -> Option<VMIRTable> {
-        self.ir_table.as_mut().map(|table| *(*table).clone())
-    }
 
     pub fn peek_token(&mut self) -> Result<Token, ParserError> {
         match self.lexer.next_token() {

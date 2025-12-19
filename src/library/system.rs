@@ -1,8 +1,8 @@
 use crate::library::{output_capture::print, register_library, LibModule, ModuleFunc};
-use crate::runtime::executor::Value;
 use crate::runtime::RuntimeError;
 use smol_str::{SmolStr, ToSmolStr};
 use std::process::exit;
+use crate::compiler::ast::vm_ir::Value;
 
 #[allow(clippy::unnecessary_wraps)]
 fn system_print(args:&[Value]) -> Result<Value,RuntimeError> {

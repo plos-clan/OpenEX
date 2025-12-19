@@ -1,6 +1,6 @@
+use std::fmt::Display;
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
-use crate::runtime::executor::Value;
 use smol_str::{SmolStr, ToSmolStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +50,36 @@ pub enum ByteCode {
     BRight,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    Int(i64),
+    Bool(bool),
+    Float(f64),
+    String(SmolStr),
+    Ref(SmolStr),
+    Null,
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Int(i) => write!(f, "{i}"),
+            Self::Bool(b) => write!(f, "{b}"),
+            Self::Float(x) => {
+                // 避免科学计数法，保留合理精度
+                if x.fract() == 0.0 {
+                    write!(f, "{x:.1}")
+                } else {
+                    write!(f, "{x}")
+                }
+            }
+            Self::String(s) => write!(f, "{s}"),
+            Self::Ref(r) => write!(f, "{r}"),
+            Self::Null => write!(f, "null"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 #[allow(dead_code)] //TODO
 pub enum Types {
@@ -70,7 +100,7 @@ pub struct ConstantTable {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrFunction {
-    pub codes: &'static [ByteCode],
+    pub codes: Vec<ByteCode>,
     pub name: SmolStr,
     pub filename: SmolStr,
     pub args: usize,
@@ -79,8 +109,12 @@ pub struct IrFunction {
 }
 
 impl IrFunction {
-    pub const fn clone_codes(&self) -> &'static [ByteCode] {
-        self.codes
+    pub fn clone_codes(&self) -> Option<Vec<ByteCode>> {
+        if self.is_native {
+            None
+        }else {
+            Some(self.codes.clone())
+        }
     }
 }
 
@@ -132,7 +166,7 @@ impl IrFunction {
         is_native: bool,
     ) -> Self {
         Self {
-            codes: &[],
+            codes: vec![],
             name,
             args,
             locals,
@@ -193,8 +227,7 @@ impl IrFunction {
                 }
             }
         }
-        let static_codes: &'static [ByteCode] = Box::leak(codes_builder.into_boxed_slice());
-        self.codes = static_codes;
+        self.codes = codes_builder;
     }
 }
 
@@ -203,7 +236,7 @@ impl IrFunction {
 pub struct VMIRTable {
     constant_table: &'static [Value],
     functions: Vec<IrFunction>,
-    codes: &'static [ByteCode],
+    codes: Vec<ByteCode>,
     globals: usize, // 全局变量表大小
 }
 
@@ -212,7 +245,7 @@ impl VMIRTable {
         Self {
             constant_table: &[],
             functions: vec![],
-            codes: &[],
+            codes: vec![],
             globals: 0,
         }
     }
@@ -229,8 +262,8 @@ impl VMIRTable {
         self.globals
     }
 
-    pub const fn clone_codes(&self) -> &'static [ByteCode] {
-        self.codes
+    pub fn clone_codes(&self) -> Vec<ByteCode> {
+        self.codes.clone()
     }
 
     pub fn set_constant_table(&mut self, constant_table: &'static [Value]) {
@@ -285,8 +318,7 @@ impl VMIRTable {
                 }
             }
         }
-        let static_codes: &'static [ByteCode] = Box::leak(codes_builder.into_boxed_slice());
-        self.codes = static_codes;
+        self.codes = codes_builder;
     }
 }
 
@@ -300,7 +332,7 @@ impl ConstantTable {
 
     fn element_to_value((types, value): (Types, SmolStr)) -> Value {
         match types {
-            String => Value::String(value.to_string()),
+            String => Value::String(value),
             Number => Value::Int(value.parse::<i64>().unwrap()),
             Float => Value::Float(value.parse::<f64>().unwrap()),
             Bool => Value::Bool(value == "true"),

@@ -9,7 +9,6 @@ slotmap = "1"
 getopts-macro = "0.1.8"
 expect-test = "1.5.1"
 linked-hash-map = "0.5.6"
-crossbeam-channel = "0.5.15"
 mimalloc = "0.1.48"
 
 [profile.release]

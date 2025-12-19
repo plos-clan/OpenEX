@@ -3,7 +3,6 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::ParserError;
 use crate::compiler::Compiler;
 use crate::library::system::register_system_lib;
-use crate::runtime::executor::Value;
 use crate::runtime::RuntimeError;
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashSet};
@@ -11,6 +10,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::sync::{LazyLock, RwLock};
+use crate::compiler::ast::vm_ir::Value;
 
 mod system;
 pub mod output_capture;
@@ -53,8 +53,8 @@ fn register_library(library: LibModule) {
 
 pub fn find_library(
     name: &str,
-    f: impl FnOnce(Option<&mut LibModule>) -> Result<(), ParserError>,
-) -> Result<(), ParserError> {
+    f: impl FnOnce(Option<&mut LibModule>) -> Result<Value, ParserError>,
+) -> Result<Value, ParserError> {
     let mut map = MODULES.write().unwrap();
     let ret_m = map.get_mut(name);
     f(ret_m)
