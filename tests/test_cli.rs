@@ -47,15 +47,29 @@ pub fn test_var_define() {
 pub fn test_loop() {
     check(b"import system;\
     var a = 0;\
-    while(a < 5) {\
+    while(a < 10) {\
     system.println(\"number: \" + a);\
     a++;\
+    if (a > 5) {\
+    continue;\
+    }\
+    system.println(\"a > 5\");\
     }",expect![[r#"
         > number: 0
+        a > 5
         number: 1
+        a > 5
         number: 2
+        a > 5
         number: 3
+        a > 5
         number: 4
+        a > 5
+        number: 5
+        number: 6
+        number: 7
+        number: 8
+        number: 9
     "#]]);
 }
 

@@ -118,7 +118,16 @@ fn main() -> io::Result<()> {
     let mut compiler = Compiler::new();
 
     if args.version {
-        println!("OpenEX RustEdition v{}", Compiler::get_version());
+        let env = if cfg!(target_env = "musl") {
+            "coolpotos-musl"
+        } else if cfg!(target_env = "gnu") {
+            "linux-gnu"
+        } else if cfg!(target_env = "msvc") {
+            "windows-msvc"
+        } else {
+            "unknown"
+        };
+        println!("OpenEX RustEdition v{} {}-{env}", Compiler::get_version(), std::env::consts::ARCH);
         println!("Copyright 2023-2026 by MCPPL,DotCS");
         return Ok(());
     }

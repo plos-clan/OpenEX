@@ -9,6 +9,7 @@ use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::semantic::Semantic;
 use crate::compiler::Compiler;
+use crate::compiler::semantic::loop_back::loop_back_semantic;
 
 pub fn block_semantic(
     semantic: &mut Semantic,
@@ -54,6 +55,14 @@ pub fn block_semantic(
                 let ret_m = while_semantic(semantic, &cond, body, code, locals)?;
                 opcodes.append_code(&ret_m);
             }
+            ASTStmtTree::Break(token) =>{
+                let ret_m = loop_back_semantic(semantic, true, token)?;
+                opcodes.append_code(&ret_m);
+            },
+            ASTStmtTree::Continue(token) =>{
+                let ret_m = loop_back_semantic(semantic, false, token)?;
+                opcodes.append_code(&ret_m);
+            },
             ASTStmtTree::Return(expr) => {
                 if let Some(expr) = expr {
                     let ref_expr = lower_expr(semantic, &expr, code, None)?;

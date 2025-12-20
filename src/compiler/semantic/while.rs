@@ -1,6 +1,7 @@
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lints::Lint::LoopNoExpr;
+use crate::compiler::parser::symbol_table::ContextType;
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::expression::lower_expr;
@@ -14,6 +15,11 @@ pub fn while_semantic(
     code: &mut Code,
     locals: &mut LocalMap,
 ) -> Result<OpCodeTable, ParserError> {
+    semantic
+        .compiler_data()
+        .symbol_table
+        .add_context(ContextType::Loop);
+
     let exp = lower_expr(semantic, expr, code, None)?;
     let mut code_table = OpCodeTable::new();
 
@@ -41,11 +47,24 @@ pub fn while_semantic(
     code_table.add_opcode(OpCode::Jump(None, Some(start)));
     let end_addr = code_table.add_opcode(OpCode::Nop(None));
 
+    code_table.change_code(|codes| {
+        for code in &mut codes.opcodes {
+            if let OpCode::LazyJump(_addr, target_addr, is_break) = code.1 {
+                *target_addr = if *is_break {
+                    Some(end_addr)
+                } else {
+                    Some(start)
+                };
+            }
+        }
+    });
+
     if let Some(jump_true_op) = code_table.find_code_mut(k)
         && let OpCode::JumpFalse(_, target, _) = jump_true_op
     {
         *target = Some(end_addr);
     }
+    semantic.compiler_data().symbol_table.exit_context();
 
     Ok(code_table)
 }

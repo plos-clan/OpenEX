@@ -3,6 +3,8 @@ use linked_hash_map::LinkedHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashMap};
+use crate::compiler::parser::ParserError;
+use crate::library::LibModule;
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct LocalAddr {
@@ -57,6 +59,7 @@ pub enum OpCode {
     Jump(Option<LocalAddr>, Option<LocalAddr>),         // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
     JumpFalse(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结构为假则跳转
+    LazyJump(Option<LocalAddr>, Option<LocalAddr>, bool), // 懒跳转 (是否是 break)
     Return(Option<LocalAddr>),                          // 栈顶结果返回
     Nop(Option<LocalAddr>),                             // 空操作
 
@@ -113,7 +116,8 @@ impl OpCode {
         match self {
             Self::JumpTrue(_, target, ..)
             | Self::JumpFalse(_, target, ..)
-            | Self::Jump(_, target) => {
+            | Self::Jump(_, target)
+            | Self::LazyJump(_, target, ..)=> {
                 if let Some(j_target) = target
                     && let Some(&new_target) = addr_map.get(j_target)
                 {
@@ -202,6 +206,10 @@ impl OpCodeTable {
 
     pub fn find_code_mut(&mut self, key: LocalAddr) -> Option<&mut OpCode> {
         self.opcodes.get_mut(&key)
+    }
+
+    pub fn change_code(&mut self, f: impl FnOnce(&mut Self)) {
+        f(self);
     }
 }
 
@@ -308,6 +316,7 @@ macro_rules! mathch_opcodes {
             | OpCode::StoreGlobal($slot, ..)
             | OpCode::LoadLocal($slot, ..)
             | OpCode::StoreLocal($slot, ..)
+            | OpCode::LazyJump($slot, ..)
             | OpCode::Push($slot, ..)
             | OpCode::Call($slot, ..)
             | OpCode::Jump($slot, ..)

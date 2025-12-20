@@ -1,12 +1,11 @@
 use smol_str::SmolStr;
 use std::cmp::PartialEq;
+use crate::compiler::ast::ssa_ir::{LocalAddr, OpCode};
 
 #[derive(PartialEq, Eq,Debug, Clone)]
-#[allow(dead_code)] //TODO
 pub enum ContextType {
     Loop,
     Func,
-    If,
     None,
     Root,
 }
@@ -29,7 +28,6 @@ pub struct Element {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] //TODO
 pub struct Context {
     elements: Vec<Element>,
     ctxt_type: ContextType,
@@ -64,15 +62,13 @@ impl SymbolTable {
         false
     }
 
-    #[allow(dead_code)] //TODO
     pub fn add_context(&mut self, ctxt_type: ContextType) {
         self.contexts.push(Context {
             elements: vec![],
-            ctxt_type
+            ctxt_type,
         });
     }
 
-    #[allow(dead_code)] //TODO
     pub fn exit_context(&mut self) {
         self.contexts.pop();
     }
@@ -82,14 +78,10 @@ impl SymbolTable {
         let peek_context = self.contexts.last_mut().unwrap();
         peek_context.elements.push(Element { name, el_type });
     }
-
-    #[allow(dead_code)] //TODO
-    pub fn in_context(&self, ctxt_type: &ContextType) -> bool {
-        for context in &self.contexts {
-            if context.ctxt_type == *ctxt_type {
-                return true;
-            }
-        }
-        false
+    
+    pub fn get_context(&mut self, target_type: ContextType) -> Option<&mut Context> {
+        self.contexts.iter_mut()
+            .rev()
+            .find(|c| c.ctxt_type == target_type)
     }
 }

@@ -5,6 +5,7 @@ mod optimizer;
 mod var;
 mod r#while;
 mod judgment;
+mod loop_back;
 
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, ValueGuessType};
 use crate::compiler::ast::ASTStmtTree;

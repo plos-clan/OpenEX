@@ -49,7 +49,7 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         for func in vm_ir.get_functions() {
             methods.push(MethodInfo {
                 name: func.name.clone(),
-                r_name: func.filename.split('.').next().clone().unwrap().to_smolstr(),
+                r_name: func.filename.split('.').next().unwrap().to_smolstr(),
                 locals: func.locals,
                 codes: func.clone_codes().unwrap_or_default(),
                 is_native: func.is_native,

@@ -1,7 +1,7 @@
-use std::fmt::Display;
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
 use smol_str::{SmolStr, ToSmolStr};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -112,7 +112,7 @@ impl IrFunction {
     pub fn clone_codes(&self) -> Option<Vec<ByteCode>> {
         if self.is_native {
             None
-        }else {
+        } else {
             Some(self.codes.clone())
         }
     }
@@ -211,7 +211,7 @@ impl IrFunction {
                     let index = globals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::StoreGlobal(*index));
                 }
-                OpCode::Jump(_, addr) => {
+                OpCode::Jump(_, addr) | OpCode::LazyJump(_, addr,..) => {
                     codes_builder.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_, addr, _) => {
@@ -254,7 +254,7 @@ impl VMIRTable {
         self.functions.clone()
     }
 
-    pub fn get_constant_table(&self) -> &'static [Value] {
+    pub const fn get_constant_table(&self) -> &'static [Value] {
         self.constant_table
     }
 
@@ -266,7 +266,7 @@ impl VMIRTable {
         self.codes.clone()
     }
 
-    pub fn set_constant_table(&mut self, constant_table: &'static [Value]) {
+    pub const fn set_constant_table(&mut self, constant_table: &'static [Value]) {
         self.constant_table = constant_table;
     }
 
@@ -302,7 +302,7 @@ impl VMIRTable {
                     let index = locals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::StoreGlobal(*index));
                 }
-                OpCode::Jump(_, addr) => {
+                OpCode::Jump(_, addr) | OpCode::LazyJump(_, addr, ..) => {
                     codes_builder.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_, addr, _) => {
