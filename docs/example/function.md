@@ -95,3 +95,39 @@ SyntaxError(example.exf-line: 1 column: 17): no native implement.
 function native no_impl_native();
 ```
 :::
+
+## 函数返回
+
+在 OpenEX 中, 使用 `return` 关键字定义一个返回语句.
+
+如:
+```js
+function name() {
+    return 12;
+}
+```
+
+> 也就是说 OpenEX 不存在没有返回值的函数 (除非本地函数实现) \
+> 一些文档中标注的没有返回值的函数可以丢弃返回值
+
+::: tip 简略写法
+
+在 OpenEX 中, 返回语句写成如下写法
+
+```js
+function example() {
+    return;
+}
+```
+
+与
+
+```js
+function example() {
+    return null;
+}
+```
+
+等效
+
+:::

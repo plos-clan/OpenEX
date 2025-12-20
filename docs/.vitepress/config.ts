@@ -33,7 +33,8 @@ export default defineConfig({
                 text: 'Runtime API',
                 items: [
                     {text: 'Index', link: '/api'},
-                    {text: 'system', link: '/api/system'}
+                    {text: 'system', link: '/api/system'},
+                    {text: 'math', link: '/api/math'},
                 ]
             }
         ],
