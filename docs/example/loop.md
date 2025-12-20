@@ -25,6 +25,74 @@ while {
 
 :::
 
+## 循环流程控制
+
+> OpenEX 的循环流程控制语句与其他编程语言逻辑基本一致, 都是最近邻循环亲和性
+
+* `continue` 语句可以取消本次循环的后续代码.
+
+::: code-group
+
+```js [source] {8}
+var a = 0;
+while (a < 10) {
+    system.println("number: " + a);
+    a++;
+    if (a > 5) {
+        continue;
+    }
+    system.println("a > 5");
+}
+```
+
+```shell [output]
+number: 0
+a > 5
+number: 1
+a > 5
+number: 2
+a > 5
+number: 3
+a > 5
+number: 4
+a > 5
+number: 5
+number: 6
+number: 7
+number: 8
+number: 9
+```
+
+:::
+
+
+* `break` 语句会直接终止循环
+
+::: code-group
+
+```js [source] {7}
+var a = 0;
+
+while {
+    system.println("number: " + a);
+    a++;
+    if (a > 5) {
+        break;
+    }
+}
+```
+
+```js [output]
+number: 0
+number: 1
+number: 2
+number: 3
+number: 4
+number: 5
+```
+
+:::
+
 ## IR层
 
 对于之前的 OpenEX 版本, `RustEdition` 则会将循环翻译成 `JumpTrue` 和 `Jump` 字节码.

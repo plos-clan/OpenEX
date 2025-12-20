@@ -100,6 +100,7 @@ pub fn test_fib() {
     "#]]);
     // fib(30) == 832040
     // fib(35) == 9227465
+    // fib(40) == 102334155
 }
 
 #[test]
@@ -120,7 +121,7 @@ pub fn test_fib_2() {
     }\
     return b;\
     }\
-    system.println(this.fib(30));", expect![[r#"
-        > 832040
+    system.println(this.fib(40));", expect![[r#"
+        > 102334155
     "#]])
 }

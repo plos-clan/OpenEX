@@ -8,7 +8,7 @@ export default defineConfig({
         logo: "/icon.png",
         nav: [
             {text: 'Home', link: '/'},
-            {text: 'Examples', link: '/markdown-examples'}
+            {text: 'Examples', link: '/example/'}
         ],
 
         sidebar: [

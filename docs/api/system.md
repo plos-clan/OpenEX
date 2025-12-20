@@ -11,6 +11,17 @@ import "system";
 > 在 `Pro` 之前的版本中, 标准库中所有的接口全部由解释器进行实现. \
 > `RustEdition` 将部分较为简单的封装函数移动到 OpenEX 源码中实现.
 
+## `exit` 退出解释器
+
+* 形参: `code` : 退出代码 (类型限制: 必须为 int32 类型)
+* 返回值: 该函数会终止执行流程
+
+```js{system.exf}
+function native exit(code);
+```
+
+> `exit` 函数是一个本地方法, 由解释器进行实现.
+
 ## `print` 标准输出
 
 * 形参: `output` : 输出的信息

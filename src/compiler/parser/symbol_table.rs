@@ -1,12 +1,10 @@
 use smol_str::SmolStr;
 use std::cmp::PartialEq;
-use crate::compiler::ast::ssa_ir::{LocalAddr, OpCode};
 
 #[derive(PartialEq, Eq,Debug, Clone)]
 pub enum ContextType {
     Loop,
     Func,
-    None,
     Root,
 }
 
@@ -78,10 +76,10 @@ impl SymbolTable {
         let peek_context = self.contexts.last_mut().unwrap();
         peek_context.elements.push(Element { name, el_type });
     }
-    
-    pub fn get_context(&mut self, target_type: ContextType) -> Option<&mut Context> {
+
+    pub fn get_context(&mut self, target_type: &ContextType) -> Option<&mut Context> {
         self.contexts.iter_mut()
             .rev()
-            .find(|c| c.ctxt_type == target_type)
+            .find(|c| c.ctxt_type == *target_type)
     }
 }

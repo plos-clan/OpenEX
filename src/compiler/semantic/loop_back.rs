@@ -12,7 +12,7 @@ pub fn loop_back_semantic(
     semantic
         .compiler_data()
         .symbol_table
-        .get_context(ContextType::Loop)
+        .get_context(&ContextType::Loop)
         .map_or_else(
             || Err(ParserError::BackOutsideLoop(token)),
             |_context| {
