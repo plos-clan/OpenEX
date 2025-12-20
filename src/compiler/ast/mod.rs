@@ -5,6 +5,8 @@ use crate::compiler::lexer::Token;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord)]
 pub enum ExprOp {
+    Pos,           // 取正 +
+    Neg,           // 取负 -
     Add,           // +
     Sub,           // -
     Mul,           // *

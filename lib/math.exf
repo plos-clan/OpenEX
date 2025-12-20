@@ -1,0 +1,37 @@
+
+function abs(value) {
+    if (value < 0) {
+        return 0 - value;
+    }
+    return value;
+}
+
+function sqrt(n) {
+    if (n < 0) {
+        return 0 - 1;
+    }
+    if (n == 0) {
+        return 0;
+    }
+
+    var x = n;
+    var last = 0;
+    var precision = 0.000001;
+
+    var diff = x * x - n;
+    if (diff < 0) { diff = 0 - diff; }
+
+    while (diff > precision) {
+        last = x;
+        x = (x + n / x) / 2;
+        
+        diff = x * x - n;
+        if (diff < 0) { diff = 0 - diff; }
+        
+        if (x == last) {
+            diff = 0; 
+        }
+    }
+
+    return x;
+}

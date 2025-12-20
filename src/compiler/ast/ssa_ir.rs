@@ -61,6 +61,9 @@ pub enum OpCode {
     Return(Option<LocalAddr>),                          // 栈顶结果返回
     Nop(Option<LocalAddr>),                             // 空操作
 
+    Pos(Option<LocalAddr>), // +
+    Neg(Option<LocalAddr>), // -
+    
     Add(Option<LocalAddr>), // +
     Sub(Option<LocalAddr>), // -
     Mul(Option<LocalAddr>), // *
@@ -321,6 +324,8 @@ macro_rules! mathch_opcodes {
             | OpCode::JumpTrue($slot, ..)
             | OpCode::JumpFalse($slot, ..)
             | OpCode::Return($slot)
+            | OpCode::Pos($slot)
+            | OpCode::Neg($slot)
             | OpCode::Add($slot)
             | OpCode::Sub($slot)
             | OpCode::Mul($slot)

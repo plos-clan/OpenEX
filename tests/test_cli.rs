@@ -43,49 +43,53 @@ pub fn test_var_define() {
     "#]]);
 }
 
+/// 考拉兹猜想测试
 #[test]
-pub fn test_loop() {
+pub fn test_collatz() {
     check(b"import system;\
-    var a = 0;\
-    while(a < 10) {\
-    system.println(\"number: \" + a);\
-    a++;\
-    if (a > 5) {\
-    continue;\
+    function test_collatz(n) {\
+    var steps = 0;\
+    while (n != 1) {\
+    if (n % 2 == 0) {\
+    n = n / 2;\
+    } else {\
+    n = 3 * n + 1;\
     }\
-    system.println(\"a > 5\");\
-    }",expect![[r#"
-        > number: 0
-        a > 5
-        number: 1
-        a > 5
-        number: 2
-        a > 5
-        number: 3
-        a > 5
-        number: 4
-        a > 5
-        number: 5
-        number: 6
-        number: 7
-        number: 8
-        number: 9
+    steps = steps + 1;\
+    }\
+    return steps;\
+    }\
+    var result = this.test_collatz(7);\
+    system.println(result);",expect![[r#"
+        > 16
     "#]]);
 }
 
+/// 质数计数器
 #[test]
-pub fn test_judgment() {
+pub fn test_count_primes() {
     check(b"import system;\
-    var a = 3 + 1 - 4;\
-    if (a != 0) {\
-    system.println(\"Hello!\"); \
-    }elif (a == 0) {\
-    system.println(\"a is zero.\");\
-    }",expect![[r#"
-        > a is zero.
+    function count_primes(limit) {\
+    var count = 0;\
+    var num = 2;\
+    while (num <= limit) {\
+    var is_prime = 1;\
+    var i = 2;\
+    while (i * i <= num) {\
+    if (num % i == 0) {\
+    is_prime = 0;\
+    }i = i + 1;}\
+    if (is_prime == 1) {\
+    count = count + 1;\
+    }num = num + 1;}\
+    return count;}\
+    var total = this.count_primes(100);\
+    system.println(total);",expect![[r#"
+        > 25
     "#]]);
 }
 
+/// 递归式斐波那契
 #[test]
 pub fn test_fib() {
     check(b"import system;\
@@ -103,6 +107,7 @@ pub fn test_fib() {
     // fib(40) == 102334155
 }
 
+/// 循环式斐波那契
 #[test]
 pub fn test_fib_2() {
     check(b"import system;\

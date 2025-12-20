@@ -615,6 +615,7 @@ impl LexerAnalysis {
             '+' => Ok(self.build_semicolon_op_in(line, column, data_index, '+')),
             '-' => Ok(self.build_semicolon_op_in(line, column, data_index, '-')),
             '*' => Ok(self.build_semicolon_op_easy(line, column, data_index, '*')),
+            '%' => Ok(self.build_semicolon_op_easy(line, column, data_index, '%')),
             '>' => Ok(self.build_semicolon_op_in(line, column, data_index, '>')),
             '<' => Ok(self.build_semicolon_op_in(line, column, data_index, '<')),
             '=' => Ok(self.build_semicolon_op_easy(line, column, data_index, '=')),

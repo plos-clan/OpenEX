@@ -1,7 +1,7 @@
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
-use crate::runtime::vm_operation::{add_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, not_equ_value, not_value, self_add_value, self_sub_value, sub_value};
+use crate::runtime::vm_operation::{add_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, neg_value, not_equ_value, not_value, rmd_value, self_add_value, self_sub_value, sub_value};
 use crate::runtime::vm_table_opt::{
     call_func, jump, jump_false, jump_true, load_local, push_stack, store_local,
 };
@@ -161,6 +161,7 @@ fn run_code<'a>(
             ByteCode::Sub => do_bin_op!(stack_frame, sub_value),
             ByteCode::Mul => do_bin_op!(stack_frame, mul_value),
             ByteCode::Div => do_bin_op!(stack_frame, div_value),
+            ByteCode::Rmd => do_bin_op!(stack_frame, rmd_value),
             ByteCode::Call => return call_func(stack_frame, units),
             ByteCode::Return => return Ok(RunState::Return),
             ByteCode::Jump(pc) => jump(stack_frame, *pc),
@@ -169,6 +170,7 @@ fn run_code<'a>(
             ByteCode::Equ => equ_value(stack_frame),
             ByteCode::NotEqu => not_equ_value(stack_frame),
             ByteCode::Not => not_value(stack_frame)?,
+            ByteCode::Neg => neg_value(stack_frame)?,
             ByteCode::SAdd => self_add_value(stack_frame)?,
             ByteCode::SSub => self_sub_value(stack_frame)?,
             ByteCode::Big => do_bin_op!(stack_frame, big_value),
@@ -193,7 +195,7 @@ fn run_code<'a>(
                 stack_frame.push_op_stack(result.clone());
                 stack_frame.next_pc();
             }
-            ByteCode::Nol => stack_frame.next_pc(),
+            ByteCode::Nol | ByteCode::Pos => stack_frame.next_pc(),
             _ => todo!(),
         }
     }

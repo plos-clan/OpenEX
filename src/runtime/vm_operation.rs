@@ -177,6 +177,42 @@ pub fn div_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
     }
 }
 
+pub fn rmd_value(left: Value, right: Value) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Int(l), Int(r)) => Ok(Int(l % r)),
+        (Int(l), Float(r)) => {
+            const MAX_SAFE_INT: i64 = (1i64 << 53) - 1;
+            const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
+
+            if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&l) {
+                return Err(RuntimeError::PrecisionLoss(
+                    format_smolstr!("{l} not in safe int."),
+                ));
+            }
+
+            #[allow(clippy::cast_precision_loss)]
+            Ok(Float(l as f64 % r))
+        },
+        (Float(l), Int(r)) => {
+            const MAX_SAFE_INT: i64 = (1i64 << 53) - 1;
+            const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
+
+            if !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&r) {
+                return Err(RuntimeError::PrecisionLoss(
+                    format_smolstr!("{r} not in safe int."),
+                ));
+            }
+
+            #[allow(clippy::cast_precision_loss)]
+            Ok(Float(l % r as f64))
+        },
+        (Float(l), Float(r)) => Ok(Float(l % r)),
+        (auto, auto1) => Err(RuntimeError::TypeException(
+            format_smolstr!("{auto} to {auto1}"),
+        )),
+    }
+}
+
 
 pub fn equ_value(stack_frame: &mut StackFrame) {
     let right = stack_frame.pop_op_stack();
@@ -356,4 +392,18 @@ pub fn less_equ_value(left: Value, right: Value)-> Result<Value, RuntimeError> {
             format_smolstr!("{auto} to {auto1}"),
         )),
     }
+}
+
+pub fn neg_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let var = stack_frame.pop_op_stack();
+    let value = match var {
+        Int(l) => Int(-l),
+        Float(f) => Float(-f),
+        auto => return Err(RuntimeError::TypeException(
+            format_smolstr!("{auto} to float or number"),
+        )),
+    };
+    stack_frame.push_op_stack(value);
+    stack_frame.next_pc();
+    Ok(())
 }

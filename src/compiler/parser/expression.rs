@@ -10,7 +10,7 @@ use std::vec::IntoIter;
 fn prefix_binding_power(token: &Token) -> ((), u8) {
     match token.text() {
         "++" | "--" => ((), 21),
-        "!" => ((), 23),
+        "!" | "+" | "-" => ((), 23),
         _ => ((), 0),
     }
 }
@@ -57,6 +57,8 @@ fn build_head_ast_tree(parser: &mut Parser,
         TokenType::Operator => {
             let ((), r_bp) = prefix_binding_power(&token);
             let op = match token.text() {
+                "+" => ExprOp::Pos,
+                "-" => ExprOp::Neg,
                 "++" => ExprOp::SAdd,
                 "--" => ExprOp::SSub,
                 "!" => ExprOp::Not,

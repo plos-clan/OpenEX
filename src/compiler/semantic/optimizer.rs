@@ -29,6 +29,15 @@ pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
                 None
             }
         }
+        ExprOp::Neg => {
+            if let ImmNum(num) = operand {
+                Some(ImmNum(-num))
+            } else if let ImmFlot(flot) = operand {
+                Some(ImmFlot(-flot))
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }

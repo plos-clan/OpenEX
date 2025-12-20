@@ -60,6 +60,9 @@ fn astop_to_opcode(astop: ExprOp) -> OpCode {
         ExprOp::Big => OpCode::Big(None),
         ExprOp::Equ => OpCode::Equ(None),
         ExprOp::NotEqu => OpCode::NotEqu(None),
+        ExprOp::Rmd => OpCode::Rmd(None),
+        ExprOp::Pos => OpCode::Pos(None),
+        ExprOp::Neg => OpCode::Neg(None),
         _ => todo!(),
     }
 }
@@ -99,7 +102,11 @@ fn guess_type_unary(
             }
         }
         Number | Float => {
-            if matches!(op, ExprOp::SAdd) || matches!(op, ExprOp::SSub) {
+            if matches!(op, ExprOp::SAdd)
+                || matches!(op, ExprOp::SSub)
+                || matches!(op, ExprOp::Neg)
+                || matches!(op, ExprOp::Pos)
+            {
                 Ok(first)
             } else {
                 Err(ParserError::IllegalTypeCombination(token.clone()))
@@ -245,7 +252,8 @@ fn guess_type(
             }
         }
         Null => {
-            if guess_check_type(&second, &[Null]) && check_opts(op, &[ExprOp::Equ, ExprOp::NotEqu]) {
+            if guess_check_type(&second, &[Null]) && check_opts(op, &[ExprOp::Equ, ExprOp::NotEqu])
+            {
                 Ok(Bool)
             } else {
                 Err(ParserError::IllegalTypeCombination(token.clone()))
@@ -431,35 +439,38 @@ pub fn lower_expr(
             {
                 return Err(ParserError::UnableResolveSymbols(u_token.clone()));
             }
-            code.find_value_key(&var_name).map_or_else(|| unreachable!(), |key| {
-                let value = code.find_value(key).unwrap();
-                value.variable = true;
-                let type_ = value.type_.clone();
-                match value.type_ {
-                    Ref => {
-                        opcode_table.add_opcode(Push(None, Operand::Library(var_name)));
-                    }
-                    _ => {
-                        if let Some(operand) = store {
-                            if operand != ImmNumFlot {
-                                value.type_ = operand_to_guess(&operand);
+            code.find_value_key(&var_name).map_or_else(
+                || unreachable!(),
+                |key| {
+                    let value = code.find_value(key).unwrap();
+                    value.variable = true;
+                    let type_ = value.type_.clone();
+                    match value.type_ {
+                        Ref => {
+                            opcode_table.add_opcode(Push(None, Operand::Library(var_name)));
+                        }
+                        _ => {
+                            if let Some(operand) = store {
+                                if operand != ImmNumFlot {
+                                    value.type_ = operand_to_guess(&operand);
+                                }
+                                opcode_table.add_opcode(OpCode::LoadLocal(
+                                    None,
+                                    key,
+                                    Operand::Val(key),
+                                ));
+                            } else {
+                                opcode_table.add_opcode(OpCode::StoreLocal(
+                                    None,
+                                    key,
+                                    Operand::Val(key),
+                                ));
                             }
-                            opcode_table.add_opcode(OpCode::LoadLocal(
-                                None,
-                                key,
-                                Operand::Val(key),
-                            ));
-                        } else {
-                            opcode_table.add_opcode(OpCode::StoreLocal(
-                                None,
-                                key,
-                                Operand::Val(key),
-                            ));
                         }
                     }
-                }
-                Ok((Operand::Val(key), type_, opcode_table))
-            })
+                    Ok((Operand::Val(key), type_, opcode_table))
+                },
+            )
         }
         ASTExprTree::Call { name, args } => {
             for arg in args {

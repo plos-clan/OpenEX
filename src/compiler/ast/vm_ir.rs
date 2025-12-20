@@ -19,6 +19,8 @@ pub enum ByteCode {
     Nol,                // 空操作
     GetRef,             // 拼接引用路径
     Return,             // 退出当前栈帧 (并将栈顶元素压入父栈帧操作栈)
+    Pos,
+    Neg,
     Add,
     Sub,
     Mul,
@@ -150,6 +152,9 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::Ref(_) => ByteCode::GetRef,
         OpCode::Nop(_) => ByteCode::Nol,
         OpCode::Return(_) => ByteCode::Return,
+        OpCode::Rmd(_) => ByteCode::Rmd,
+        OpCode::Pos(_) => ByteCode::Pos,
+        OpCode::Neg(_) => ByteCode::Neg,
         c => {
             dbg!(c);
             todo!()
