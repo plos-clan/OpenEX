@@ -1,4 +1,4 @@
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lints::Lint::LoopNoExpr;
 use crate::compiler::parser::symbol_table::ContextType;
@@ -12,7 +12,7 @@ pub fn while_semantic(
     semantic: &mut Semantic,
     expr: &ASTExprTree,
     body: Vec<ASTStmtTree>,
-    code: &mut Code,
+    code: &mut ValueAlloc,
     locals: &mut LocalMap,
     is_easy: bool,
 ) -> Result<OpCodeTable, ParserError> {

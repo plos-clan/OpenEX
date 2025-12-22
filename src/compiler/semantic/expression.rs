@@ -3,7 +3,7 @@ use crate::compiler::ast::ssa_ir::Operand::ImmNumFlot;
 use crate::compiler::ast::ssa_ir::ValueGuessType::{
     Bool, Float, Null, Number, Ref, String, This, Unknown,
 };
-use crate::compiler::ast::ssa_ir::{Code, OpCode, OpCodeTable, Operand, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError;
@@ -266,7 +266,7 @@ fn guess_type(
 fn lower_ref(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
-    code: &mut Code,
+    code: &mut ValueAlloc,
 ) -> Result<(SmolStr, OpCodeTable), ParserError> {
     let mut opcode_table = OpCodeTable::new();
     let mut path = SmolStrBuilder::new();
@@ -328,7 +328,7 @@ const fn operand_to_guess(operand: &Operand) -> ValueGuessType {
 pub fn lower_expr(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
-    code: &mut Code,
+    code: &mut ValueAlloc,
     store: Option<Operand>,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
     let mut opcode_table = OpCodeTable::new();
@@ -531,7 +531,7 @@ pub fn check_expr_operand(operand: &Operand, op_code: &OpCode, call_count: i32) 
 pub fn expr_semantic(
     semantic: &mut Semantic,
     expr: Option<ASTExprTree>,
-    code: &mut Code,
+    code: &mut ValueAlloc,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
     let guess_type;
     let operand: Operand;

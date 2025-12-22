@@ -1,4 +1,4 @@
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{LocalMap, OpCode, OpCodeTable, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::block::block_semantic;
@@ -10,7 +10,7 @@ pub fn judgment_semantic(
     expr: &ASTExprTree,
     then_body: Vec<ASTStmtTree>,
     else_body: Vec<ASTStmtTree>,
-    code: &mut Code,
+    code: &mut ValueAlloc,
     locals: &mut LocalMap,
 ) -> Result<OpCodeTable, ParserError> {
     let exp = lower_expr(semantic, expr, code, None)?;

@@ -1,5 +1,5 @@
 use crate::compiler::ast::ssa_ir::OpCode::{LoadGlobal, LoadLocal};
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCodeTable};
+use crate::compiler::ast::ssa_ir::{LocalMap, OpCodeTable, ValueAlloc};
 use crate::compiler::ast::ASTExprTree;
 use crate::compiler::lexer::Token;
 use crate::compiler::parser::symbol_table::ElementType::Value;
@@ -11,7 +11,7 @@ pub fn var_semantic(
     semantic: &mut Semantic,
     name: Token,
     init_var: Option<ASTExprTree>,
-    code: &mut Code,
+    code: &mut ValueAlloc,
     root: bool,
     locals:&mut LocalMap
 ) -> Result<OpCodeTable, ParserError> {

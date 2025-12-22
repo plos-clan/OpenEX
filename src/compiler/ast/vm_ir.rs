@@ -193,8 +193,13 @@ impl IrFunction {
             match code.1 {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
-                        let index = locals.get_index(key).unwrap();
-                        codes_builder.push(ByteCode::StoreGlobal(*index));
+                        if let Some(index) = locals.get_index(key) {
+                            codes_builder.push(ByteCode::Store(*index));
+                        }else if let Some(index) = globals.get_index(key) {
+                            codes_builder.push(ByteCode::StoreGlobal(*index));
+                        }else {
+                            unreachable!()
+                        }
                     } else {
                         let index = constant_table.add_operand(imm, code0);
                         codes_builder.push(ByteCode::Push(index));

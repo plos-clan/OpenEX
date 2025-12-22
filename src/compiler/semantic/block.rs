@@ -1,20 +1,20 @@
 use crate::compiler::ast::ssa_ir::OpCode::Push;
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
+use crate::compiler::ast::ssa_ir::{LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc};
 use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::lints::Lint::UnusedExpression;
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic, lower_expr};
 use crate::compiler::semantic::judgment::judgment_semantic;
+use crate::compiler::semantic::loop_back::loop_back_semantic;
 use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::var_semantic;
 use crate::compiler::semantic::Semantic;
 use crate::compiler::Compiler;
-use crate::compiler::semantic::loop_back::loop_back_semantic;
 
 pub fn block_semantic(
     semantic: &mut Semantic,
     stmt_tree: Vec<ASTStmtTree>,
-    code: &mut Code,
+    code: &mut ValueAlloc,
     locals: &mut LocalMap,
 ) -> Result<OpCodeTable, ParserError> {
     let mut opcodes = OpCodeTable::new();

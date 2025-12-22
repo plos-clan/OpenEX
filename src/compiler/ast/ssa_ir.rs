@@ -250,26 +250,15 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] //TODO
-pub struct Code {
-    codes: OpCodeTable,
+pub struct ValueAlloc {
     values: SlotMap<DefaultKey, Value>,
-    pub(crate) funcs: Vec<Function>,
-    root: bool, // 是否是根脚本上下文 (true: 根上下文|false: 函数上下文)
 }
 
-impl Code {
-    pub fn new(root: bool) -> Self {
-        Self {
-            codes: OpCodeTable::new(),
+impl ValueAlloc {
+    pub fn new() -> Self {
+        Self{
             values: SlotMap::new(),
-            funcs: Vec::new(),
-            root,
         }
-    }
-
-    pub const fn get_code_table(&mut self) -> &mut OpCodeTable {
-        &mut self.codes
     }
 
     pub fn find_value_key(&mut self, name: &SmolStr) -> Option<DefaultKey> {
@@ -292,6 +281,28 @@ impl Code {
             type_,
         };
         self.values.insert(va)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)] //TODO
+pub struct Code {
+    codes: OpCodeTable,
+    pub(crate) funcs: Vec<Function>,
+    root: bool, // 是否是根脚本上下文 (true: 根上下文|false: 函数上下文)
+}
+
+impl Code {
+    pub fn new(root: bool) -> Self {
+        Self {
+            codes: OpCodeTable::new(),
+            funcs: Vec::new(),
+            root,
+        }
+    }
+
+    pub const fn get_code_table(&mut self) -> &mut OpCodeTable {
+        &mut self.codes
     }
 
     pub fn add_function(&mut self, func: Function) {

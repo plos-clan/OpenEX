@@ -138,7 +138,7 @@ fn expr_bp(
                         let mut p_count: u64 = 0;
                         let mut done: bool = false;
                         loop {
-                            if token.t_type == TokenType::Operator && token.text() == "," {
+                            if token.t_type == TokenType::Operator && token.text() == "," && p_count == 0 {
                                 break;
                             }
                             if token.t_type == LP && token.text() == "(" {

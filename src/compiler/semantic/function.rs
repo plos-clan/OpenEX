@@ -1,4 +1,4 @@
-use crate::compiler::ast::ssa_ir::{Code, Function, LocalMap, OpCode, OpCodeTable, Operand, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{Code, Function, LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::Token;
 use crate::compiler::parser::symbol_table::ElementType::Argument;
@@ -65,22 +65,25 @@ pub fn function_semantic(
         .add_context(ContextType::Func);
     let mut tables = OpCodeTable::new();
     let mut locals = LocalMap::new();
+    let mut value_alloc = ValueAlloc::new();
 
     let args_len = arguments.len();
     for i in arguments {
         if let ASTExprTree::Var(token) = i {
             let token_c = token.clone();
-            let key = code.alloc_value(token, ValueGuessType::Unknown);
+            let key = value_alloc.alloc_value(token, ValueGuessType::Unknown);
             locals.add_local(key);
             semantic
                 .compiler_data()
                 .symbol_table
                 .add_element(token_c.value().unwrap(), Argument);
             tables.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
+        }else {
+            unreachable!()
         }
     }
 
-    let blk = block_semantic(semantic, body, code, &mut locals)?;
+    let blk = block_semantic(semantic, body, &mut value_alloc, &mut locals)?;
     tables.append_code(&blk);
 
     semantic.compiler_data().symbol_table.exit_context();
