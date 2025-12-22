@@ -10,12 +10,13 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
     let head = token.clone();
     let cond: ASTExprTree;
-
+    let is_easy;
     match token.t_type {
         LP => {
             if token.text() == "{" {
                 let tk_b = token.clone();
                 parser.cache = Some(token);
+                is_easy = true;
                 cond = Literal(Token::new(
                     SmolStr::new("true"),
                     tk_b.line,
@@ -24,6 +25,7 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
                     TokenType::True,
                 ));
             } else {
+                is_easy = false;
                 parser.cache = Some(token);
                 cond = parser.parser_cond()?;
             }
@@ -40,5 +42,5 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
 
     let body = blk_eval(parser)?;
 
-    Ok(ASTStmtTree::Loop { token:head,cond, body })
+    Ok(ASTStmtTree::Loop { token:head,cond, body, is_easy })
 }

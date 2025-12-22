@@ -14,6 +14,7 @@ pub fn while_semantic(
     body: Vec<ASTStmtTree>,
     code: &mut Code,
     locals: &mut LocalMap,
+    is_easy: bool,
 ) -> Result<OpCodeTable, ParserError> {
     semantic
         .compiler_data()
@@ -29,7 +30,7 @@ pub fn while_semantic(
         ));
     }
 
-    if matches!(exp.0, Operand::ImmBool(_)) && !semantic.file.has_warnings(LoopNoExpr) {
+    if matches!(exp.0, Operand::ImmBool(_)) && !semantic.file.has_warnings(LoopNoExpr) && !is_easy {
         Compiler::warning_info_expr(
             semantic.file,
             "'while(true)' can be written as 'while'.",

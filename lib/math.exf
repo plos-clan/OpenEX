@@ -24,12 +24,12 @@ function sqrt(n) {
     while (diff > precision) {
         last = x;
         x = (x + n / x) / 2;
-        
+
         diff = x * x - n;
         if (diff < 0) { diff = 0 - diff; }
-        
+
         if (x == last) {
-            diff = 0; 
+            diff = 0;
         }
     }
 

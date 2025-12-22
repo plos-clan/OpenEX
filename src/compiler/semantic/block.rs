@@ -51,8 +51,9 @@ pub fn block_semantic(
                 token: _token,
                 cond,
                 body,
+                is_easy,
             } => {
-                let ret_m = while_semantic(semantic, &cond, body, code, locals)?;
+                let ret_m = while_semantic(semantic, &cond, body, code, locals, is_easy)?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Break(token) =>{

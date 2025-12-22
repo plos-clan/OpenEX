@@ -74,8 +74,9 @@ impl<'a> Semantic<'a> {
                         token: _token,
                         cond,
                         body,
+                        is_easy,
                     } => {
-                        let ret_m = while_semantic(self, &cond, body, code, &mut global)?;
+                        let ret_m = while_semantic(self, &cond, body, code, &mut global, is_easy)?;
                         code.get_code_table().append_code(&ret_m);
                     }
                     ASTStmtTree::Function { name, args, body } => {
