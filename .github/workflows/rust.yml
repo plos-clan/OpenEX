@@ -5,14 +5,10 @@ on:
     branches: [ "main" ]
     paths-ignore:
       - "docs/"
-    tags-ignore:
-      - 'v[0-9]+.*'
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - "docs/"
-    tags-ignore:
-      - 'v[0-9]+.*'
 
 env:
   CARGO_TERM_COLOR: always
