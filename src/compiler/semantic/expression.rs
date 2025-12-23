@@ -440,7 +440,9 @@ pub fn lower_expr(
                 return Err(ParserError::UnableResolveSymbols(u_token.clone()));
             }
             code.find_value_key(&var_name).map_or_else(
-                || unreachable!(),
+                || {
+                    unreachable!()
+                },
                 |key| {
                     let value = code.find_value(key).unwrap();
                     value.variable = true;

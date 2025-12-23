@@ -54,11 +54,13 @@ pub fn function_semantic(
     arguments: Vec<ASTExprTree>,
     body: Vec<ASTStmtTree>,
     code: &mut Code,
+    global_value: &ValueAlloc,
 ) -> Result<(), ParserError> {
     let func_name = name.value::<SmolStr>().unwrap();
     if code.find_function(&func_name).is_some() {
         return Err(ParserError::SymbolDefined(name));
     }
+
     semantic
         .compiler_data()
         .symbol_table
@@ -66,6 +68,7 @@ pub fn function_semantic(
     let mut tables = OpCodeTable::new();
     let mut locals = LocalMap::new();
     let mut value_alloc = ValueAlloc::new();
+    value_alloc.append_ref(global_value);
 
     let args_len = arguments.len();
     for i in arguments {

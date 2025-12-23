@@ -282,6 +282,15 @@ impl ValueAlloc {
         };
         self.values.insert(va)
     }
+
+    /// 用于提取另一个分配表中的引用
+    pub fn append_ref(&mut self, value_alloc: &Self) {
+        for val in value_alloc.values.values() {
+            if val.type_ == ValueGuessType::Ref {
+                self.values.insert(val.clone());
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -72,6 +72,7 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         for file in &metadata {
             if !file.library {
                 ret_file = Some(file);
+                break
             }
         }
         ret_file.unwrap()

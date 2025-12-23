@@ -81,7 +81,7 @@ impl<'a> Semantic<'a> {
                         code.get_code_table().append_code(&ret_m);
                     }
                     ASTStmtTree::Function { name, args, body } => {
-                        function_semantic(self, name, args,body,code)?;
+                        function_semantic(self, name, args,body,code, value_alloc)?;
                     }
                     ASTStmtTree::NativeFunction { name, args } => {
                         native_function_semantic(self, name, &args, code)?;
