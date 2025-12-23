@@ -1,8 +1,6 @@
 {
   "name": "docs",
   "module": "index.ts",
-  "type": "module",
-  "private": true,
   "devDependencies": {
     "@types/bun": "latest",
     "vitepress": "^1.6.4"
@@ -10,9 +8,15 @@
   "peerDependencies": {
     "typescript": "^5"
   },
+  "private": true,
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview"
+  },
+  "type": "module",
+  "dependencies": {
+    "markdown-it-katex": "^2.0.3",
+    "markdown-it-mathjax3": "^4"
   }
 }

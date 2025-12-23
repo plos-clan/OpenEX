@@ -53,9 +53,10 @@ export default defineConfig({
                 usePolling: true,
                 interval: 100
             }
-        }
+        },
     },
     markdown: {
-        lineNumbers: true
+        lineNumbers: true,
+        math: true,
     }
 })

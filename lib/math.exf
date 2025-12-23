@@ -65,30 +65,30 @@ function cbrt(n) {
 }
 
 function log(n) {
-    if (n <= 0) { return 0.0; }
+    if (n <= 0) { return 0; }
 
     var x = 1.0;
-    if (n > 100.0) { x = 5.0; }
+    if (n > 100) { x = 5; }
 
-    var last = 0.0;
+    var last = 0;
     var precision = 0.000001;
 
     while {
         last = x;
-        var ex = exp(x);
-        x = x + (n / ex) - 1.0;
+        var ex = this.exp(x);
+        x = x + (n / ex) - 1;
 
         var diff = x - last;
-        if (diff < 0) { diff = 0.0 - diff; }
+        if (diff < 0) { diff = 0 - diff; }
         if (diff < precision) { break; }
     }
     return x;
 }
 
 function exp(x) {
-    var sum = 1.0;
-    var term = 1.0;
-    var i = 1.0;
+    var sum = 1;
+    var term = 1;
+    var i = 1;
     var precision = 0.000001;
 
     while {
@@ -96,19 +96,21 @@ function exp(x) {
         sum = sum + term;
 
         var abs_term = term;
-        if (abs_term < 0) { abs_term = 0.0 - abs_term; }
+        if (abs_term < 0) { abs_term = 0 - abs_term; }
         if (abs_term < precision) { break; }
 
-        i = i + 1.0;
-        if (i > 100.0) { break; }
+        i = i + 1;
+        if (i > 100) { break; }
     }
     return sum;
 }
 
 function pow(base, exp_val) {
+    if (base == 0) { return 0; }
+    if (exp_val == 0) { return 1; }
     if (base == 0.0) { return 0.0; }
     if (exp_val == 0.0) { return 1.0; }
 
-    var res = exp(exp_val * log(base));
+    var res = this.exp(exp_val * this.log(base));
     return res;
 }
