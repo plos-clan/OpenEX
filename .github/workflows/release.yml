@@ -38,6 +38,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
+          bin: openex
           archive: ${{ matrix.archive_name }}
           include: lib
           target: ${{ matrix.target }}
