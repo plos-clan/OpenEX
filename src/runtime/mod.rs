@@ -1,5 +1,5 @@
-mod executor;
-mod thread;
+pub mod executor;
+pub mod thread;
 mod vm_operation;
 mod vm_table_opt;
 
@@ -26,12 +26,12 @@ pub struct MethodInfo {
 }
 
 pub struct MetadataUnit<'a> {
-    constant_table: &'a [Value],
-    methods: Vec<MethodInfo>,
-    names: &'a str,
-    globals: usize,           // 全局变量表
-    root_code: Vec<ByteCode>, // 全局代码
-    library: bool
+    pub constant_table: &'a [Value],
+    pub methods: Vec<MethodInfo>,
+    pub names: &'a str,
+    pub globals: usize,           // 全局变量表
+    pub root_code: Vec<ByteCode>, // 全局代码
+    pub library: bool
 }
 
 impl MethodInfo {

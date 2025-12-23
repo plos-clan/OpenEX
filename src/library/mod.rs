@@ -86,6 +86,6 @@ pub fn load_libraries(
 
     register_system_lib();
 
-    compiler.compile();
+    compiler.compile().expect("error: library has error.");
     Ok(())
 }

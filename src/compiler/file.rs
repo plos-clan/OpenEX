@@ -15,10 +15,10 @@ pub struct SourceFile {
     pub name: String,
     data: String,
     pub(crate) compiled: bool,
-    pub(crate) is_library: bool,
+    pub is_library: bool,
     pub lexer: LexerAnalysis,
     pub(crate) c_data: CompilerData,
-    pub(crate) ir_table: Option<Box<VMIRTable>>,
+    pub ir_table: Option<Box<VMIRTable>>,
 }
 
 impl SourceFile {

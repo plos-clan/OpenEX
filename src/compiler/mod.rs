@@ -5,7 +5,6 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
 use std::collections::HashSet;
-use std::process::exit;
 
 pub mod ast;
 pub mod file;
@@ -26,11 +25,19 @@ pub struct Compiler {
     files: Vec<SourceFile>,
 }
 
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Compiler {
+    #[must_use] 
     pub const fn new() -> Self {
         Self { files: vec![] }
     }
 
+    #[must_use] 
     pub const fn get_version() -> &'static str {
         env!("CARGO_PKG_VERSION")
     }
@@ -43,6 +50,8 @@ impl Compiler {
         &mut self.files
     }
 
+    #[must_use] 
+    /// # Panics
     pub fn find_file(&self, path: &str) -> Option<&SourceFile> {
         for file in &self.files {
             if file.name.as_str().split('.').next().unwrap() == path {
@@ -228,22 +237,28 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self) {
+    /// # Errors
+    /// # Panics
+    #[warn(clippy::result_unit_err)]
+    pub fn compile(&mut self) -> Result<(), ()> {
         let mut compiler = self.clone();
         for file in &mut self.files {
             if file.compiled {
                 continue;
             }
-            let failed = false;
-            let vm_ir = file.compiler(&mut compiler).unwrap_or_else(|error| {
-                Self::dump_parser_error(error, file);
-                exit(-1);
-            });
-            if failed {
-                continue;
-            }
+            let vm_ir = file.compiler(&mut compiler);
+            let vm_ir = match vm_ir {
+                Ok(_) => {
+                    vm_ir.unwrap()
+                }
+                Err(error) => {
+                    Self::dump_parser_error(error, file);
+                    return Err(());
+                }
+            };
             file.ir_table = Some(Box::new(vm_ir));
             file.compiled = true;
         }
+        Ok(())
     }
 }

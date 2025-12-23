@@ -156,7 +156,7 @@ fn main() -> io::Result<()> {
         }
     }
 
-    compiler.compile();
+    compiler.compile().expect("");
     initialize_executor(&mut compiler);
     Ok(())
 }

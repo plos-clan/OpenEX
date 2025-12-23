@@ -11,6 +11,13 @@ expect-test = "1.5.1"
 linked-hash-map = "0.5.6"
 mimalloc = "0.1.48"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "openex"
+path = "src/main.rs"
+
 [profile.release]
 debug = false
 strip = true
