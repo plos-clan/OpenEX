@@ -66,6 +66,8 @@ impl CValue {
     }
 }
 
+/// # Panics
+#[must_use]
 pub fn into_c_value(value: Value) -> CValue {
     match value {
         Value::Int(i) => CValue {
@@ -220,8 +222,9 @@ pub unsafe extern "C" fn openex_initialize_executor(handle_raw: *mut OpenEX) -> 
             let mut methods: Vec<MethodInfo> = vec![];
 
             for func in vm_ir.get_functions() {
+                let name = func.name.clone();
                 methods.push(MethodInfo {
-                    name: func.name.clone(),
+                    name,
                     r_name: func.filename.split('.').next().unwrap().to_smolstr(),
                     locals: func.locals,
                     codes: func.clone_codes().unwrap_or_default(),
@@ -371,6 +374,7 @@ pub unsafe extern "C" fn openex_free(handle_raw: *mut OpenEX) -> OpenExStatus {
 
 #[unsafe(no_mangle)]
 /// 用于释放 `OpenEX` 值传递句柄
+/// 该函数不释放句柄本身, 而是释放 `OpenEX` 内值具体包含的字符串等额外数据, 句柄本身是由 cffi 管理.
 /// # Safety
 /// # Panics
 pub unsafe extern "C" fn openex_free_c_value(c_val: *mut CValue) -> OpenExStatus {
@@ -379,12 +383,12 @@ pub unsafe extern "C" fn openex_free_c_value(c_val: *mut CValue) -> OpenExStatus
     }
 
     unsafe {
-        let v_box = Box::from_raw(c_val);
+        let Some(v) = c_val.as_ref() else { return OpenExStatus::FfiError };
 
-        match v_box.tag {
+        match v.tag {
             ValueTag::String | ValueTag::Ref => {
-                if !v_box.data.s.is_null() {
-                    let raw_ptr = v_box.data.s as *mut c_char;
+                if !v.data.s.is_null() {
+                    let raw_ptr = v.data.s.cast_mut();
                     let _ = CString::from_raw(raw_ptr);
                 }
             }

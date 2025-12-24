@@ -12,7 +12,7 @@ hero:
       link: /started
     - theme: alt
       text: API Examples
-      link: /api-examples
+      link: /api
   image:
     src: /icon.png
     alt: logo icon
