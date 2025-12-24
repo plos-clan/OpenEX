@@ -2,20 +2,108 @@ pub mod compiler;
 pub mod library;
 pub mod runtime;
 
+use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::file::SourceFile;
 use crate::compiler::Compiler;
 use crate::library::load_libraries;
+use crate::runtime::executor::call_function;
 use crate::runtime::{MetadataUnit, MethodInfo};
 use smol_str::{SmolStr, ToSmolStr};
 use std::collections::HashSet;
-use std::ffi::{c_char, CStr};
-use std::ptr;
-use crate::compiler::ast::vm_ir::Value;
-use crate::runtime::thread::ThreadManager;
+use std::ffi::{c_char, CStr, CString};
+use std::{ptr, slice};
 
 pub struct OpenEX {
     compiler: Compiler,
     metadata: Vec<MetadataUnit<'static>>,
+}
+
+#[repr(C)]
+pub enum ValueTag {
+    Int = 0,
+    Bool = 1,
+    Float = 2,
+    String = 3,
+    Ref = 4,
+    Null = 5,
+}
+
+#[repr(C)]
+pub union ValueData {
+    pub i: i64,
+    pub b: bool,
+    pub f: f64,
+    pub s: *const c_char, // 字符串和 Ref 都用指针
+}
+
+#[repr(C)]
+pub struct CValue {
+    pub tag: ValueTag,
+    pub data: ValueData,
+}
+
+impl CValue {
+    /// # Safety
+    /// 用于将 C ffi 传输过来的类型转换成 `OpenEX` 解释器内部类型表示
+    #[must_use]
+    pub unsafe fn to_value(&self) -> Value {
+        unsafe {
+            match self.tag {
+                ValueTag::Int => Value::Int(self.data.i),
+                ValueTag::Bool => Value::Bool(self.data.b),
+                ValueTag::Float => Value::Float(self.data.f),
+                ValueTag::String => {
+                    let c_str = CStr::from_ptr(self.data.s);
+                    Value::String(SmolStr::new(c_str.to_string_lossy()))
+                }
+                ValueTag::Ref => {
+                    let c_str = CStr::from_ptr(self.data.s);
+                    Value::Ref(SmolStr::new(c_str.to_string_lossy()))
+                }
+                ValueTag::Null => Value::Null,
+            }
+        }
+    }
+}
+
+pub fn into_c_value(value: Value) -> CValue {
+    match value {
+        Value::Int(i) => CValue {
+            tag: ValueTag::Int,
+            data: ValueData { i },
+        },
+        Value::Bool(b) => CValue {
+            tag: ValueTag::Bool,
+            data: ValueData { b },
+        },
+        Value::Float(f) => CValue {
+            tag: ValueTag::Float,
+            data: ValueData { f },
+        },
+        Value::String(s) => {
+            // 将字符串转换到堆上，并交出所有权给 C
+            let c_str = CString::new(s.as_str()).unwrap();
+            CValue {
+                tag: ValueTag::String,
+                data: ValueData {
+                    s: c_str.into_raw(),
+                },
+            }
+        }
+        Value::Ref(s) => {
+            let c_str = CString::new(s.as_str()).unwrap();
+            CValue {
+                tag: ValueTag::Ref,
+                data: ValueData {
+                    s: c_str.into_raw(),
+                },
+            }
+        }
+        Value::Null => CValue {
+            tag: ValueTag::Null,
+            data: ValueData { i: 0 },
+        },
+    }
 }
 
 #[repr(C)]
@@ -26,6 +114,7 @@ pub enum OpenExStatus {
     FfiError = 4,     // ffi 交互异常
 }
 
+/// WARN 解控 String, 需要后续通过 `openex_free` 恢复管理
 fn leak_string(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
 }
@@ -167,11 +256,16 @@ pub unsafe extern "C" fn openex_initialize_executor(handle_raw: *mut OpenEX) -> 
 /// 调用一个 `OpenEX` 函数, 需要指定文件名和函数名
 /// # Safety
 /// # Panics
+/// `args_ptr` 和 `arg_count` 必须是有效的, 如没有参数要传递 `arg_count` 标记为 0 即可
+/// `out_result` 为 NULL 代表不需要接受返回值
 pub unsafe extern "C" fn openex_call_function(
     handle_raw: *mut OpenEX,
     file: *const c_char,
     func: *const c_char,
-) -> OpenExStatus{
+    args_ptr: *const CValue, // 指向 CValue 数组的指针
+    arg_count: usize,        // 参数个数
+    out_result: *mut CValue, // 返回值参数
+) -> OpenExStatus {
     if file.is_null() || func.is_null() {
         return OpenExStatus::FfiError;
     }
@@ -179,13 +273,26 @@ pub unsafe extern "C" fn openex_call_function(
     let r_file = match c_str_file.to_str() {
         Ok(rust_str) => Some(String::from(rust_str)),
         Err(_) => return OpenExStatus::FfiError,
-    }.unwrap();
+    }
+    .unwrap();
 
     let c_str_func = unsafe { CStr::from_ptr(func) };
     let r_func = match c_str_func.to_str() {
         Ok(rust_str) => Some(String::from(rust_str)),
         Err(_) => return OpenExStatus::FfiError,
-    }.unwrap();
+    }
+    .unwrap();
+
+    let c_args_slice: &[CValue] = if args_ptr.is_null() || arg_count == 0 {
+        &[] // 如果没有参数，返回空切片
+    } else {
+        unsafe { slice::from_raw_parts(args_ptr, arg_count) }
+    };
+
+    let args: Vec<Value> = c_args_slice
+        .iter()
+        .map(|cv| unsafe { cv.to_value() }) // 调用上一回回复中定义的 to_value 方法
+        .collect();
 
     if let Some(handle) = unsafe { handle_raw.as_mut() } {
         let main_metadata = {
@@ -193,7 +300,7 @@ pub unsafe extern "C" fn openex_call_function(
             for file in &handle.metadata {
                 if file.names == r_file.as_str() {
                     ret_file = Some(file);
-                    break
+                    break;
                 }
             }
             match ret_file {
@@ -207,7 +314,7 @@ pub unsafe extern "C" fn openex_call_function(
             for funcs in &main_metadata.methods {
                 if funcs.name.as_str() == r_func {
                     ret_func = Some(funcs);
-                    break
+                    break;
                 }
             }
             match ret_func {
@@ -216,13 +323,22 @@ pub unsafe extern "C" fn openex_call_function(
             }
         };
 
-        std::thread::scope(|scope| {
-            let thread_manager = ThreadManager::new(scope);
-            thread_manager.submit_join_thread(main_metadata, main_method, handle.metadata.as_slice());
-        });
+        let ret_var = call_function(
+            main_method.get_codes(),
+            main_metadata.constant_table,
+            main_metadata.names,
+            handle.metadata.as_slice(),
+            main_method.locals + args.len(),
+            args,
+        );
+        let ret_raw = into_c_value(ret_var);
+
+        if let Some(ret_result) = unsafe { out_result.as_mut() } {
+            *ret_result = ret_raw;
+        }
 
         OpenExStatus::Success
-    }else {
+    } else {
         OpenExStatus::FfiError
     }
 }
@@ -250,5 +366,30 @@ pub unsafe extern "C" fn openex_free(handle_raw: *mut OpenEX) -> OpenExStatus {
         }
     }
 
+    OpenExStatus::Success
+}
+
+#[unsafe(no_mangle)]
+/// 用于释放 `OpenEX` 值传递句柄
+/// # Safety
+/// # Panics
+pub unsafe extern "C" fn openex_free_c_value(c_val: *mut CValue) -> OpenExStatus {
+    if c_val.is_null() {
+        return OpenExStatus::FfiError;
+    }
+
+    unsafe {
+        let v_box = Box::from_raw(c_val);
+
+        match v_box.tag {
+            ValueTag::String | ValueTag::Ref => {
+                if !v_box.data.s.is_null() {
+                    let raw_ptr = v_box.data.s as *mut c_char;
+                    let _ = CString::from_raw(raw_ptr);
+                }
+            }
+            _ => {}
+        }
+    }
     OpenExStatus::Success
 }

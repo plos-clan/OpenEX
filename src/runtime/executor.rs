@@ -1,7 +1,10 @@
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
-use crate::runtime::vm_operation::{add_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, neg_value, not_equ_value, not_value, rmd_value, self_add_value, self_sub_value, sub_value};
+use crate::runtime::vm_operation::{
+    add_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value,
+    neg_value, not_equ_value, not_value, rmd_value, self_add_value, self_sub_value, sub_value,
+};
 use crate::runtime::vm_table_opt::{
     call_func, jump, jump_false, jump_true, load_local, push_stack, store_local,
 };
@@ -202,19 +205,30 @@ fn run_code<'a>(
     Ok(RunState::None)
 }
 
-pub fn interpretive(
+pub fn call_function(
     codes: &[ByteCode],
     const_table: &[Value],
     name: &str,
     units: &[MetadataUnit],
     globals: usize,
-) {
+    arguments: Vec<Value>,
+) -> Value {
     let mut executor = Executor::new();
-    executor.push_frame(StackFrame::new(globals, codes, const_table, name, name,
+    executor.push_frame(StackFrame::new(
+        globals,
+        codes,
+        const_table,
+        name,
+        name,
         None,
         0,
     ));
     let mut failed_status = None;
+
+    for arg in arguments {
+        executor.get_top_frame().unwrap().push_op_stack(arg);
+    }
+
     loop {
         let size = executor.call_stack.len();
         let (root_frame, stack_frame) = if size > 2 {
@@ -282,6 +296,9 @@ pub fn interpretive(
                         let frame = executor.call_stack.pop().unwrap();
                         executor.frame_index -= 1;
                         if let Some(ret_var) = frame.get_op_stack_top() {
+                            if executor.call_stack.is_empty() {
+                                return ret_var.clone();
+                            }
                             executor
                                 .call_stack
                                 .last_mut()
@@ -310,4 +327,16 @@ pub fn interpretive(
             eprintln!("\t at <{name}>");
         }
     }
+
+    Value::Null
+}
+
+pub fn interpretive(
+    codes: &[ByteCode],
+    const_table: &[Value],
+    name: &str,
+    units: &[MetadataUnit],
+    globals: usize,
+) {
+    call_function(codes, const_table, name, units, globals, Vec::new());
 }
