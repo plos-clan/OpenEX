@@ -1,0 +1,1 @@
+import{_ as e,c as t,o as i,ae as r}from"./chunks/framework.DqA2quMh.js";const _=JSON.parse('{"title":"库索引","description":"","frontmatter":{},"headers":[],"relativePath":"api/index.md","filePath":"api/index.md"}'),l={name:"api/index.md"};function n(o,a,s,d,h,c){return i(),t("div",null,[...a[0]||(a[0]=[r("",7)])])}const m=e(l,[["render",n]]);export{_ as __pageData,m as default};
