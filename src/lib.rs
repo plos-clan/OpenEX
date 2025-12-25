@@ -105,6 +105,7 @@ pub fn into_c_value(value: Value) -> CValue {
             tag: ValueTag::Null,
             data: ValueData { i: 0 },
         },
+        _=> todo!()
     }
 }
 

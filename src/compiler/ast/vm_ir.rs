@@ -7,18 +7,23 @@ use std::fmt::Display;
 #[repr(u8)]
 #[allow(dead_code)] //TODO
 pub enum ByteCode {
-    Push(usize),        // 将常量表中的元素压入操作栈 (常量表索引)
-    Load(usize),        // 栈顶元素加载到局部变量表 (变量表索引)
-    Store(usize),       // 将局部变量加载到栈顶 (变量表索引)
-    LoadGlobal(usize),  // 栈顶元素加载到全局变量表 (变量表索引)
-    StoreGlobal(usize), // 将全局变量加载到栈顶 (变量表索引)
-    Jump(usize),        // 无条件跳转 (pc位置)
-    JumpTrue(usize),    // 栈顶条件跳转 (pc位置)
-    JumpFalse(usize),   // 栈顶反转条件跳转 (pc位置)
-    Call,               // 函数调用 (要求栈上最少有两个引用)
-    Nol,                // 空操作
-    GetRef,             // 拼接引用路径
-    Return,             // 退出当前栈帧 (并将栈顶元素压入父栈帧操作栈)
+    Push(usize),                   // 将常量表中的元素压入操作栈 (常量表索引)
+    Load(usize),                   // 栈顶元素加载到局部变量表 (变量表索引)
+    Store(usize),                  // 将局部变量加载到栈顶 (变量表索引)
+    LoadGlobal(usize),             // 栈顶元素加载到全局变量表 (变量表索引)
+    StoreGlobal(usize),            // 将全局变量加载到栈顶 (变量表索引)
+    LoadArrayGlobal(usize, usize), // 将数组变量加载到全局变量表 (变量表索引) (数组大小)
+    LoadArray(usize, usize),       // 将数组变量加载到局部变量表 (变量表索引) (数组大小)
+    SetArrayGlobal(usize),         // 取出栈顶的数据和索引, 将其设置到指定全局变量表数组上
+    SetArray(usize),               // 取出栈顶的数据和索引, 将其设置到指定局部变量表数组上
+    Jump(usize),                   // 无条件跳转 (pc位置)
+    JumpTrue(usize),               // 栈顶条件跳转 (pc位置)
+    JumpFalse(usize),              // 栈顶反转条件跳转 (pc位置)
+    Call,                          // 函数调用 (要求栈上最少有两个引用)
+    Nol,                           // 空操作
+    GetRef,                        // 拼接引用路径
+    Return,                        // 退出当前栈帧 (并将栈顶元素压入父栈帧操作栈)
+    GetIndex,                      // 取出数组的元素并压入栈顶 (会消费掉操作栈里的数组和索引)
     Pos,
     Neg,
     Add,
@@ -59,6 +64,7 @@ pub enum Value {
     Float(f64),
     String(SmolStr),
     Ref(SmolStr),
+    Array(usize, Vec<Value>),
     Null,
 }
 
@@ -74,6 +80,13 @@ impl Display for Value {
                 } else {
                     write!(f, "{x}")
                 }
+            }
+            Self::Array(_len, arrays) => {
+                write!(f, "[")?;
+                for var in arrays {
+                    write!(f, "{var}, ")?;
+                }
+                write!(f, "]")
             }
             Self::String(s) => write!(f, "{s}"),
             Self::Ref(r) => write!(f, "{r}"),
@@ -111,6 +124,7 @@ pub struct IrFunction {
 }
 
 impl IrFunction {
+    #[must_use]
     pub fn clone_codes(&self) -> Option<Vec<ByteCode>> {
         if self.is_native {
             None
@@ -155,6 +169,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::Rmd(_) => ByteCode::Rmd,
         OpCode::Pos(_) => ByteCode::Pos,
         OpCode::Neg(_) => ByteCode::Neg,
+        OpCode::AIndex(_) => ByteCode::GetIndex,
         c => {
             dbg!(c);
             todo!()
@@ -163,6 +178,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
 }
 
 impl IrFunction {
+    #[must_use]
     pub const fn new(
         name: SmolStr,
         args: usize,
@@ -180,6 +196,7 @@ impl IrFunction {
         }
     }
 
+    /// # Panics
     pub fn append_code(
         &mut self,
         table: OpCodeTable,
@@ -195,9 +212,9 @@ impl IrFunction {
                     if let Operand::Val(key) = imm {
                         if let Some(index) = locals.get_index(key) {
                             codes_builder.push(ByteCode::Store(*index));
-                        }else if let Some(index) = globals.get_index(key) {
+                        } else if let Some(index) = globals.get_index(key) {
                             codes_builder.push(ByteCode::StoreGlobal(*index));
-                        }else {
+                        } else {
                             unreachable!()
                         }
                     } else {
@@ -221,7 +238,23 @@ impl IrFunction {
                     let index = globals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::StoreGlobal(*index));
                 }
-                OpCode::Jump(_, addr) | OpCode::LazyJump(_, addr,..) => {
+                OpCode::LoadArrayLocal(_, key, len) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::LoadArray(*index, len));
+                }
+                OpCode::LoadArrayGlobal(_, key, len) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::LoadArrayGlobal(*index, len));
+                }
+                OpCode::SetArrayLocal(_, key) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::SetArray(*index));
+                }
+                OpCode::SetArrayGlobal(_, key) => {
+                    let index = globals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::SetArrayGlobal(*index));
+                }
+                OpCode::Jump(_, addr) | OpCode::LazyJump(_, addr, ..) => {
                     codes_builder.push(ByteCode::Jump(addr.unwrap().offset));
                 }
                 OpCode::JumpTrue(_, addr, _) => {
@@ -250,7 +283,14 @@ pub struct VMIRTable {
     globals: usize, // 全局变量表大小
 }
 
+impl Default for VMIRTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VMIRTable {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             constant_table: &[],
@@ -260,18 +300,22 @@ impl VMIRTable {
         }
     }
 
+    #[must_use]
     pub fn get_functions(&self) -> Vec<IrFunction> {
         self.functions.clone()
     }
 
+    #[must_use]
     pub const fn get_constant_table(&self) -> &'static [Value] {
         self.constant_table
     }
 
+    #[must_use]
     pub const fn get_locals_len(&self) -> usize {
         self.globals
     }
 
+    #[must_use]
     pub fn clone_codes(&self) -> Vec<ByteCode> {
         self.codes.clone()
     }
@@ -280,6 +324,7 @@ impl VMIRTable {
         self.constant_table = constant_table;
     }
 
+    /// # Panics
     pub fn append_code(
         &mut self,
         table: &OpCodeTable,
@@ -323,6 +368,14 @@ impl VMIRTable {
                     let addr_some = addr.unwrap();
                     codes_builder.push(ByteCode::JumpFalse(addr_some.offset));
                 }
+                OpCode::LoadArrayGlobal(_, key, len) | OpCode::LoadArrayLocal(_, key, len) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::LoadArrayGlobal(*index, len));
+                }
+                OpCode::SetArrayLocal(_, key) | OpCode::SetArrayGlobal(_, key) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::SetArrayGlobal(*index));
+                }
                 c => {
                     codes_builder.push(opcode_to_vmir(c));
                 }
@@ -333,6 +386,7 @@ impl VMIRTable {
 }
 
 impl ConstantTable {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             table_size: 0,
@@ -373,6 +427,7 @@ impl ConstantTable {
     }
 }
 
+#[must_use]
 pub fn ssa_to_vm(mut code: Code, locals: &LocalMap, filename: &SmolStr) -> VMIRTable {
     let mut vm_table = VMIRTable::new();
     let mut const_table = ConstantTable::new();

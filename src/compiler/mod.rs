@@ -217,6 +217,8 @@ impl Compiler {
                 ASTExprTree::Var(token)
                 | ASTExprTree::Literal(token)
                 | ASTExprTree::This(token)
+                | ASTExprTree::Expr { token, .. }
+                | ASTExprTree::Unary { token, .. }
                 | ASTExprTree::Ref(token)=> token,
                 ASTExprTree::Call { name: e_name, .. } =>{
                     match e_name.as_ref() { 
@@ -226,8 +228,6 @@ impl Compiler {
                         }
                     }
                 },
-                ASTExprTree::Unary { token: u_token, .. } => u_token,
-                ASTExprTree::Expr { token: e_token, .. } => e_token,
             };
             println!("warning: {msg}");
             println!(

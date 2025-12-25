@@ -35,6 +35,7 @@ pub enum ValueGuessType {
     Ref,
     This,
     Unknown,
+    Array,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,18 +53,22 @@ pub enum OpCode {
     StoreGlobal(Option<LocalAddr>, DefaultKey, Operand), // 将一个全局变量加载到栈顶
     LoadLocal(Option<LocalAddr>, DefaultKey, Operand),  // 栈顶元素加载到局部变量
     StoreLocal(Option<LocalAddr>, DefaultKey, Operand), // 将一个变量加载到栈顶
-    Push(Option<LocalAddr>, Operand),                   // 将值压入操作栈
-    Call(Option<LocalAddr>, SmolStr),                   // 函数调用
-    Jump(Option<LocalAddr>, Option<LocalAddr>),         // 无条件跳转
+    LoadArrayLocal(Option<LocalAddr>, DefaultKey, usize), // 将指定栈顶元素组合成数组加载到局部变量表
+    LoadArrayGlobal(Option<LocalAddr>, DefaultKey, usize), // 将指定栈顶元素组合成数组加载到全局变量表
+    SetArrayLocal(Option<LocalAddr>, DefaultKey),          // 将栈顶元素设置进数组指定索引
+    SetArrayGlobal(Option<LocalAddr>, DefaultKey),         // 将栈顶元素设置进数组指定索引
+    Push(Option<LocalAddr>, Operand),                      // 将值压入操作栈
+    Call(Option<LocalAddr>, SmolStr),                      // 函数调用
+    Jump(Option<LocalAddr>, Option<LocalAddr>),            // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
     JumpFalse(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结构为假则跳转
-    LazyJump(Option<LocalAddr>, Option<LocalAddr>, bool), // 懒跳转 (是否是 break)
-    Return(Option<LocalAddr>),                          // 栈顶结果返回
-    Nop(Option<LocalAddr>),                             // 空操作
+    LazyJump(Option<LocalAddr>, Option<LocalAddr>, bool),  // 懒跳转 (是否是 break)
+    Return(Option<LocalAddr>),                             // 栈顶结果返回
+    Nop(Option<LocalAddr>),                                // 空操作
 
     Pos(Option<LocalAddr>), // +
     Neg(Option<LocalAddr>), // -
-    
+
     Add(Option<LocalAddr>), // +
     Sub(Option<LocalAddr>), // -
     Mul(Option<LocalAddr>), // *
@@ -118,7 +123,7 @@ impl OpCode {
             Self::JumpTrue(_, target, ..)
             | Self::JumpFalse(_, target, ..)
             | Self::Jump(_, target)
-            | Self::LazyJump(_, target, ..)=> {
+            | Self::LazyJump(_, target, ..) => {
                 if let Some(j_target) = target
                     && let Some(&new_target) = addr_map.get(j_target)
                 {
@@ -137,7 +142,14 @@ pub struct OpCodeTable {
     alloc_addr: LocalAddr,
 }
 
+impl Default for OpCodeTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OpCodeTable {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             opcodes: LinkedHashMap::new(),
@@ -221,7 +233,14 @@ pub struct LocalMap {
     pub(crate) now_index: usize,
 }
 
+impl Default for LocalMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LocalMap {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             locals: BTreeMap::new(),
@@ -236,6 +255,7 @@ impl LocalMap {
         ret_m
     }
 
+    #[must_use]
     pub fn get_index(&self, key: DefaultKey) -> Option<&usize> {
         self.locals.get(&key)
     }
@@ -254,9 +274,16 @@ pub struct ValueAlloc {
     values: SlotMap<DefaultKey, Value>,
 }
 
+impl Default for ValueAlloc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValueAlloc {
+    #[must_use]
     pub fn new() -> Self {
-        Self{
+        Self {
             values: SlotMap::new(),
         }
     }
@@ -302,6 +329,7 @@ pub struct Code {
 }
 
 impl Code {
+    #[must_use]
     pub fn new(root: bool) -> Self {
         Self {
             codes: OpCodeTable::new(),
@@ -330,13 +358,17 @@ impl Code {
     }
 }
 
-macro_rules! mathch_opcodes {
+macro_rules! match_opcodes {
     ($expr: expr,$slot:ident,$stmt: expr) => {
         match $expr {
             OpCode::LoadGlobal($slot, ..)
             | OpCode::StoreGlobal($slot, ..)
             | OpCode::LoadLocal($slot, ..)
             | OpCode::StoreLocal($slot, ..)
+            | OpCode::LoadArrayLocal($slot, ..)
+            | OpCode::LoadArrayGlobal($slot, ..)
+            | OpCode::SetArrayLocal($slot, ..)
+            | OpCode::SetArrayGlobal($slot, ..)
             | OpCode::LazyJump($slot, ..)
             | OpCode::Push($slot, ..)
             | OpCode::Call($slot, ..)
@@ -384,11 +416,12 @@ macro_rules! mathch_opcodes {
 }
 
 impl OpCode {
+    #[must_use]
     pub const fn get_id(&self) -> LocalAddr {
-        mathch_opcodes!(self, slot, slot).unwrap()
+        match_opcodes!(self, slot, slot).unwrap()
     }
 
     pub const fn set_id(&mut self, id: LocalAddr) {
-        mathch_opcodes!(self, slot, *slot = Some(id));
+        match_opcodes!(self, slot, *slot = Some(id));
     }
 }

@@ -5,11 +5,9 @@ use crate::runtime::vm_operation::{
     add_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value,
     neg_value, not_equ_value, not_value, rmd_value, self_add_value, self_sub_value, sub_value,
 };
-use crate::runtime::vm_table_opt::{
-    call_func, jump, jump_false, jump_true, load_local, push_stack, store_local,
-};
+use crate::runtime::vm_table_opt::{call_func, get_index_array, jump, jump_false, jump_true, load_array_local, load_local, push_stack, set_index_array, store_local};
 use crate::runtime::{MetadataUnit, RuntimeError};
-use smol_str::SmolStr;
+use smol_str::{SmolStr, ToSmolStr};
 
 pub struct StackFrame<'a> {
     pc: usize,
@@ -85,6 +83,7 @@ impl<'a> StackFrame<'a> {
         self.args
     }
 
+    #[must_use]
     pub fn get_op_stack_top(&self) -> Option<&Value> {
         self.op_stack.last()
     }
@@ -93,14 +92,20 @@ impl<'a> StackFrame<'a> {
         self.local[index] = value;
     }
 
+    #[must_use]
     pub fn get_local(&self, index: usize) -> &Value {
         &self.local[index]
+    }
+
+    pub fn get_local_mut(&mut self, index: usize) -> &mut Value {
+        &mut self.local[index]
     }
 
     pub fn push_op_stack(&mut self, value: Value) {
         self.op_stack.push(value);
     }
 
+    /// # Panics
     pub fn pop_op_stack(&mut self) -> Value {
         self.op_stack.pop().unwrap()
     }
@@ -198,6 +203,49 @@ fn run_code<'a>(
                 stack_frame.push_op_stack(result.clone());
                 stack_frame.next_pc();
             }
+            ByteCode::LoadArrayGlobal(var_index, len) => {
+                let len_s = *len;
+                let index = *var_index;
+                let mut elements: Vec<Value> = Vec::new();
+                for _ in 0..len_s {
+                    elements.push(stack_frame.pop_op_stack());
+                }
+
+                let reversed_values: Vec<Value> = elements.into_iter().rev().collect();
+
+                let result = Value::Array(len_s, reversed_values);
+                if let Some(ref mut root) = root_frame {
+                    root.set_local(index, result);
+                } else {
+                    stack_frame.set_local(index, result);
+                }
+                stack_frame.next_pc();
+            }
+            ByteCode::SetArray(var_index) => set_index_array(stack_frame, *var_index)?,
+            ByteCode::SetArrayGlobal(var_index) => {
+                let index = *var_index;
+                let arr_index = stack_frame.pop_op_stack();
+                let value = stack_frame.pop_op_stack();
+                let result = root_frame.as_mut().map_or_else(
+                    || stack_frame.get_local_mut(index),
+                    |root| root.get_local_mut(index),
+                );
+                if let Value::Array(len, elements) = result
+                && let Value::Int(a_index) = arr_index{
+                    let usize_index = usize::try_from(a_index).unwrap();
+                    if usize_index >= *len {
+                        return Err(RuntimeError::IndexOutOfBounds(
+                            format_args!("Index {a_index} out of bounds for length {len}").to_smolstr()
+                        ))
+                    }
+                    elements[usize_index] = value;
+                    stack_frame.next_pc();
+                }else {
+                    return Err(RuntimeError::TypeException("cannot set unknown type for array.".to_smolstr()))
+                }
+            }
+            ByteCode::LoadArray(var_index, len) => load_array_local(stack_frame, *len, *var_index),
+            ByteCode::GetIndex => get_index_array(stack_frame)?,
             ByteCode::Nol | ByteCode::Pos => stack_frame.next_pc(),
             _ => todo!(),
         }

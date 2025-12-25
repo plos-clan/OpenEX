@@ -102,6 +102,10 @@ pub enum ASTStmtTree {
         then_body: Vec<ASTStmtTree>,
         else_body: Vec<ASTStmtTree>,
     },
+    Array {
+        token: Token,
+        elements: Vec<ASTExprTree>,
+    },
     Break(Token),
     Continue(Token),
     Empty, // 空语句需要剔除

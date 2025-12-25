@@ -130,3 +130,20 @@ pub fn test_fib_2() {
         > 102334155
     "#]])
 }
+
+/// 数组功能测试
+#[test]
+pub fn test_array() {
+    check(b"import system;\
+    function test() {\
+    var ary = [1,2,3,4];\
+    system.println(ary[3]);\
+    ary[3] = 12;\
+    ary[2] = 1111;\
+    system.println(ary[3] + \" \" + ary[2]);\
+    }\
+    this.test();", expect![[r#"
+        > 4
+        12 1111
+    "#]])
+}

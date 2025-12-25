@@ -4,17 +4,29 @@ use smol_str::{SmolStr, ToSmolStr};
 use std::process::exit;
 use crate::compiler::ast::vm_ir::Value;
 
-#[allow(clippy::unnecessary_wraps)]
-fn system_print(args:&[Value]) -> Result<Value,RuntimeError> {
-    let output = args.first().unwrap().clone();
-    match output {
+fn print_impl(value: Value) {
+    match value {
         Value::Int(i) => print(format_args!("{i}")),
         Value::Bool(i) => print(format_args!("{i}")),
         Value::Float(i) => print(format_args!("{i}")),
         Value::String(i) => print(format_args!("{i}")),
         Value::Ref(i) => print(format_args!("<ref:{i}>")),
         Value::Null => print(format_args!("null")),
+        Value::Array(_i,ele) => {
+            print(format_args!("["));
+            for var in ele {
+                print_impl(var);
+                print(format_args!(","));
+            }
+            print(format_args!("]"));
+        },
     }
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn system_print(args:&[Value]) -> Result<Value,RuntimeError> {
+    let output = args.first().unwrap().clone();
+    print_impl(output);
     Ok(Value::Null)
 }
 fn reg_println() -> ModuleFunc{

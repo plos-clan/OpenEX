@@ -13,6 +13,7 @@ pub enum RuntimeError {
     NoSuchFunctionException(SmolStr), // 找不到函数
     TypeException(SmolStr),           // 类型检查错误
     PrecisionLoss(SmolStr),           // 精度转换损失
+    IndexOutOfBounds(SmolStr),        // 索引越界
     VMError,                          // 解释器内部错误
 }
 
