@@ -36,6 +36,7 @@ export default defineConfig({
                     {text: 'Index', link: '/api'},
                     {text: 'system', link: '/api/system'},
                     {text: 'math', link: '/api/math'},
+                    {text: 'type', link: '/api/type'},
                     {text: 'cffi', link: '/api/cffi'},
                 ]
             },
