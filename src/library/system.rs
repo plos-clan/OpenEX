@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Read;
 use crate::library::{output_capture::print, register_library, LibModule, ModuleFunc};
 use crate::runtime::RuntimeError;
 use smol_str::{SmolStr, ToSmolStr};
@@ -59,6 +61,31 @@ fn reg_exit() -> ModuleFunc{
     }
 }
 
+
+#[allow(clippy::unnecessary_wraps)]
+fn system_read(_args:&[Value]) -> Result<Value,RuntimeError> {
+    let mut buffer = [0u8; 1];
+
+    let read = match io::stdin().read_exact(&mut buffer) {
+        Ok(_) => {
+            (buffer[0] as char).to_string()
+        }
+        Err(_) => {
+            String::new() // 可以返回 EOF
+        }
+    };
+
+    Ok(Value::String(read.to_smolstr()))
+}
+
+fn reg_read() -> ModuleFunc{
+    ModuleFunc {
+        name: SmolStr::new("read"),
+        arity: 0,
+        func: system_read,
+    }
+}
+
 pub fn register_system_lib() {
     let mut system_lib = LibModule {
         name: SmolStr::new("system"),
@@ -66,5 +93,6 @@ pub fn register_system_lib() {
     };
     system_lib.functions.push(reg_println());
     system_lib.functions.push(reg_exit());
+    system_lib.functions.push(reg_read());
     register_library(system_lib);
 }

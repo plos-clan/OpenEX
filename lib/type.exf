@@ -1,0 +1,12 @@
+
+function native to_number(auto);
+function native to_float(auto);
+function native check_type(auto);
+
+function to_bool(auto) {
+    return auto == 0 || auto == "true";
+}
+
+function to_string(auto) {
+    return auto + "";
+}

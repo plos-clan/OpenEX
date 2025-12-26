@@ -1,7 +1,29 @@
 
 function native print(output);
 function native exit(code);
+function native read();
 
 function println(output) {
     this.print(output + "\n");
+}
+
+function readline() {
+    var line = "";
+    var c = "";
+    var newline = "\n";
+
+    while {
+        c = this.read();
+        if (c == "") {
+            break;
+        }
+        if (c == newline) {
+            break;
+        }
+        if (c == "\r") {
+            continue;
+        }
+        line = line + c;
+    }
+    return line;
 }

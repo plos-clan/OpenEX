@@ -2,7 +2,7 @@ use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::ast::vm_ir::Value::{Bool, Float, Int, String, Null};
 use crate::runtime::executor::StackFrame;
 use crate::runtime::RuntimeError;
-use smol_str::format_smolstr;
+use smol_str::{format_smolstr, ToSmolStr};
 
 pub fn get_ref(stack_frame: &mut StackFrame) {
     let ref1 = stack_frame.pop_op_stack();
@@ -406,4 +406,28 @@ pub fn neg_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
     stack_frame.push_op_stack(value);
     stack_frame.next_pc();
     Ok(())
+}
+
+pub fn and_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let v1 = stack_frame.pop_op_stack();
+    let v2 = stack_frame.pop_op_stack();
+    if let Bool(b1) = v1 && let Bool(b2) = v2 {
+        stack_frame.push_op_stack(Bool(b1 && b2));
+        stack_frame.next_pc();
+        Ok(())
+    }else { 
+        Err(RuntimeError::TypeException("unknown to bool.".to_smolstr()))
+    }
+}
+
+pub fn or_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let v1 = stack_frame.pop_op_stack();
+    let v2 = stack_frame.pop_op_stack();
+    if let Bool(b1) = v1 && let Bool(b2) = v2 {
+        stack_frame.push_op_stack(Bool(b1 || b2));
+        stack_frame.next_pc();
+        Ok(())
+    }else {
+        Err(RuntimeError::TypeException("unknown to bool.".to_smolstr()))
+    }
 }

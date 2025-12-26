@@ -11,9 +11,11 @@ use std::fs::File;
 use std::io::Read;
 use std::sync::{LazyLock, RwLock};
 use crate::compiler::ast::vm_ir::Value;
+use crate::library::type_lib::register_type_lib;
 
 mod system;
 pub mod output_capture;
+mod type_lib;
 
 static MODULES: LazyLock<RwLock<BTreeMap<SmolStr, LibModule>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
@@ -85,6 +87,7 @@ pub fn load_libraries(
     }
 
     register_system_lib();
+    register_type_lib();
 
     compiler.compile().expect("error: library has error.");
     Ok(())
