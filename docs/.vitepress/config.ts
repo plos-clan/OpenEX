@@ -23,6 +23,7 @@ export default defineConfig({
                 text: '基础教程',
                 items: [
                     {text: '第一个程序', link: '/example'},
+                    {text: '依赖导入', link: '/example/import'},
                     {text: '表达式', link: '/example/expression'},
                     {text: '函数', link: '/example/function'},
                     {text: '判断语句', link: '/example/conditional'},
