@@ -19,7 +19,6 @@ use crate::compiler::semantic::judgment::judgment_semantic;
 use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::{array_semantic, var_semantic};
 use crate::compiler::{Compiler, CompilerData};
-use smol_str::SmolStr;
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,
@@ -61,15 +60,15 @@ impl<'a> Semantic<'a> {
                             );
                         }
                     }
-                    ASTStmtTree::Import(token) => {
-                        let lib_name = token.text();
-                        if self.compiler.find_file(lib_name).is_none() {
+                    ASTStmtTree::Import(token,use_name, imp_name) => {
+                        let lib_name = imp_name.clone();
+                        if self.compiler.find_file(lib_name.as_str()).is_none() {
                             return Err(ParserError::NotFoundLibrary(token));
                         }
-                        let name = token.clone().value::<SmolStr>().unwrap();
+                        let name = use_name;
                         self.compiler_data()
                             .symbol_table
-                            .add_element(name, ElementType::Library);
+                            .add_element(name, ElementType::Library(imp_name));
                         value_alloc.alloc_value(token, ValueGuessType::Ref);
                     }
                     ASTStmtTree::Loop {

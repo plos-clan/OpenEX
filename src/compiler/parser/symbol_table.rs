@@ -12,7 +12,7 @@ pub enum ContextType {
 #[allow(dead_code)] //TODO
 pub enum ElementType {
     Argument,
-    Library,
+    Library(SmolStr), // SmolStr: 导入名
     Function(usize), // usize: 形参个数
     Value,
     Func,
@@ -58,6 +58,17 @@ impl SymbolTable {
             }
         }
         false
+    }
+
+    pub fn get_element_type(&self, name: &str) -> Option<&ElementType> {
+        for context in &self.contexts {
+            for el in &context.elements {
+                if el.name.as_str() == name {
+                    return Some(&el.el_type);
+                }
+            }
+        }
+        None
     }
 
     pub fn add_context(&mut self, ctxt_type: ContextType) {

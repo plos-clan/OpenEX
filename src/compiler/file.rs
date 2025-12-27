@@ -57,14 +57,13 @@ impl SourceFile {
         &self.data
     }
 
+    /// # Errors
     pub fn compiler(&mut self,compiler: &mut Compiler) -> Result<VMIRTable, ParserError> {
-
         let parser = Parser::new(self);
         let ast_tree = parser.parser()?;
         let mut semantic = Semantic::new(self,compiler);
         let ssa_ir = semantic.semantic(ast_tree)?;
         let vm_ir = ssa_to_vm(ssa_ir.0, &ssa_ir.1, &self.name.to_smolstr());
         Ok(vm_ir)
-
     }
 }

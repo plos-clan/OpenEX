@@ -23,6 +23,12 @@ pub struct Executor<'a> {
     frame_index: usize,
 }
 
+impl<'a> Default for Executor<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> Executor<'a> {
     pub const fn new() -> Self {
         Self {
@@ -252,6 +258,28 @@ fn run_code<'a>(
     Ok(RunState::None)
 }
 
+fn print_and_return(executor: &Executor,failed_status: Option<RuntimeError>) -> Value {
+    if let Some(error) = failed_status {
+        eprintln!("RuntimeError: {error:?}");
+        for frame in &executor.call_stack {
+            let name = frame.get_frame_name();
+            eprintln!("\t at <{name}>");
+        }
+    }
+    Value::Null
+}
+
+fn print_error(executor: &Executor, path: SmolStr) {
+    eprintln!(
+        "RuntimeError: {:?}",
+        RuntimeError::NoSuchFunctionException(path)
+    );
+    for frame in &executor.call_stack {
+        let name = frame.get_frame_name();
+        eprintln!("\t at <{name}>");
+    }
+}
+
 pub fn call_function(
     codes: &[ByteCode],
     const_table: &[Value],
@@ -271,7 +299,6 @@ pub fn call_function(
         0,
     ));
     let mut failed_status = None;
-
     for arg in arguments {
         executor.get_top_frame().unwrap().push_op_stack(arg);
     }
@@ -313,14 +340,7 @@ pub fn call_function(
                 executor.call_stack.last_mut().unwrap().push_op_stack(lib);
                 executor.frame_index -= 1;
             } else {
-                eprintln!(
-                    "RuntimeError: {:?}",
-                    RuntimeError::NoSuchFunctionException(path)
-                );
-                for frame in &mut executor.call_stack {
-                    let name = frame.get_frame_name();
-                    eprintln!("\t at <{name}>");
-                }
+                print_error(&executor, path);
                 break;
             }
         } else {
@@ -367,15 +387,7 @@ pub fn call_function(
         }
     }
 
-    if let Some(error) = failed_status {
-        eprintln!("RuntimeError: {error:?}");
-        for frame in &mut executor.call_stack {
-            let name = frame.get_frame_name();
-            eprintln!("\t at <{name}>");
-        }
-    }
-
-    Value::Null
+    print_and_return(&executor, failed_status)
 }
 
 pub fn interpretive(

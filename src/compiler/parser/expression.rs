@@ -40,9 +40,11 @@ fn binding_power(token: &Token) -> Option<(u8, u8)> {
     }
 }
 
-fn build_head_ast_tree(parser: &mut Parser,
-                       tokens: &mut Peekable<IntoIter<Token>>,
-                       token: Token) -> Result<ASTExprTree, ParserError> {
+fn build_head_ast_tree(
+    parser: &mut Parser,
+    tokens: &mut Peekable<IntoIter<Token>>,
+    token: Token,
+) -> Result<ASTExprTree, ParserError> {
     match token.t_type {
         LP => {
             let t = token;
@@ -50,7 +52,9 @@ fn build_head_ast_tree(parser: &mut Parser,
                 return Err(IllegalExpression(t));
             }
             let lhs = expr_bp(parser, tokens, 0);
-            let Some(n_token) = tokens.next() else { return Err(MissingCondition(t)) };
+            let Some(n_token) = tokens.next() else {
+                return Err(MissingCondition(t));
+            };
             check_char(&n_token, TokenType::LR, ')')?;
             lhs
         }
@@ -84,12 +88,61 @@ fn build_head_ast_tree(parser: &mut Parser,
     }
 }
 
+macro_rules! match_opcode {
+    ($token:expr) => {
+        match $token.text() {
+            "+" => ExprOp::Add,
+            "-" => ExprOp::Sub,
+            "*" => ExprOp::Mul,
+            "/" => ExprOp::Div,
+            "==" => ExprOp::Equ,
+            "!=" => ExprOp::NotEqu,
+            ">=" => ExprOp::BigEqu,
+            "<=" => ExprOp::LesEqu,
+            "=" => ExprOp::Store,
+            ">" => ExprOp::Big,
+            "<" => ExprOp::Less,
+            "&&" => ExprOp::And,
+            "||" => ExprOp::Or,
+            "%" => ExprOp::Rmd,
+            "+=" => ExprOp::AddS,
+            "-=" => ExprOp::SubS,
+            "*=" => ExprOp::MulS,
+            "/=" => ExprOp::DivS,
+            "%=" => ExprOp::RmdS,
+            "&" => ExprOp::BitAnd,
+            "^" => ExprOp::BitXor,
+            "|" => ExprOp::BitOr,
+            "&=" => ExprOp::BAndS,
+            "|=" => ExprOp::BOrS,
+            "^=" => ExprOp::BXorS,
+            ">>" => ExprOp::BLeft,
+            "<<" => ExprOp::BRight,
+            "." => ExprOp::Ref,
+            _ => return Err(IllegalExpression($token)),
+        }
+    };
+}
+
+macro_rules! check_operand {
+    ($token:expr) => {
+        if $token.t_type != TokenType::Operator
+            && $token.t_type != TokenType::LR
+            && !($token.t_type == LP && ($token.text() == "[" || $token.text() == "("))
+        {
+            return Err(IllegalExpression($token));
+        }
+    };
+}
+
 fn expr_bp(
     parser: &mut Parser,
     tokens: &mut Peekable<IntoIter<Token>>,
     min_bp: u8,
 ) -> Result<ASTExprTree, ParserError> {
-    let Some(mut token) = tokens.next() else { return Err(IllegalExpression(parser.last.take().unwrap())) };
+    let Some(mut token) = tokens.next() else {
+        return Err(IllegalExpression(parser.last.take().unwrap()));
+    };
 
     let mut expr_tree: ASTExprTree = build_head_ast_tree(parser, tokens, token)?;
 
@@ -99,12 +152,7 @@ fn expr_bp(
             None => break,
         };
 
-        if token.t_type != TokenType::Operator
-            && token.t_type != TokenType::LR
-            && !(token.t_type == LP && (token.text() == "[" || token.text() == "("))
-        {
-            return Err(IllegalExpression(token));
-        }
+        check_operand!(token);
 
         if let Some((l_bp, ())) = postfix_binding_power(&token) {
             if l_bp < min_bp {
@@ -138,7 +186,10 @@ fn expr_bp(
                         let mut p_count: u64 = 0;
                         let mut done: bool = false;
                         loop {
-                            if token.t_type == TokenType::Operator && token.text() == "," && p_count == 0 {
+                            if token.t_type == TokenType::Operator
+                                && token.text() == ","
+                                && p_count == 0
+                            {
                                 break;
                             }
                             if token.t_type == LP && token.text() == "(" {
@@ -188,37 +239,7 @@ fn expr_bp(
             }
             tokens.next();
             let rhs = expr_bp(parser, tokens, r_bp)?;
-            let op = match token.text() {
-                "+" => ExprOp::Add,
-                "-" => ExprOp::Sub,
-                "*" => ExprOp::Mul,
-                "/" => ExprOp::Div,
-                "==" => ExprOp::Equ,
-                "!=" => ExprOp::NotEqu,
-                ">=" => ExprOp::BigEqu,
-                "<=" => ExprOp::LesEqu,
-                "=" => ExprOp::Store,
-                ">" => ExprOp::Big,
-                "<" => ExprOp::Less,
-                "&&" => ExprOp::And,
-                "||" => ExprOp::Or,
-                "%" => ExprOp::Rmd,
-                "+=" => ExprOp::AddS,
-                "-=" => ExprOp::SubS,
-                "*=" => ExprOp::MulS,
-                "/=" => ExprOp::DivS,
-                "%=" => ExprOp::RmdS,
-                "&" => ExprOp::BitAnd,
-                "^" => ExprOp::BitXor,
-                "|" => ExprOp::BitOr,
-                "&=" => ExprOp::BAndS,
-                "|=" => ExprOp::BOrS,
-                "^=" => ExprOp::BXorS,
-                ">>" => ExprOp::BLeft,
-                "<<" => ExprOp::BRight,
-                "." => ExprOp::Ref,
-                _ => return Err(IllegalExpression(token)),
-            };
+            let op = match_opcode!(token);
             expr_tree = Expr {
                 token,
                 op,

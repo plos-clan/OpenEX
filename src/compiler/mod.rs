@@ -218,8 +218,7 @@ impl Compiler {
                 | ASTExprTree::Literal(token)
                 | ASTExprTree::This(token)
                 | ASTExprTree::Expr { token, .. }
-                | ASTExprTree::Unary { token, .. }
-                | ASTExprTree::Ref(token)=> token,
+                | ASTExprTree::Unary { token, .. } => token,
                 ASTExprTree::Call { name: e_name, .. } =>{
                     match e_name.as_ref() { 
                         ASTExprTree::Var(token ) => token,

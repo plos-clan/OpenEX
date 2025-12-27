@@ -2,51 +2,50 @@ pub mod ssa_ir;
 pub mod vm_ir;
 
 use crate::compiler::lexer::Token;
+use smol_str::SmolStr;
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExprOp {
-    Pos,           // 取正 +
-    Neg,           // 取负 -
-    Add,           // +
-    Sub,           // -
-    Mul,           // *
-    Div,           // /
-    And,           // &&
-    Or,            // ||
-    Rmd,           // %
-    Equ,           // ==
-    SAdd,          // ++
-    SSub,          // --
-    Not,           // !
-    NotEqu,        // !=
-    BigEqu,        // >=
-    LesEqu,        // <=
-    Big,           // >
-    Less,          // <
-    Store,         // =
-    AddS,          // +=
-    SubS,          // -=
-    MulS,          // *=
-    DivS,          // /=
-    RmdS,          // %=
-    BitAnd,        // &
-    BitOr,         // |
-    BitXor,        // ^
-    BAndS,         // &=
-    BOrS,          // |=
-    BXorS,         // ^=
-    BLeft,         // <<
-    BRight,        // >>
-    Ref,           // .
-    AIndex,        // 数组索引
+    Pos,    // 取正 +
+    Neg,    // 取负 -
+    Add,    // +
+    Sub,    // -
+    Mul,    // *
+    Div,    // /
+    And,    // &&
+    Or,     // ||
+    Rmd,    // %
+    Equ,    // ==
+    SAdd,   // ++
+    SSub,   // --
+    Not,    // !
+    NotEqu, // !=
+    BigEqu, // >=
+    LesEqu, // <=
+    Big,    // >
+    Less,   // <
+    Store,  // =
+    AddS,   // +=
+    SubS,   // -=
+    MulS,   // *=
+    DivS,   // /=
+    RmdS,   // %=
+    BitAnd, // &
+    BitOr,  // |
+    BitXor, // ^
+    BAndS,  // &=
+    BOrS,   // |=
+    BXorS,  // ^=
+    BLeft,  // <<
+    BRight, // >>
+    Ref,    // .
+    AIndex, // 数组索引
 }
 
-#[derive(Debug,Clone,PartialEq)]
-#[allow(dead_code)] //TODO
+#[derive(Debug, Clone, PartialEq)]
 pub enum ASTExprTree {
     Literal(Token), // Number | String | Bool
     Var(Token),     // x
-    Ref(Token),
     This(Token),    // script current context
     Expr {
         token: Token,
@@ -76,10 +75,10 @@ pub enum ASTStmtTree {
         name: Token,
         value: Option<ASTExprTree>,
     },
-    Expr(ASTExprTree),           // 表达式语句：a + b;
-    Return(Option<ASTExprTree>), // return x;
-    Import(Token),               // import "library";
-    Context(Vec<ASTStmtTree>),   // 独立上下文
+    Expr(ASTExprTree),               // 表达式语句：a + b;
+    Return(Option<ASTExprTree>),     // return x;
+    Import(Token, SmolStr, SmolStr), // import "library"; (use_name, import_name)
+    Context(Vec<ASTStmtTree>),       // 独立上下文
     Loop {
         token: Token,
         cond: ASTExprTree,
@@ -117,10 +116,9 @@ impl ASTExprTree {
             Self::Call { name, .. } => name.token(),
             Self::Literal(token)
             | Self::Var(token)
-            | Self::Ref(token)
             | Self::This(token)
             | Self::Expr { token, .. }
-            | Self::Unary { token, .. }=> token,
+            | Self::Unary { token, .. } => token,
         }
     }
 }

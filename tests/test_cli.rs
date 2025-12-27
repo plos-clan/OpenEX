@@ -91,7 +91,7 @@ pub fn test_count_primes() {
 
 /// 递归式斐波那契
 #[test]
-pub fn test_fib() {
+pub fn test_fib_1() {
     check(b"import system;\
     function fib(n) {\
     if (n < 2) {\

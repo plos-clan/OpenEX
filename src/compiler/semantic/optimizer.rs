@@ -1,6 +1,7 @@
 use crate::compiler::ast::ssa_ir::Operand;
-use crate::compiler::ast::ssa_ir::Operand::{ImmBool, ImmFlot, ImmNum, ImmStr};
+use crate::compiler::ast::ssa_ir::Operand::{ImmBool, ImmFlot, ImmNum, ImmStr, Library, Reference};
 use crate::compiler::ast::ExprOp;
+use smol_str::SmolStrBuilder;
 
 pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
     match op {
@@ -52,7 +53,7 @@ fn check_not_sflnum(num: i64) -> bool {
 macro_rules! float_safe_check {
     ($a:expr) => {
         if check_not_sflnum(*$a) {
-            return None
+            return None;
         }
     };
 }
@@ -69,52 +70,53 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
             float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot((*a as f64) + b))
-        },
+        }
         (ImmNum(a), ImmFlot(b), ExprOp::Sub) => {
             float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(*a as f64 - b))},
-        (ImmNum(a), ImmFlot(b), ExprOp::Mul) =>{
+            Some(ImmFlot(*a as f64 - b))
+        }
+        (ImmNum(a), ImmFlot(b), ExprOp::Mul) => {
             float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 * b))
-        },
-        (ImmNum(a), ImmFlot(b), ExprOp::Div) =>{
+        }
+        (ImmNum(a), ImmFlot(b), ExprOp::Div) => {
             float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 / b))
-        },
+        }
         (ImmNum(a), ImmFlot(b), ExprOp::Rmd) => {
             float_safe_check!(a);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(*a as f64 % b))
-        },
+        }
 
         (ImmFlot(a), ImmNum(b), ExprOp::Add) => {
             float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a + *b as f64))
-        },
+        }
         (ImmFlot(a), ImmNum(b), ExprOp::Sub) => {
             float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a - *b as f64))
-        },
+        }
         (ImmFlot(a), ImmNum(b), ExprOp::Mul) => {
             float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a * *b as f64))
-        },
+        }
         (ImmFlot(a), ImmNum(b), ExprOp::Div) => {
             float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a / *b as f64))
-        },
+        }
         (ImmFlot(a), ImmNum(b), ExprOp::Rmd) => {
             float_safe_check!(b);
             #[allow(clippy::cast_precision_loss)]
             Some(ImmFlot(a % *b as f64))
-        },
+        }
         // 位运算
         (ImmNum(a), ImmNum(b), ExprOp::BitAnd) => Some(ImmNum(a & b)),
         (ImmNum(a), ImmNum(b), ExprOp::BitOr) => Some(ImmNum(a | b)),
@@ -144,7 +146,7 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
         (ImmFlot(a), ImmFlot(b), ExprOp::NotEqu) => {
             let result = (a - b).abs() < f64::EPSILON;
             Some(ImmBool(!result))
-        },
+        }
         (ImmBool(a), ImmBool(b), ExprOp::And) => Some(ImmBool(*a && *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Or) => Some(ImmBool(*a || *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Equ) => Some(ImmBool(a == b)),
@@ -153,6 +155,13 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
         (ImmStr(a), ImmStr(b), ExprOp::Equ) => Some(ImmBool(a == b)),
         (ImmStr(a), ImmStr(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
 
+        (Reference(str) | Library(str), Reference(str1) | Library(str1), ExprOp::Ref) => {
+            let mut ref_build = SmolStrBuilder::new();
+            ref_build.push_str(str1.as_str());
+            ref_build.push('/');
+            ref_build.push_str(str.as_str());
+            Some(Reference(ref_build.finish()))
+        }
         // 赋值 / 复合赋值 / 引用 / 下标 —— 不做常量折叠
         _ => None,
     }

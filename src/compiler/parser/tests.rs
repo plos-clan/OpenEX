@@ -29,6 +29,8 @@ fn basic_work() {
                             index: 8,
                             data: "system",
                         },
+                        "system",
+                        "system",
                     ),
                     Expr(
                         Expr {

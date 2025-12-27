@@ -6,6 +6,7 @@ use crate::compiler::ast::ssa_ir::ValueGuessType::{
 use crate::compiler::ast::ssa_ir::{OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
+use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::parser::ParserError;
 use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
 use crate::compiler::semantic::Semantic;
@@ -396,6 +397,7 @@ fn expr_var(
     code: &mut ValueAlloc,
     mut opcode_table: OpCodeTable,
     store: Option<Operand>,
+    check_urs: bool, // 是否检查符号未定义 (引用不检查)
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
     let var_name = u_token.clone().value::<SmolStr>().unwrap();
     if !semantic
@@ -405,30 +407,52 @@ fn expr_var(
     {
         return Err(ParserError::UnableResolveSymbols(u_token.clone()));
     }
-    code.find_value_key(&var_name).map_or_else(
-        || unreachable!(),
-        |key| {
-            let value = code.find_value(key).unwrap();
-            value.variable = true;
-            let type_ = value.type_.clone();
-            match value.type_ {
-                Ref => {
-                    opcode_table.add_opcode(Push(None, Operand::Library(var_name)));
-                }
-                _ => {
-                    if let Some(operand) = store {
-                        if operand != ImmNumFlot {
-                            value.type_ = operand_to_guess(&operand);
+
+    if check_urs {
+        code.find_value_key(&var_name).map_or_else(
+            || unreachable!(),
+            |key| {
+                let value = code.find_value(key).unwrap();
+                value.variable = true;
+                let type_ = value.type_.clone();
+                match value.type_ {
+                    Ref => {
+                        let name = match semantic
+                            .compiler_data()
+                            .symbol_table
+                            .get_element_type(var_name.clone().as_str())
+                        {
+                            Some(ElementType::Library(names)) => names.clone(),
+                            _ => var_name,
+                        };
+                        opcode_table.add_opcode(Push(None, Operand::Library(name)));
+                    }
+                    _ => {
+                        if let Some(operand) = store {
+                            if operand != ImmNumFlot {
+                                value.type_ = operand_to_guess(&operand);
+                            }
+                            opcode_table.add_opcode(OpCode::LoadLocal(
+                                None,
+                                key,
+                                Operand::Val(key),
+                            ));
+                        } else {
+                            opcode_table.add_opcode(OpCode::StoreLocal(
+                                None,
+                                key,
+                                Operand::Val(key),
+                            ));
                         }
-                        opcode_table.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
-                    } else {
-                        opcode_table.add_opcode(OpCode::StoreLocal(None, key, Operand::Val(key)));
                     }
                 }
-            }
-            Ok((Operand::Val(key), type_, opcode_table))
-        },
-    )
+                Ok((Operand::Val(key), type_, opcode_table))
+            },
+        )
+    } else {
+        opcode_table.add_opcode(Push(None, Operand::Reference(var_name.clone())));
+        Ok((Operand::Reference(var_name), Ref, opcode_table))
+    }
 }
 
 fn expr_call(
@@ -476,14 +500,6 @@ pub fn lower_expr(
     let mut opcode_table = OpCodeTable::new();
     match expr_tree {
         ASTExprTree::Literal(lit) => expr_literal(&mut lit.clone(), opcode_table),
-        ASTExprTree::Ref(token) => {
-            opcode_table.add_opcode(Push(None, Operand::Reference(token.text().to_smolstr())));
-            Ok((
-                Operand::Reference(token.text().to_smolstr()),
-                Ref,
-                opcode_table,
-            ))
-        }
         ASTExprTree::This(_token) => {
             opcode_table.add_opcode(Push(None, Operand::This));
             Ok((Operand::This, This, opcode_table))
@@ -510,11 +526,11 @@ pub fn lower_expr(
             // 该 if 用于特判数组赋值 arr[index] = expression
             if matches!(e_op, ExprOp::Store)
                 && let ASTExprTree::Expr {
-                token: _token,
-                op,
-                left: ex_left,
-                right: ex_right,
-            } = e_left.as_ref()
+                    token: _token,
+                    op,
+                    left: ex_left,
+                    right: ex_right,
+                } = e_left.as_ref()
                 && matches!(op, ExprOp::AIndex)
             {
                 opcode_table.append_code(&right.2); // 赋值数据 expression
@@ -525,13 +541,13 @@ pub fn lower_expr(
                         || unreachable!(),
                         |key| {
                             opcode_table.add_opcode(OpCode::SetArrayLocal(None, key));
-                        }
+                        },
                     );
-                }else {
+                } else {
                     unreachable!()
                 }
                 //TODO CALL 占位符
-                return Ok((Operand::Call("".to_smolstr()),Unknown,opcode_table));
+                return Ok((Operand::Call("".to_smolstr()), Unknown, opcode_table));
             }
 
             let left = lower_expr(semantic, e_left.as_ref(), code, stores)?;
@@ -558,7 +574,7 @@ pub fn lower_expr(
             }
             Ok((n_operand, guess_type, opcode_table))
         }
-        ASTExprTree::Var(u_token) => expr_var(semantic, u_token, code, opcode_table, store),
+        ASTExprTree::Var(u_token) => expr_var(semantic, u_token, code, opcode_table, store, true),
         ASTExprTree::Call { name, args } => expr_call(semantic, name, args, code, opcode_table),
     }
 }

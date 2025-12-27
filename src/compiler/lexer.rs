@@ -59,9 +59,10 @@ pub enum TokenType {
     This,
     Null,
     Native,
+    From,
 }
 
-const KEYWORDS: [(&str, TokenType); 16] = [
+const KEYWORDS: [(&str, TokenType); 17] = [
     ("for", TokenType::For),
     ("while", TokenType::While),
     ("if", TokenType::If),
@@ -78,9 +79,11 @@ const KEYWORDS: [(&str, TokenType); 16] = [
     ("this", TokenType::This),
     ("null", TokenType::Null),
     ("native", TokenType::Native),
+    ("from", TokenType::From),
 ];
 
 impl Token {
+    #[must_use]
     pub const fn new(
         data: SmolStr,
         line: usize,
@@ -102,16 +105,29 @@ impl Token {
     }
 
     pub fn value_number(&self) -> i64 {
-        self
-            .data
+        self.data
             .strip_prefix("0x")
-            .or_else(|| self.data.strip_prefix("0X")).map_or_else(|| self
-            .data
-            .strip_prefix("0b")
-            .or_else(|| self.data.strip_prefix("0B")).map_or_else(|| self
-            .data
-            .strip_prefix("0o")
-            .or_else(|| self.data.strip_prefix("0O")).map_or_else(|| self.data.parse::<i64>().unwrap(), |oct| i64::from_str_radix(oct, 8).unwrap()), |bin| i64::from_str_radix(bin, 2).unwrap()), |hex| i64::from_str_radix(hex, 16).unwrap())
+            .or_else(|| self.data.strip_prefix("0X"))
+            .map_or_else(
+                || {
+                    self.data
+                        .strip_prefix("0b")
+                        .or_else(|| self.data.strip_prefix("0B"))
+                        .map_or_else(
+                            || {
+                                self.data
+                                    .strip_prefix("0o")
+                                    .or_else(|| self.data.strip_prefix("0O"))
+                                    .map_or_else(
+                                        || self.data.parse::<i64>().unwrap(),
+                                        |oct| i64::from_str_radix(oct, 8).unwrap(),
+                                    )
+                            },
+                            |bin| i64::from_str_radix(bin, 2).unwrap(),
+                        )
+                },
+                |hex| i64::from_str_radix(hex, 16).unwrap(),
+            )
     }
 
     pub fn value<T>(&self) -> Option<T>
@@ -172,8 +188,7 @@ impl LexerAnalysis {
         loop {
             match self.next_char() {
                 '\0' => return Err(Eof),
-                ' ' | '\t' => {
-                }
+                ' ' | '\t' => {}
                 '\r' => {
                     self.now_column -= 1;
                 }
@@ -189,12 +204,7 @@ impl LexerAnalysis {
         }
     }
 
-    fn build_identifier(
-        &mut self,
-        line: usize,
-        column: usize,
-        data_index: usize,
-    ) -> Token {
+    fn build_identifier(&mut self, line: usize, column: usize, data_index: usize) -> Token {
         let mut data = String::new();
         loop {
             match self.next_char() {
@@ -210,12 +220,55 @@ impl LexerAnalysis {
 
         let t_type = Self::match_keyword(data.as_str());
 
+        Token::new(SmolStr::new(data), line, column, data_index, t_type)
+    }
+
+    fn build_number_hex(
+        &mut self,
+        line: usize,
+        column: usize,
+        data_index: usize,
+        data: &mut SmolStrBuilder,
+        next: char,
+    ) -> Token {
+        data.push(next);
+        loop {
+            match self.next_char() {
+                c if c.is_ascii_hexdigit() => data.push(c),
+                c => {
+                    self.cache = Some(c);
+                    break;
+                }
+            }
+        }
+
+        Token::new(data.finish(), line, column, data_index, TokenType::Number)
+    }
+
+    fn build_number_binary(
+        &mut self,
+        line: usize,
+        column: usize,
+        data_index: usize,
+        data: &mut SmolStrBuilder,
+        next: char,
+    ) -> Token {
+        data.push(next);
+        loop {
+            match self.next_char() {
+                c if c == '0' || c == '1' => data.push(c),
+                c => {
+                    self.cache = Some(c);
+                    break;
+                }
+            }
+        }
         Token::new(
-            SmolStr::new(data),
+            data.finish(),
             line,
             column,
             data_index,
-            t_type,
+            TokenType::Number,
         )
     }
 
@@ -226,7 +279,7 @@ impl LexerAnalysis {
         data_index: usize,
     ) -> Result<Token, LexerError> {
         let mut data = SmolStrBuilder::new();
-        let mut is_float = false;
+        let mut is_float = TokenType::Number;
 
         let first_char = self.next_char();
 
@@ -235,7 +288,7 @@ impl LexerAnalysis {
 
             if lookahead.is_ascii_digit() {
                 // 合法浮点：.123
-                is_float = true;
+                is_float = TokenType::Float;
                 data.push('.');
                 data.push(lookahead);
             } else {
@@ -255,54 +308,17 @@ impl LexerAnalysis {
 
         if first_char == '0' {
             let next = self.next_char();
-
             match next {
                 'x' | 'X' => {
-                    data.push(next);
-                    loop {
-                        match self.next_char() {
-                            c if c.is_ascii_hexdigit() => data.push(c),
-                            c => {
-                                self.cache = Some(c);
-                                break;
-                            }
-                        }
-                    }
-
-                    return Ok(Token::new(
-                        data.finish(),
-                        line,
-                        column,
-                        data_index,
-                        TokenType::Number,
-                    ));
+                    return Ok(self.build_number_hex(line, column, data_index, &mut data, next));
                 }
-                'b' | 'B' => {
-                    data.push(next);
-                    loop {
-                        match self.next_char() {
-                            c if c == '0' || c == '1' => data.push(c),
-                            c => {
-                                self.cache = Some(c);
-                                break;
-                            }
-                        }
-                    }
-
-                    return Ok(Token::new(
-                        data.finish(),
-                        line,
-                        column,
-                        data_index,
-                        TokenType::Number,
-                    ));
-                }
+                'b' | 'B' => return Ok(self.build_number_binary(line, column, data_index, &mut data, next)),
                 c if c.is_ascii_digit() => {
                     data.push(next);
                 }
                 '.' => {
                     data.push(next);
-                    is_float = true;
+                    is_float = TokenType::Float;
                 }
                 _ => {
                     self.cache = Some(next);
@@ -324,14 +340,14 @@ impl LexerAnalysis {
                     data.push(c);
                 }
                 '.' => {
-                    if is_float {
+                    if let TokenType::Float = is_float {
                         return Err(LexerError::IllegalLiteral);
                     }
-                    is_float = true;
+                    is_float = TokenType::Float;
                     data.push('.');
                 }
                 'e' | 'E' => {
-                    is_float = true;
+                    is_float = TokenType::Float;
                     data.push('e');
 
                     let sign = self.next_char();
@@ -371,11 +387,7 @@ impl LexerAnalysis {
             line,
             column,
             data_index,
-            if is_float {
-                TokenType::Float
-            } else {
-                TokenType::Number
-            },
+            is_float,
         ))
     }
 
@@ -438,13 +450,7 @@ impl LexerAnalysis {
                 data.push(c);
             }
         }
-        Token::new(
-            data.finish(),
-            line,
-            column,
-            data_index,
-            TokenType::Operator,
-        )
+        Token::new(data.finish(), line, column, data_index, TokenType::Operator)
     }
 
     fn build_semicolon_op_double(
@@ -466,13 +472,7 @@ impl LexerAnalysis {
                 data.push(c);
             }
         }
-        Token::new(
-            data.finish(),
-            line,
-            column,
-            data_index,
-            TokenType::Operator,
-        )
+        Token::new(data.finish(), line, column, data_index, TokenType::Operator)
     }
 
     fn build_semicolon_op_easy(
@@ -491,20 +491,16 @@ impl LexerAnalysis {
             self.cache = Some(c0);
             data.push(c);
         }
-        Token::new(
-            data.finish(),
-            line,
-            column,
-            data_index,
-            TokenType::Operator,
-        )
+        Token::new(data.finish(), line, column, data_index, TokenType::Operator)
     }
 
-    fn build_opt_skip_text(&mut self,
-                           line: usize,
-                           column: usize,
-                           data_index: usize,
-                           mut c: char,)-> Result<Token, LexerError> {
+    fn build_opt_skip_text(
+        &mut self,
+        line: usize,
+        column: usize,
+        data_index: usize,
+        mut c: char,
+    ) -> Result<Token, LexerError> {
         let mut str_builder = SmolStrBuilder::new();
         str_builder.push(c);
         c = self.next_char();
@@ -558,7 +554,7 @@ impl LexerAnalysis {
         }
     }
 
-    const fn is_sem( c: char) -> bool {
+    const fn is_sem(c: char) -> bool {
         c == ',' || c == ':' || c == '?'
     }
 
@@ -610,7 +606,7 @@ impl LexerAnalysis {
                 data_index,
                 TokenType::Operator,
             )),
-            '/' => self.build_opt_skip_text(line,column, data_index, '/'),
+            '/' => self.build_opt_skip_text(line, column, data_index, '/'),
             '"' => self.build_string(line, column, data_index),
             '+' => Ok(self.build_semicolon_op_in(line, column, data_index, '+')),
             '-' => Ok(self.build_semicolon_op_in(line, column, data_index, '-')),
