@@ -8,6 +8,8 @@ use crate::compiler::Compiler;
 use crate::library::load_libraries;
 use crate::runtime::executor::call_function;
 use crate::runtime::{MetadataUnit, MethodInfo};
+use dashu::float::round::mode::HalfAway;
+use dashu::float::FBig;
 use smol_str::{SmolStr, ToSmolStr};
 use std::collections::HashSet;
 use std::ffi::{c_char, CStr, CString};
@@ -51,7 +53,9 @@ impl CValue {
             match self.tag {
                 ValueTag::Int => Value::Int(self.data.i),
                 ValueTag::Bool => Value::Bool(self.data.b),
-                ValueTag::Float => Value::Float(self.data.f),
+                ValueTag::Float => Value::Float(FBig::<HalfAway, 2>::try_from(self.data.f)
+                    .expect("f64 is NaN or Inf")
+                    .to_decimal().unwrap()),
                 ValueTag::String => {
                     let c_str = CStr::from_ptr(self.data.s);
                     Value::String(SmolStr::new(c_str.to_string_lossy()))
@@ -80,7 +84,9 @@ pub fn into_c_value(value: Value) -> CValue {
         },
         Value::Float(f) => CValue {
             tag: ValueTag::Float,
-            data: ValueData { f },
+            data: ValueData {
+                f: f.to_f64().unwrap(),
+            },
         },
         Value::String(s) => {
             // 将字符串转换到堆上，并交出所有权给 C

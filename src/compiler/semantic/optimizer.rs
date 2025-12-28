@@ -1,6 +1,7 @@
 use crate::compiler::ast::ssa_ir::Operand;
 use crate::compiler::ast::ssa_ir::Operand::{ImmBool, ImmFlot, ImmNum, ImmStr, Library, Reference};
 use crate::compiler::ast::ExprOp;
+use dashu::float::{Context, DBig};
 use smol_str::SmolStrBuilder;
 
 pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
@@ -16,7 +17,7 @@ pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
             if let ImmNum(num) = operand {
                 Some(ImmNum(num + 1))
             } else if let ImmFlot(flot) = operand {
-                Some(ImmFlot(flot + 1.0))
+                Some(ImmFlot(flot + DBig::from(1)))
             } else {
                 None
             }
@@ -25,7 +26,7 @@ pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
             if let ImmNum(num) = operand {
                 Some(ImmNum(num - 1))
             } else if let ImmFlot(flot) = operand {
-                Some(ImmFlot(flot - 1.0))
+                Some(ImmFlot(flot - DBig::from(1)))
             } else {
                 None
             }
@@ -43,20 +44,6 @@ pub fn unary_optimizer(op: ExprOp, operand: &Operand) -> Option<Operand> {
     }
 }
 
-// 检查整型是否符合浮点转换安全期间
-fn check_not_sflnum(num: i64) -> bool {
-    const MAX_SAFE_INT: i64 = (1i64 << 53) - 1;
-    const MIN_SAFE_INT: i64 = -MAX_SAFE_INT;
-    (MIN_SAFE_INT..=MAX_SAFE_INT).contains(&num)
-}
-
-macro_rules! float_safe_check {
-    ($a:expr) => {
-        if check_not_sflnum(*$a) {
-            return None;
-        }
-    };
-}
 
 pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Operand> {
     match (left, right, op) {
@@ -66,56 +53,36 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
         (ImmNum(a), ImmNum(b), ExprOp::Div) => Some(ImmNum(a / b)),
         (ImmNum(a), ImmNum(b), ExprOp::Rmd) => Some(ImmNum(a % b)),
 
-        (ImmNum(a), ImmFlot(b), ExprOp::Add) => {
-            float_safe_check!(a);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot((*a as f64) + b))
-        }
-        (ImmNum(a), ImmFlot(b), ExprOp::Sub) => {
-            float_safe_check!(a);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(*a as f64 - b))
-        }
-        (ImmNum(a), ImmFlot(b), ExprOp::Mul) => {
-            float_safe_check!(a);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(*a as f64 * b))
-        }
+        (ImmNum(a), ImmFlot(b), ExprOp::Add) => Some(ImmFlot(DBig::from(*a) + b)),
+        (ImmNum(a), ImmFlot(b), ExprOp::Sub) => Some(ImmFlot(DBig::from(*a) - b)),
+        (ImmNum(a), ImmFlot(b), ExprOp::Mul) => Some(ImmFlot(DBig::from(*a) * b)),
         (ImmNum(a), ImmFlot(b), ExprOp::Div) => {
-            float_safe_check!(a);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(*a as f64 / b))
+            let context = Context::new(30);
+            Some(ImmFlot(
+                context.div(DBig::from(*a).repr(), b.repr()).value(),
+            ))
         }
         (ImmNum(a), ImmFlot(b), ExprOp::Rmd) => {
-            float_safe_check!(a);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(*a as f64 % b))
+            let context = Context::new(30);
+            Some(ImmFlot(
+                context.rem(DBig::from(*a).repr(), b.repr()).value(),
+            ))
         }
 
-        (ImmFlot(a), ImmNum(b), ExprOp::Add) => {
-            float_safe_check!(b);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(a + *b as f64))
-        }
-        (ImmFlot(a), ImmNum(b), ExprOp::Sub) => {
-            float_safe_check!(b);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(a - *b as f64))
-        }
-        (ImmFlot(a), ImmNum(b), ExprOp::Mul) => {
-            float_safe_check!(b);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(a * *b as f64))
-        }
+        (ImmFlot(a), ImmNum(b), ExprOp::Add) => Some(ImmFlot(a + DBig::from(*b))),
+        (ImmFlot(a), ImmNum(b), ExprOp::Sub) => Some(ImmFlot(a - DBig::from(*b))),
+        (ImmFlot(a), ImmNum(b), ExprOp::Mul) => Some(ImmFlot(a * DBig::from(*b))),
         (ImmFlot(a), ImmNum(b), ExprOp::Div) => {
-            float_safe_check!(b);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(a / *b as f64))
+            let context = Context::new(30);
+            Some(ImmFlot(
+                context.div(a.repr(), DBig::from(*b).repr()).value(),
+            ))
         }
         (ImmFlot(a), ImmNum(b), ExprOp::Rmd) => {
-            float_safe_check!(b);
-            #[allow(clippy::cast_precision_loss)]
-            Some(ImmFlot(a % *b as f64))
+            let context = Context::new(30);
+            Some(ImmFlot(
+                context.rem(a.repr(), DBig::from(*b).repr()).value(),
+            ))
         }
         // 位运算
         (ImmNum(a), ImmNum(b), ExprOp::BitAnd) => Some(ImmNum(a & b)),
@@ -142,11 +109,8 @@ pub fn expr_optimizer(left: &Operand, right: &Operand, op: ExprOp) -> Option<Ope
         (ImmFlot(a), ImmFlot(b), ExprOp::Less) => Some(ImmBool(a < b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::BigEqu) => Some(ImmBool(a >= b)),
         (ImmFlot(a), ImmFlot(b), ExprOp::LesEqu) => Some(ImmBool(a <= b)),
-        (ImmFlot(a), ImmFlot(b), ExprOp::Equ) => Some(ImmBool((a - b).abs() < f64::EPSILON)),
-        (ImmFlot(a), ImmFlot(b), ExprOp::NotEqu) => {
-            let result = (a - b).abs() < f64::EPSILON;
-            Some(ImmBool(!result))
-        }
+        (ImmFlot(a), ImmFlot(b), ExprOp::Equ) => Some(ImmBool(a == b)),
+        (ImmFlot(a), ImmFlot(b), ExprOp::NotEqu) => Some(ImmBool(a != b)),
         (ImmBool(a), ImmBool(b), ExprOp::And) => Some(ImmBool(*a && *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Or) => Some(ImmBool(*a || *b)),
         (ImmBool(a), ImmBool(b), ExprOp::Equ) => Some(ImmBool(a == b)),

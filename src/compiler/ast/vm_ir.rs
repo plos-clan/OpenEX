@@ -2,6 +2,9 @@ use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand}
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
 use smol_str::{SmolStr, ToSmolStr};
 use std::fmt::Display;
+use std::str::FromStr;
+use dashu::float::{DBig, FBig};
+use dashu::float::round::mode::HalfAway;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -61,7 +64,7 @@ pub enum ByteCode {
 pub enum Value {
     Int(i64),
     Bool(bool),
-    Float(f64),
+    Float(FBig<HalfAway, 10>),
     String(SmolStr),
     Ref(SmolStr),
     Array(usize, Vec<Value>),
@@ -75,7 +78,7 @@ impl Display for Value {
             Self::Bool(b) => write!(f, "{b}"),
             Self::Float(x) => {
                 // 避免科学计数法，保留合理精度
-                if x.fract() == 0.0 {
+                if x.fract() == DBig::from(0) {
                     write!(f, "{x:.1}")
                 } else {
                     write!(f, "{x}")
@@ -398,7 +401,7 @@ impl ConstantTable {
         match types {
             String => Value::String(value),
             Number => Value::Int(value.parse::<i64>().unwrap()),
-            Float => Value::Float(value.parse::<f64>().unwrap()),
+            Float => Value::Float(DBig::from_str(&value).unwrap()),
             Bool => Value::Bool(value == "true"),
             Ref => Value::Ref(value.to_smolstr()),
             Null => Value::Null,

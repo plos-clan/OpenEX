@@ -3,6 +3,8 @@ use linked_hash_map::LinkedHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashMap};
+use dashu::float::FBig;
+use dashu::float::round::mode::HalfAway;
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct LocalAddr {
@@ -17,7 +19,7 @@ pub enum Operand {
     This,
     ImmBool(bool),
     ImmNum(i64),
-    ImmFlot(f64),
+    ImmFlot(FBig<HalfAway, 10>),
     ImmStr(SmolStr),
     Call(SmolStr),
     Reference(SmolStr), // 对象引用

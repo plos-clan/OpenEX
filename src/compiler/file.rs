@@ -6,8 +6,8 @@ use crate::compiler::parser::ParserError::LexError;
 use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::semantic::Semantic;
 use crate::compiler::{Compiler, CompilerData};
-use std::collections::HashSet;
 use smol_str::ToSmolStr;
+use std::collections::HashSet;
 
 #[derive(Debug,Clone)]
 #[allow(dead_code)] // TODO
@@ -63,6 +63,7 @@ impl SourceFile {
         let ast_tree = parser.parser()?;
         let mut semantic = Semantic::new(self,compiler);
         let ssa_ir = semantic.semantic(ast_tree)?;
+
         let vm_ir = ssa_to_vm(ssa_ir.0, &ssa_ir.1, &self.name.to_smolstr());
         Ok(vm_ir)
     }

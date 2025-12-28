@@ -1,3 +1,5 @@
+use std::str::FromStr;
+use dashu::float::DBig;
 use crate::compiler::ast::vm_ir::Value;
 use crate::library::{register_library, LibModule, ModuleFunc};
 use crate::runtime::RuntimeError;
@@ -10,7 +12,7 @@ fn type_to_number(args: &[Value]) -> Result<Value, RuntimeError> {
         let i = raw_str.as_str().parse::<i64>().unwrap();
         Ok(Value::Int(i))
     } else if let Value::Float(raw_float) = args.first().unwrap() {
-        let i = raw_float.floor() as i64;
+        let i = raw_float.trunc().to_int().value().try_into().unwrap();
         Ok(Value::Int(i))
     } else {
         Err(RuntimeError::TypeException(
@@ -31,11 +33,9 @@ fn reg_to_number() -> ModuleFunc {
 fn type_to_float(args: &[Value]) -> Result<Value, RuntimeError> {
     let auto = args.first().unwrap().clone();
     if let Value::String(raw_str) = auto {
-        let i = raw_str.as_str().parse::<f64>().unwrap();
-        Ok(Value::Float(i))
+        Ok(Value::Float(DBig::from_str(raw_str.as_str()).unwrap()))
     } else if let Value::Int(raw_number) = args.first().unwrap() {
-        let i = *raw_number as f64;
-        Ok(Value::Float(i))
+        Ok(Value::Float(DBig::from(*raw_number)))
     } else {
         Err(RuntimeError::TypeException(
             "to_float: auto not a string or number.".to_smolstr(),

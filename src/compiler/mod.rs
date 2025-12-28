@@ -13,6 +13,7 @@ pub mod lexer;
 pub mod lints;
 pub mod parser;
 mod semantic;
+mod node;
 
 #[derive(Debug, Clone)]
 pub struct CompilerData {

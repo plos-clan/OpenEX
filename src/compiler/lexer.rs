@@ -4,6 +4,8 @@ use smol_str::{SmolStr, SmolStrBuilder};
 use std::char;
 use std::fmt::Debug;
 use std::str::FromStr;
+use dashu::float::{DBig, FBig};
+use dashu::float::round::mode::HalfAway;
 
 #[derive(Debug, Clone)]
 pub struct LexerAnalysis {
@@ -100,8 +102,8 @@ impl Token {
         }
     }
 
-    pub fn value_float(&self) -> f64 {
-        f64::from_str(&self.data).unwrap_or(0.0)
+    pub fn value_float(&self) -> FBig<HalfAway, 10> {
+        DBig::from_str(&self.data).unwrap()
     }
 
     pub fn value_number(&self) -> i64 {
