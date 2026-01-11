@@ -1,8 +1,15 @@
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
-use crate::runtime::vm_operation::{add_value, and_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, neg_value, not_equ_value, not_value, or_value, rmd_value, self_add_value, self_sub_value, sub_value};
-use crate::runtime::vm_table_opt::{call_func, get_index_array, jump, jump_false, jump_true, load_array_local, load_local, push_stack, set_index_array, store_local};
+use crate::runtime::vm_operation::{
+    add_value, and_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value,
+    mul_value, neg_value, not_equ_value, not_value, or_value, rmd_value, self_add_value,
+    self_sub_value, sub_value,
+};
+use crate::runtime::vm_table_opt::{
+    call_func, get_index_array, jump, jump_false, jump_true, load_array_local, load_local,
+    push_stack, set_index_array, store_local,
+};
 use crate::runtime::{MetadataUnit, RuntimeError};
 use smol_str::{SmolStr, ToSmolStr};
 
@@ -236,17 +243,21 @@ fn run_code<'a>(
                     |root| root.get_local_mut(index),
                 );
                 if let Value::Array(len, elements) = result
-                && let Value::Int(a_index) = arr_index{
+                    && let Value::Int(a_index) = arr_index
+                {
                     let usize_index = usize::try_from(a_index).unwrap();
                     if usize_index >= *len {
                         return Err(RuntimeError::IndexOutOfBounds(
-                            format_args!("Index {a_index} out of bounds for length {len}").to_smolstr()
-                        ))
+                            format_args!("Index {a_index} out of bounds for length {len}")
+                                .to_smolstr(),
+                        ));
                     }
                     elements[usize_index] = value;
                     stack_frame.next_pc();
-                }else {
-                    return Err(RuntimeError::TypeException("cannot set unknown type for array.".to_smolstr()))
+                } else {
+                    return Err(RuntimeError::TypeException(
+                        "cannot set unknown type for array.".to_smolstr(),
+                    ));
                 }
             }
             ByteCode::LoadArray(var_index, len) => load_array_local(stack_frame, *len, *var_index),
@@ -258,7 +269,7 @@ fn run_code<'a>(
     Ok(RunState::None)
 }
 
-fn print_and_return(executor: &Executor,failed_status: Option<RuntimeError>) -> Value {
+fn print_and_return(executor: &Executor, failed_status: Option<RuntimeError>) -> Value {
     if let Some(error) = failed_status {
         eprintln!("RuntimeError: {error:?}");
         for frame in &executor.call_stack {

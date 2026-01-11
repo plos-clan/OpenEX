@@ -6,10 +6,10 @@ use crate::compiler::ast::ssa_ir::ValueGuessType::{
 use crate::compiler::ast::ssa_ir::{OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
-use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::parser::ParserError;
-use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
+use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::semantic::Semantic;
+use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
 use smol_str::{SmolStr, SmolStrBuilder, ToSmolStr};
 
 macro_rules! check_bool_expr {
@@ -47,10 +47,10 @@ fn astop_to_opcode(astop: ExprOp) -> OpCode {
         ExprOp::Mul => OpCode::Mul(None),
         ExprOp::Div => OpCode::Div(None),
         ExprOp::RmdS => OpCode::RmdS(None),
-        ExprOp::AddS => OpCode::AddS(None),
-        ExprOp::SubS => OpCode::SubS(None),
-        ExprOp::MulS => OpCode::MulS(None),
-        ExprOp::DivS => OpCode::DivS(None),
+        ExprOp::AddS => OpCode::Add(None), // += 类会被正常拆解成加法运算和赋值运算
+        ExprOp::SubS => OpCode::Sub(None),
+        ExprOp::MulS => OpCode::Mul(None),
+        ExprOp::DivS => OpCode::Div(None),
         ExprOp::Ref => OpCode::Ref(None),
         ExprOp::SAdd => OpCode::SAdd(None),
         ExprOp::SSub => OpCode::SSub(None),
@@ -491,6 +491,28 @@ fn expr_call(
     }
 }
 
+fn exp_compound(
+    semantic: &mut Semantic,
+    token: Token,
+    right_table: &OpCodeTable,
+    left: &ASTExprTree,
+    expr_op: &ExprOp,
+    code: &mut ValueAlloc,
+    mut opcode_table: OpCodeTable,
+    stores: Option<Operand>,
+) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
+    let left_exp = lower_expr(semantic, left, code, stores)?;
+    opcode_table.append_code(&left_exp.2);
+    opcode_table.append_code(right_table);
+    opcode_table.add_opcode(astop_to_opcode(*expr_op));
+
+    if let ASTExprTree::Var(token) = left {
+        expr_var(semantic, token, code, opcode_table, Some(ImmNumFlot), true)
+    }else {
+        Err(ParserError::IllegalExpression(token))
+    }
+}
+
 pub fn lower_expr(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
@@ -523,6 +545,24 @@ pub fn lower_expr(
                 None
             };
 
+            // 该 if 用于特判组合赋值运算 += *=
+            if matches!(e_op, ExprOp::AddS)
+                || matches!(e_op, ExprOp::SubS)
+                || matches!(e_op, ExprOp::MulS)
+                || matches!(e_op, ExprOp::DivS)
+            {
+                return exp_compound(
+                    semantic,
+                    e_token.clone(),
+                    &right.2,
+                    e_left.as_ref(),
+                    e_op,
+                    code,
+                    opcode_table,
+                    store,
+                );
+            }
+
             // 该 if 用于特判数组赋值 arr[index] = expression
             if matches!(e_op, ExprOp::Store)
                 && let ASTExprTree::Expr {
@@ -554,7 +594,6 @@ pub fn lower_expr(
 
             let left_opd = Box::new(left.0.clone());
             let guess_type = guess_type(e_token, &left.1, right.1, *e_op)?;
-
             let n_operand;
 
             if let Some(operand) = expr_optimizer(&left.0, &right.0, *e_op) {
