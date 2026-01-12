@@ -7,10 +7,12 @@ edition = "2024"
 smol_str = "0.3.5"
 slotmap = "1.1.1"
 getopts-macro = "0.1.10"
-expect-test = "1.5.1"
 linked-hash-map = "0.5.6"
 mimalloc = "0.1.48"
 dashu = "0.4.2"
+
+[dev-dependencies]
+expect-test = "1.5.1"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -66,7 +66,6 @@ pub enum ASTExprTree {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)] //TODO
 pub enum ASTStmtTree {
     Root(Vec<ASTStmtTree>),
     Block(Vec<ASTStmtTree>),

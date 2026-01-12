@@ -1,11 +1,12 @@
-use crate::compiler::lexer::LexerError::{Eof, UnexpectedCharacter};
-use crate::compiler::lexer::TokenType::End;
 use dashu::float::round::mode::HalfAway;
 use dashu::float::{DBig, FBig};
 use smol_str::{SmolStr, SmolStrBuilder};
 use std::char;
 use std::fmt::Debug;
 use std::str::FromStr;
+
+use crate::compiler::lexer::LexerError::{Eof, UnexpectedCharacter};
+use crate::compiler::lexer::TokenType::End;
 
 #[derive(Debug, Clone)]
 pub struct LexerAnalysis {

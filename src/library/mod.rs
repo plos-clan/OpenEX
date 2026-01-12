@@ -1,3 +1,10 @@
+use smol_str::SmolStr;
+use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::fs::File;
+use std::io::Read;
+use std::sync::{LazyLock, RwLock};
+
 use crate::compiler::Compiler;
 use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::file::SourceFile;
@@ -6,12 +13,6 @@ use crate::compiler::parser::ParserError;
 use crate::library::system::register_system_lib;
 use crate::library::type_lib::register_type_lib;
 use crate::runtime::RuntimeError;
-use smol_str::SmolStr;
-use std::collections::{BTreeMap, HashSet};
-use std::fs;
-use std::fs::File;
-use std::io::Read;
-use std::sync::{LazyLock, RwLock};
 
 pub mod output_capture;
 mod system;

@@ -1,3 +1,6 @@
+use smol_str::ToSmolStr;
+use std::collections::HashSet;
+
 use crate::compiler::ast::vm_ir::{VMIRTable, ssa_to_vm};
 use crate::compiler::lexer::{LexerAnalysis, LexerError, Token};
 use crate::compiler::lints::Lint;
@@ -6,11 +9,8 @@ use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::semantic::{Semantic, const_prop_linear, eliminate_dead_locals};
 use crate::compiler::{Compiler, CompilerData};
-use smol_str::ToSmolStr;
-use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // TODO
 pub struct SourceFile {
     pub name: String,
     data: String,

@@ -1,10 +1,11 @@
-use crate::compiler::ast::vm_ir::Value;
-use crate::library::{LibModule, ModuleFunc, output_capture::print, register_library};
-use crate::runtime::RuntimeError;
 use smol_str::{SmolStr, ToSmolStr};
 use std::io;
 use std::io::Read;
 use std::process::exit;
+
+use crate::compiler::ast::vm_ir::Value;
+use crate::library::{LibModule, ModuleFunc, output_capture::print, register_library};
+use crate::runtime::RuntimeError;
 
 fn print_impl(value: Value) {
     match value {

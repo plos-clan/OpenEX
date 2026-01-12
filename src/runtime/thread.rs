@@ -1,6 +1,7 @@
+use std::thread::Scope;
+
 use crate::runtime::executor::interpretive;
 use crate::runtime::{MetadataUnit, MethodInfo};
-use std::thread::Scope;
 
 pub struct ThreadManager<'scope, 'env> {
     scope: &'scope Scope<'scope, 'env>,

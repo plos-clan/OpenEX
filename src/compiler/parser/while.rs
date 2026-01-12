@@ -1,10 +1,11 @@
+use smol_str::SmolStr;
+
 use crate::compiler::ast::ASTExprTree::Literal;
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::{Parser, ParserError};
-use smol_str::SmolStr;
 
 pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;

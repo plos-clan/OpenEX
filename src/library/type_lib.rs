@@ -1,9 +1,10 @@
-use crate::compiler::ast::vm_ir::Value;
-use crate::library::{LibModule, ModuleFunc, register_library};
-use crate::runtime::RuntimeError;
 use dashu::float::DBig;
 use smol_str::{SmolStr, ToSmolStr};
 use std::str::FromStr;
+
+use crate::compiler::ast::vm_ir::Value;
+use crate::library::{LibModule, ModuleFunc, register_library};
+use crate::runtime::RuntimeError;
 
 #[allow(clippy::unnecessary_wraps)]
 fn type_to_number(args: &[Value]) -> Result<Value, RuntimeError> {

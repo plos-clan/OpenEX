@@ -1,11 +1,12 @@
+use std::iter::Peekable;
+use std::vec::IntoIter;
+
 use crate::compiler::ast::ASTExprTree::{Call, Expr, Var};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError::{IllegalExpression, IllegalKey, MissingCondition};
 use crate::compiler::parser::{Parser, ParserError, check_char};
-use std::iter::Peekable;
-use std::vec::IntoIter;
 
 fn prefix_binding_power(token: &Token) -> ((), u8) {
     match token.text() {

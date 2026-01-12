@@ -1,15 +1,15 @@
+use std::collections::HashSet;
+
 use crate::compiler::ast::ASTExprTree;
 use crate::compiler::file::SourceFile;
 use crate::compiler::lexer::{LexerError, Token};
 use crate::compiler::lints::Lint;
 use crate::compiler::parser::ParserError;
 use crate::compiler::parser::symbol_table::SymbolTable;
-use std::collections::HashSet;
 
 pub mod ast;
 pub mod file;
 pub mod lexer;
-#[allow(unused)]
 pub mod lints;
 pub mod parser;
 mod semantic;

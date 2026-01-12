@@ -1,9 +1,10 @@
+use dashu::float::{Context, DBig};
+use smol_str::{ToSmolStr, format_smolstr};
+
 use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::ast::vm_ir::Value::{Bool, Float, Int, Null, String};
 use crate::runtime::RuntimeError;
 use crate::runtime::executor::StackFrame;
-use dashu::float::{Context, DBig};
-use smol_str::{ToSmolStr, format_smolstr};
 
 pub fn get_ref(stack_frame: &mut StackFrame) {
     let ref1 = stack_frame.pop_op_stack();

@@ -1,12 +1,13 @@
-pub mod executor;
-pub mod thread;
-mod vm_operation;
-mod vm_table_opt;
+use smol_str::{SmolStr, ToSmolStr};
 
 use crate::compiler::Compiler;
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::runtime::thread::ThreadManager;
-use smol_str::{SmolStr, ToSmolStr};
+
+pub mod executor;
+pub mod thread;
+mod vm_operation;
+mod vm_table_opt;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum RuntimeError {

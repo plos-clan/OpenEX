@@ -1,7 +1,8 @@
+use smol_str::ToSmolStr;
+
 use crate::compiler::ast::vm_ir::Value;
 use crate::runtime::executor::{RunState, StackFrame};
 use crate::runtime::{MetadataUnit, RuntimeError};
-use smol_str::ToSmolStr;
 
 pub fn push_stack(stack_frame: &mut StackFrame, index: usize) {
     let Some(value_ref) = stack_frame.get_const(index) else {

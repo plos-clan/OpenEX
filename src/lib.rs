@@ -1,6 +1,9 @@
-pub mod compiler;
-pub mod library;
-pub mod runtime;
+use dashu::float::FBig;
+use dashu::float::round::mode::HalfAway;
+use smol_str::{SmolStr, ToSmolStr};
+use std::collections::HashSet;
+use std::ffi::{CStr, CString, c_char};
+use std::{ptr, slice};
 
 use crate::compiler::Compiler;
 use crate::compiler::ast::vm_ir::Value;
@@ -8,12 +11,10 @@ use crate::compiler::file::SourceFile;
 use crate::library::load_libraries;
 use crate::runtime::executor::call_function;
 use crate::runtime::{MetadataUnit, MethodInfo};
-use dashu::float::FBig;
-use dashu::float::round::mode::HalfAway;
-use smol_str::{SmolStr, ToSmolStr};
-use std::collections::HashSet;
-use std::ffi::{CStr, CString, c_char};
-use std::{ptr, slice};
+
+pub mod compiler;
+pub mod library;
+pub mod runtime;
 
 pub struct OpenEX {
     compiler: Compiler,

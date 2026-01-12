@@ -1,14 +1,9 @@
-#![forbid(unsafe_code)]
-mod compiler;
-mod library;
-mod runtime;
-
-use crate::compiler::file::SourceFile;
-use crate::compiler::{Compiler, lints};
-use crate::library::load_libraries;
-use crate::runtime::initialize_executor;
 use getopts_macro::getopts_options;
 use mimalloc::MiMalloc;
+use openex::compiler::file::SourceFile;
+use openex::compiler::{Compiler, lints};
+use openex::library::load_libraries;
+use openex::runtime::initialize_executor;
 use smol_str::SmolStr;
 use std::collections::HashSet;
 use std::io::Write;

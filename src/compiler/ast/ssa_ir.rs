@@ -1,10 +1,11 @@
-use crate::compiler::lexer::Token;
 use dashu::float::FBig;
 use dashu::float::round::mode::HalfAway;
 use linked_hash_map::LinkedHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashMap};
+
+use crate::compiler::lexer::Token;
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct LocalAddr {

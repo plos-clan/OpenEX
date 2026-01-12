@@ -1,10 +1,11 @@
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
-use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
 use dashu::float::round::mode::HalfAway;
 use dashu::float::{DBig, FBig};
 use smol_str::{SmolStr, ToSmolStr};
 use std::fmt::Display;
 use std::str::FromStr;
+
+use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
+use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

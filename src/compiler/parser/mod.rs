@@ -6,10 +6,11 @@ mod import;
 mod judgment;
 mod r#return;
 pub mod symbol_table;
-#[cfg(test)]
-mod tests;
 mod var;
 mod r#while;
+
+#[cfg(test)]
+mod tests;
 
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::file::SourceFile;
