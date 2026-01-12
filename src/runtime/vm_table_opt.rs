@@ -113,24 +113,27 @@ pub fn load_array_local(stack_frame: &mut StackFrame, len: usize, index: usize) 
     stack_frame.next_pc();
 }
 
-pub fn set_index_array(stack_frame: &mut StackFrame,index: usize) -> Result<(), RuntimeError> {
+pub fn set_index_array(stack_frame: &mut StackFrame, index: usize) -> Result<(), RuntimeError> {
     let arr_index = stack_frame.pop_op_stack();
     let value = stack_frame.pop_op_stack();
     let result = stack_frame.get_local_mut(index);
 
     if let Value::Array(len, elements) = result
-        && let Value::Int(a_index) = arr_index{
+        && let Value::Int(a_index) = arr_index
+    {
         let usize_index = usize::try_from(a_index).unwrap();
         if usize_index >= *len {
             return Err(RuntimeError::IndexOutOfBounds(
-                format_args!("Index {a_index} out of bounds for length {len}").to_smolstr()
-            ))
+                format_args!("Index {a_index} out of bounds for length {len}").to_smolstr(),
+            ));
         }
         elements[usize_index] = value;
         stack_frame.next_pc();
         Ok(())
-    }else {
-        Err(RuntimeError::TypeException("cannot set unknown type for array.".to_smolstr()))
+    } else {
+        Err(RuntimeError::TypeException(
+            "cannot set unknown type for array.".to_smolstr(),
+        ))
     }
 }
 
@@ -145,7 +148,10 @@ pub fn get_index_array(stack_frame: &mut StackFrame) -> Result<(), RuntimeError>
                 format_args!("Index {index} out of bounds for length {len}").to_smolstr(),
             ));
         }
-        let result = element.get(usize::try_from(index).unwrap()).unwrap().clone();
+        let result = element
+            .get(usize::try_from(index).unwrap())
+            .unwrap()
+            .clone();
         stack_frame.push_op_stack(result);
         stack_frame.next_pc();
         Ok(())

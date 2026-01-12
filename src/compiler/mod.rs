@@ -2,8 +2,8 @@ use crate::compiler::ast::ASTExprTree;
 use crate::compiler::file::SourceFile;
 use crate::compiler::lexer::{LexerError, Token};
 use crate::compiler::lints::Lint;
-use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError;
+use crate::compiler::parser::symbol_table::SymbolTable;
 use std::collections::HashSet;
 
 pub mod ast;
@@ -20,7 +20,7 @@ pub struct CompilerData {
     lints: HashSet<Lint>,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Compiler {
     files: Vec<SourceFile>,
 }
@@ -32,12 +32,12 @@ impl Default for Compiler {
 }
 
 impl Compiler {
-    #[must_use] 
+    #[must_use]
     pub const fn new() -> Self {
         Self { files: vec![] }
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn get_version() -> &'static str {
         env!("CARGO_PKG_VERSION")
     }
@@ -50,12 +50,12 @@ impl Compiler {
         &mut self.files
     }
 
-    #[must_use] 
+    #[must_use]
     /// # Panics
     pub fn find_file(&self, path: &str) -> Option<&SourceFile> {
         for file in &self.files {
             if file.name.as_str().split('.').next().unwrap() == path {
-                return Some(file)
+                return Some(file);
             }
         }
         None
@@ -63,7 +63,9 @@ impl Compiler {
 
     fn highlight_line_and_column(data: &str, target_line: usize, target_column: usize) -> String {
         let target_line_content = data.lines().nth(target_line);
-        let Some(line_content) = target_line_content else { return format!("error: unknown line {target_line}") };
+        let Some(line_content) = target_line_content else {
+            return format!("error: unknown line {target_line}");
+        };
         let line_number_str = format!("{}", target_line + 1);
         let line_prefix = format!("{line_number_str:<4} | ");
         let mut output = format!("{line_prefix}{line_content}\n");
@@ -216,7 +218,7 @@ impl Compiler {
         Self::dump_error_info(&message, line, column, file);
     }
 
-    pub fn warning_info_expr(source_file: &SourceFile, msg: &str, expr: &ASTExprTree,lint: Lint) {
+    pub fn warning_info_expr(source_file: &SourceFile, msg: &str, expr: &ASTExprTree, lint: Lint) {
         if !source_file.has_warnings(lint) {
             let token: &Token = match expr {
                 ASTExprTree::Var(token)
@@ -224,12 +226,10 @@ impl Compiler {
                 | ASTExprTree::This(token)
                 | ASTExprTree::Expr { token, .. }
                 | ASTExprTree::Unary { token, .. } => token,
-                ASTExprTree::Call { name: e_name, .. } =>{
-                    match e_name.as_ref() { 
-                        ASTExprTree::Var(token ) => token,
-                        _=> {
-                            return;
-                        }
+                ASTExprTree::Call { name: e_name, .. } => match e_name.as_ref() {
+                    ASTExprTree::Var(token) => token,
+                    _ => {
+                        return;
                     }
                 },
             };
@@ -252,9 +252,7 @@ impl Compiler {
             }
             let vm_ir = file.compiler(&mut compiler);
             let vm_ir = match vm_ir {
-                Ok(_) => {
-                    vm_ir.unwrap()
-                }
+                Ok(_) => vm_ir.unwrap(),
                 Err(error) => {
                     Self::dump_parser_error(error, file);
                     return Err(());

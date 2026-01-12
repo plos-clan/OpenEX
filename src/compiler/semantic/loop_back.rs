@@ -1,7 +1,7 @@
 use crate::compiler::ast::ssa_ir::{OpCode, OpCodeTable};
 use crate::compiler::lexer::Token;
-use crate::compiler::parser::symbol_table::ContextType;
 use crate::compiler::parser::ParserError;
+use crate::compiler::parser::symbol_table::ContextType;
 use crate::compiler::semantic::Semantic;
 
 pub fn loop_back_semantic(

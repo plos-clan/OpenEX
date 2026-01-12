@@ -1,9 +1,9 @@
-use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::ast::ASTStmtTree::Var;
-use crate::compiler::lexer::TokenType::{End, Operator, LP, LR};
+use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
+use crate::compiler::lexer::TokenType::{End, LP, LR, Operator};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::expression::expr_eval;
-use crate::compiler::parser::{check_char, Parser, ParserError};
+use crate::compiler::parser::{Parser, ParserError, check_char};
 
 pub fn var_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
@@ -50,13 +50,15 @@ pub fn var_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
                 sub_exp.push(token);
             }
 
-            cone.push( match expr_eval(parser,sub_exp)? {
+            cone.push(match expr_eval(parser, sub_exp)? {
                 None => {
                     return Err(ParserError::IllegalTypeCombination(token));
                 }
                 Some(expr) => expr,
             });
-            if done { break; }
+            if done {
+                break;
+            }
         }
 
         Ok(ASTStmtTree::Array {

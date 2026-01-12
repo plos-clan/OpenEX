@@ -1,13 +1,13 @@
-use smol_str::SmolStr;
-use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::ast::ASTExprTree::Literal;
 use crate::compiler::ast::ASTStmtTree::Loop;
-use crate::compiler::lexer::TokenType::{End, Var, LP};
+use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
+use crate::compiler::lexer::TokenType::{End, LP, Var};
 use crate::compiler::lexer::{Token, TokenType};
+use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::expression::expr_eval;
 use crate::compiler::parser::var::var_eval;
-use crate::compiler::parser::{check_char, Parser, ParserError};
-use crate::compiler::parser::block::blk_eval;
+use crate::compiler::parser::{Parser, ParserError, check_char};
+use smol_str::SmolStr;
 
 pub fn for_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
@@ -45,16 +45,16 @@ pub fn for_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
                 head.column,
                 head.index,
                 TokenType::True,
-            )
+            ),
         }
     };
 
     f_expr = match parser.parser_cond(Some(token)) {
         Ok(expr) => Some(expr),
         Err(err) => match err {
-            ParserError::MissingCondition(_token) => { None }
+            ParserError::MissingCondition(_token) => None,
             _ => return Err(err),
-        }
+        },
     };
 
     let result = parser.next_parser_token();
@@ -77,7 +77,5 @@ pub fn for_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
         is_easy,
     });
 
-    Ok(ASTStmtTree::Context {
-        0: ctxt_stmt,
-    })
+    Ok(ASTStmtTree::Context { 0: ctxt_stmt })
 }

@@ -1,15 +1,17 @@
-use crate::compiler::ast::ssa_ir::{Code, Function, LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
+use crate::compiler::ast::ssa_ir::{
+    Code, Function, LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType,
+};
+use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::Token;
-use crate::compiler::parser::symbol_table::ElementType::Argument;
-use crate::compiler::parser::symbol_table::{ContextType, ElementType};
 use crate::compiler::parser::ParserError;
 use crate::compiler::parser::ParserError::NoNativeImplement;
-use crate::compiler::semantic::block::block_semantic;
+use crate::compiler::parser::symbol_table::ElementType::Argument;
+use crate::compiler::parser::symbol_table::{ContextType, ElementType};
 use crate::compiler::semantic::Semantic;
+use crate::compiler::semantic::block::block_semantic;
 use crate::library::find_library;
 use smol_str::{SmolStr, ToSmolStr};
-use crate::compiler::ast::vm_ir::Value;
 
 pub fn native_function_semantic(
     semantic: &mut Semantic,
@@ -81,7 +83,7 @@ pub fn function_semantic(
                 .symbol_table
                 .add_element(token_c.value().unwrap(), Argument);
             tables.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
-        }else {
+        } else {
             unreachable!()
         }
     }

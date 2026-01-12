@@ -42,5 +42,10 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
 
     let body = blk_eval(parser)?;
 
-    Ok(ASTStmtTree::Loop { token:head,cond, body, is_easy })
+    Ok(ASTStmtTree::Loop {
+        token: head,
+        cond,
+        body,
+        is_easy,
+    })
 }

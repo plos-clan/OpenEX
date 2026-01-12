@@ -1,7 +1,11 @@
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
-use crate::runtime::vm_operation::{add_value, and_value, big_value, bit_and_value, bit_left_value, bit_or_value, bit_right_value, bit_xor_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, neg_value, not_equ_value, not_value, or_value, rmd_value, self_add_value, self_sub_value, sub_value};
+use crate::runtime::vm_operation::{
+    add_value, and_value, big_value, bit_and_value, bit_left_value, bit_or_value, bit_right_value,
+    bit_xor_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, neg_value,
+    not_equ_value, not_value, or_value, rmd_value, self_add_value, self_sub_value, sub_value,
+};
 use crate::runtime::vm_table_opt::{
     call_func, get_index_array, jump, jump_false, jump_true, load_array_local, load_local,
     push_stack, set_index_array, store_local,
@@ -146,7 +150,7 @@ impl<'a> StackFrame<'a> {
 }
 
 pub enum RunState<'a> {
-    CallRequest(StackFrame<'a>), // 函数调用请求 
+    CallRequest(StackFrame<'a>), // 函数调用请求
     Return,                      // 返回需要将子栈帧栈顶压入父栈帧操作栈
     None,                        // 空操作
 }

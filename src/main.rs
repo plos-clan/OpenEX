@@ -4,17 +4,17 @@ mod library;
 mod runtime;
 
 use crate::compiler::file::SourceFile;
-use crate::compiler::{lints, Compiler};
-use crate::library::{load_libraries};
+use crate::compiler::{Compiler, lints};
+use crate::library::load_libraries;
+use crate::runtime::initialize_executor;
 use getopts_macro::getopts_options;
+use mimalloc::MiMalloc;
 use smol_str::SmolStr;
 use std::collections::HashSet;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
-use mimalloc::MiMalloc;
-use crate::runtime::initialize_executor;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -59,10 +59,7 @@ impl Args {
                 .filter_map(Self::parse_allow)
                 .collect(),
             version: m.opt_present("version"),
-            lib: m
-                .opt_strs("lib")
-                .iter()
-                .find_map(Self::parse_lib_path),
+            lib: m.opt_strs("lib").iter().find_map(Self::parse_lib_path),
             input: m.free,
         };
         args.check();
@@ -127,12 +124,16 @@ fn main() -> io::Result<()> {
         } else {
             "unknown"
         };
-        println!("OpenEX RustEdition v{} {}-{env}", Compiler::get_version(), std::env::consts::ARCH);
+        println!(
+            "OpenEX RustEdition v{} {}-{env}",
+            Compiler::get_version(),
+            std::env::consts::ARCH
+        );
         println!("Copyright 2023-2026 by MCPPL,DotCS");
         return Ok(());
     }
 
-    load_libraries(&mut compiler,args.lib,&args.allow)?;
+    load_libraries(&mut compiler, args.lib, &args.allow)?;
 
     if args.cli {
         print!("> ");
@@ -141,7 +142,12 @@ fn main() -> io::Result<()> {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_) => {
-                compiler.add_file(SourceFile::new("<console>".to_string(), input, args.allow, false));
+                compiler.add_file(SourceFile::new(
+                    "<console>".to_string(),
+                    input,
+                    args.allow,
+                    false,
+                ));
             }
             Err(_) => {
                 eprintln!("error: cannot read from stdin.");
@@ -156,7 +162,9 @@ fn main() -> io::Result<()> {
         }
     }
 
-    if compiler.compile().is_err() { exit(1); }
+    if compiler.compile().is_err() {
+        exit(1);
+    }
     initialize_executor(&mut compiler);
     Ok(())
 }

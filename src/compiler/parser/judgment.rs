@@ -1,38 +1,35 @@
-use crate::compiler::ast::ASTStmtTree::Block;
 use crate::compiler::ast::ASTStmtTree;
+use crate::compiler::ast::ASTStmtTree::Block;
 use crate::compiler::lexer::TokenType;
 use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::{Parser, ParserError};
 
-fn next_parser_if(parser: &mut Parser,else_body:&mut Vec<ASTStmtTree>) -> Result<(),ParserError> {
-    match parser_elif(parser){
+fn next_parser_if(
+    parser: &mut Parser,
+    else_body: &mut Vec<ASTStmtTree>,
+) -> Result<(), ParserError> {
+    match parser_elif(parser) {
         Ok(elif_stmt) => {
             if let Some(elif_stmt) = elif_stmt {
                 else_body.push(elif_stmt);
             }
-        },
-        Err(parser_error) =>{
-            match parser_error {
-                ParserError::Eof => {}
-                _ => return Err(parser_error),
-            }
+        }
+        Err(parser_error) => match parser_error {
+            ParserError::Eof => {}
+            _ => return Err(parser_error),
         },
     }
 
-    match parser_else(parser){
+    match parser_else(parser) {
         Ok(else_stmt) => {
             if let Some(else_stmt) = else_stmt {
                 else_body.push(else_stmt);
             }
             Ok(())
         }
-        Err(parser_error) =>{
-            match parser_error {
-                ParserError::Eof => {
-                    Ok(())
-                }
-                _ => Err(parser_error),
-            }
+        Err(parser_error) => match parser_error {
+            ParserError::Eof => Ok(()),
+            _ => Err(parser_error),
         },
     }
 }

@@ -3,7 +3,7 @@ use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::ParserError::{IllegalExpression, IllegalKey, MissingCondition};
-use crate::compiler::parser::{check_char, Parser, ParserError};
+use crate::compiler::parser::{Parser, ParserError, check_char};
 use std::iter::Peekable;
 use std::vec::IntoIter;
 

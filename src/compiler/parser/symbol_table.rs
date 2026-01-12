@@ -1,19 +1,19 @@
 use smol_str::SmolStr;
 use std::cmp::PartialEq;
 
-#[derive(PartialEq, Eq,Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum ContextType {
     Loop,
     Func,
     Root,
 }
 
-#[derive(PartialEq, Eq,Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 #[allow(dead_code)] //TODO
 pub enum ElementType {
     Argument,
     Library(SmolStr), // SmolStr: 导入名
-    Function(usize), // usize: 形参个数
+    Function(usize),  // usize: 形参个数
     Value,
     Func,
 }
@@ -33,14 +33,12 @@ pub struct Context {
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
-    contexts: Vec<Context>
+    contexts: Vec<Context>,
 }
 
 impl SymbolTable {
     pub fn new() -> Self {
-        let mut table = Self {
-            contexts: vec![]
-        };
+        let mut table = Self { contexts: vec![] };
         table.contexts.push(Context {
             elements: vec![],
             ctxt_type: ContextType::Root,
@@ -89,7 +87,8 @@ impl SymbolTable {
     }
 
     pub fn get_context(&mut self, target_type: &ContextType) -> Option<&mut Context> {
-        self.contexts.iter_mut()
+        self.contexts
+            .iter_mut()
             .rev()
             .find(|c| c.ctxt_type == *target_type)
     }

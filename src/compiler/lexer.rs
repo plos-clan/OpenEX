@@ -1,11 +1,11 @@
 use crate::compiler::lexer::LexerError::{Eof, UnexpectedCharacter};
 use crate::compiler::lexer::TokenType::End;
+use dashu::float::round::mode::HalfAway;
+use dashu::float::{DBig, FBig};
 use smol_str::{SmolStr, SmolStrBuilder};
 use std::char;
 use std::fmt::Debug;
 use std::str::FromStr;
-use dashu::float::{DBig, FBig};
-use dashu::float::round::mode::HalfAway;
 
 #[derive(Debug, Clone)]
 pub struct LexerAnalysis {
@@ -265,13 +265,7 @@ impl LexerAnalysis {
                 }
             }
         }
-        Token::new(
-            data.finish(),
-            line,
-            column,
-            data_index,
-            TokenType::Number,
-        )
+        Token::new(data.finish(), line, column, data_index, TokenType::Number)
     }
 
     fn build_number(
@@ -314,7 +308,9 @@ impl LexerAnalysis {
                 'x' | 'X' => {
                     return Ok(self.build_number_hex(line, column, data_index, &mut data, next));
                 }
-                'b' | 'B' => return Ok(self.build_number_binary(line, column, data_index, &mut data, next)),
+                'b' | 'B' => {
+                    return Ok(self.build_number_binary(line, column, data_index, &mut data, next));
+                }
                 c if c.is_ascii_digit() => {
                     data.push(next);
                 }

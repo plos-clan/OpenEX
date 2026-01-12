@@ -3,8 +3,8 @@ pub mod thread;
 mod vm_operation;
 mod vm_table_opt;
 
-use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::Compiler;
+use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::runtime::thread::ThreadManager;
 use smol_str::{SmolStr, ToSmolStr};
 
@@ -32,7 +32,7 @@ pub struct MetadataUnit<'a> {
     pub names: &'a str,
     pub globals: usize,           // 全局变量表
     pub root_code: Vec<ByteCode>, // 全局代码
-    pub library: bool
+    pub library: bool,
 }
 
 impl MethodInfo {
@@ -73,7 +73,7 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         for file in &metadata {
             if !file.library {
                 ret_file = Some(file);
-                break
+                break;
             }
         }
         ret_file.unwrap()

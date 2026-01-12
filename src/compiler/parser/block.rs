@@ -3,12 +3,12 @@ use crate::compiler::ast::ASTStmtTree::Context;
 use crate::compiler::lexer::TokenType::{LP, LR};
 use crate::compiler::lexer::{Token, TokenType};
 use crate::compiler::parser::expression::expr_eval;
+use crate::compiler::parser::r#for::for_eval;
 use crate::compiler::parser::judgment::if_eval;
+use crate::compiler::parser::r#return::return_eval;
 use crate::compiler::parser::var::var_eval;
 use crate::compiler::parser::r#while::while_eval;
-use crate::compiler::parser::{check_char, Parser, ParserError};
-use crate::compiler::parser::r#for::for_eval;
-use crate::compiler::parser::r#return::return_eval;
+use crate::compiler::parser::{Parser, ParserError, check_char};
 
 fn parser_expr(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut tokens: Vec<Token> = vec![];
@@ -49,8 +49,7 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
                 parser.last = Some(token);
                 stmt.push(for_eval(parser)?);
             }
-            TokenType::End => {
-            }
+            TokenType::End => {}
             TokenType::Return => {
                 parser.last = Some(token);
                 stmt.push(return_eval(parser)?);
@@ -59,14 +58,14 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
                 stmt.push(ASTStmtTree::Break(token));
                 token = parser.next_parser_token()?;
                 if token.t_type != TokenType::End {
-                    return Err(ParserError::Expected(token,';'));
+                    return Err(ParserError::Expected(token, ';'));
                 }
             }
             TokenType::Continue => {
                 stmt.push(ASTStmtTree::Continue(token));
                 token = parser.next_parser_token()?;
                 if token.t_type != TokenType::End {
-                    return Err(ParserError::Expected(token,';'));
+                    return Err(ParserError::Expected(token, ';'));
                 }
             }
             LR => {
@@ -88,7 +87,7 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
             _ => {
                 parser.cache = Some(token);
                 stmt.push(parser_expr(parser)?);
-            } ,
+            }
         }
     }
     token = parser.next_parser_token()?;

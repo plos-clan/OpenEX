@@ -1,12 +1,14 @@
-use crate::compiler::ast::ssa_ir::{LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
+use crate::compiler::Compiler;
+use crate::compiler::ast::ssa_ir::{
+    LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType,
+};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lints::Lint::LoopNoExpr;
-use crate::compiler::parser::symbol_table::ContextType;
 use crate::compiler::parser::ParserError;
+use crate::compiler::parser::symbol_table::ContextType;
+use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::expression::lower_expr;
-use crate::compiler::semantic::Semantic;
-use crate::compiler::Compiler;
 
 pub fn while_semantic(
     semantic: &mut Semantic,

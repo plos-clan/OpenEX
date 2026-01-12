@@ -2,17 +2,17 @@ pub mod compiler;
 pub mod library;
 pub mod runtime;
 
+use crate::compiler::Compiler;
 use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::file::SourceFile;
-use crate::compiler::Compiler;
 use crate::library::load_libraries;
 use crate::runtime::executor::call_function;
 use crate::runtime::{MetadataUnit, MethodInfo};
-use dashu::float::round::mode::HalfAway;
 use dashu::float::FBig;
+use dashu::float::round::mode::HalfAway;
 use smol_str::{SmolStr, ToSmolStr};
 use std::collections::HashSet;
-use std::ffi::{c_char, CStr, CString};
+use std::ffi::{CStr, CString, c_char};
 use std::{ptr, slice};
 
 pub struct OpenEX {
@@ -53,9 +53,12 @@ impl CValue {
             match self.tag {
                 ValueTag::Int => Value::Int(self.data.i),
                 ValueTag::Bool => Value::Bool(self.data.b),
-                ValueTag::Float => Value::Float(FBig::<HalfAway, 2>::try_from(self.data.f)
-                    .expect("f64 is NaN or Inf")
-                    .to_decimal().unwrap()),
+                ValueTag::Float => Value::Float(
+                    FBig::<HalfAway, 2>::try_from(self.data.f)
+                        .expect("f64 is NaN or Inf")
+                        .to_decimal()
+                        .unwrap(),
+                ),
                 ValueTag::String => {
                     let c_str = CStr::from_ptr(self.data.s);
                     Value::String(SmolStr::new(c_str.to_string_lossy()))
@@ -111,7 +114,7 @@ pub fn into_c_value(value: Value) -> CValue {
             tag: ValueTag::Null,
             data: ValueData { i: 0 },
         },
-        _=> todo!()
+        _ => todo!(),
     }
 }
 
@@ -390,7 +393,9 @@ pub unsafe extern "C" fn openex_free_c_value(c_val: *mut CValue) -> OpenExStatus
     }
 
     unsafe {
-        let Some(v) = c_val.as_ref() else { return OpenExStatus::FfiError };
+        let Some(v) = c_val.as_ref() else {
+            return OpenExStatus::FfiError;
+        };
 
         match v.tag {
             ValueTag::String | ValueTag::Ref => {

@@ -1,9 +1,9 @@
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::TokenType;
 use crate::compiler::lexer::TokenType::{LP, LR};
-use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::ParserError::{Expected, IdentifierExpected, IllegalArgument};
-use crate::compiler::parser::{check_char, Parser, ParserError};
+use crate::compiler::parser::block::blk_eval;
+use crate::compiler::parser::{Parser, ParserError, check_char};
 
 fn parser_argument(parser: &mut Parser) -> Result<Vec<ASTExprTree>, ParserError> {
     let mut token = parser.next_parser_token()?;
@@ -92,7 +92,7 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     }
     token = result?;
     if token.t_type == TokenType::End && is_native {
-        Ok(ASTStmtTree::NativeFunction {name,args})
+        Ok(ASTStmtTree::NativeFunction { name, args })
     } else {
         parser.cache = Some(token);
         let body = blk_eval(parser)?;

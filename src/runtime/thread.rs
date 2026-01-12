@@ -3,14 +3,12 @@ use crate::runtime::{MetadataUnit, MethodInfo};
 use std::thread::Scope;
 
 pub struct ThreadManager<'scope, 'env> {
-    scope: &'scope Scope<'scope,'env>
+    scope: &'scope Scope<'scope, 'env>,
 }
 
 impl<'scope, 'env> ThreadManager<'scope, 'env> {
-    pub const fn new(scope: &'scope Scope<'scope,'env>) -> Self {
-        Self {
-            scope
-        }
+    pub const fn new(scope: &'scope Scope<'scope, 'env>) -> Self {
+        Self { scope }
     }
 
     pub fn submit_join_thread(
@@ -33,18 +31,3 @@ impl<'scope, 'env> ThreadManager<'scope, 'env> {
             .unwrap();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

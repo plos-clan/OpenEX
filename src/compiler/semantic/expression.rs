@@ -511,7 +511,7 @@ fn exp_compound(
 
     if let ASTExprTree::Var(token) = left {
         expr_var(semantic, token, code, opcode_table, Some(ImmNumFlot), true)
-    }else {
+    } else {
         Err(ParserError::IllegalExpression(token))
     }
 }

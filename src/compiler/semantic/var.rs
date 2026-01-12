@@ -1,11 +1,13 @@
-use crate::compiler::ast::ssa_ir::OpCode::{LoadArrayGlobal, LoadArrayLocal, LoadGlobal, LoadLocal};
-use crate::compiler::ast::ssa_ir::{LocalMap, OpCodeTable, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::ASTExprTree;
+use crate::compiler::ast::ssa_ir::OpCode::{
+    LoadArrayGlobal, LoadArrayLocal, LoadGlobal, LoadLocal,
+};
+use crate::compiler::ast::ssa_ir::{LocalMap, OpCodeTable, ValueAlloc, ValueGuessType};
 use crate::compiler::lexer::Token;
-use crate::compiler::parser::symbol_table::ElementType::Value;
 use crate::compiler::parser::ParserError;
-use crate::compiler::semantic::expression::expr_semantic;
+use crate::compiler::parser::symbol_table::ElementType::Value;
 use crate::compiler::semantic::Semantic;
+use crate::compiler::semantic::expression::expr_semantic;
 
 pub fn array_semantic(
     semantic: &mut Semantic,

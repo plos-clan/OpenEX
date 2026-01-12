@@ -1,8 +1,8 @@
 use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::ast::ASTStmtTree::Return;
 use crate::compiler::lexer::{Token, TokenType};
-use crate::compiler::parser::{Parser, ParserError};
 use crate::compiler::parser::expression::expr_eval;
+use crate::compiler::parser::{Parser, ParserError};
 
 pub fn return_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
@@ -16,4 +16,3 @@ pub fn return_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     }
     Ok(Return(expr_eval(parser, tokens)?))
 }
-

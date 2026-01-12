@@ -1,9 +1,9 @@
 use crate::compiler::ast::ssa_ir::{LocalMap, OpCode, OpCodeTable, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::parser::ParserError;
+use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::expression::lower_expr;
-use crate::compiler::semantic::Semantic;
 
 pub fn judgment_semantic(
     semantic: &mut Semantic,

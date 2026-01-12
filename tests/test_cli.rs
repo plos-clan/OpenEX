@@ -1,4 +1,4 @@
-use expect_test::{expect, Expect};
+use expect_test::{Expect, expect};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -12,9 +12,7 @@ fn run_source(buf: &[u8]) -> String {
         .expect("failed to spawn process");
     {
         let stdin = child.stdin.as_mut().expect("failed to open stdin");
-        stdin
-            .write_all(buf)
-            .unwrap();
+        stdin.write_all(buf).unwrap();
     }
     let output = child.wait_with_output().unwrap();
 
@@ -32,21 +30,25 @@ fn check(buf: &[u8], expect: Expect) {
 
 #[test]
 pub fn test_var_define() {
-    check(b"import system;\
+    check(
+        b"import system;\
     var a = 3.1415926535;\
     var b = 4;\
     b = b * 3;\
     system.println(a);\
-    system.println(b);",expect![[r#"
+    system.println(b);",
+        expect![[r#"
         > 3.1415926535
         12
-    "#]]);
+    "#]],
+    );
 }
 
 /// 考拉兹猜想测试
 #[test]
 pub fn test_collatz() {
-    check(b"import system;\
+    check(
+        b"import system;\
     function test_collatz(n) {\
     var steps = 0;\
     while (n != 1) {\
@@ -60,15 +62,18 @@ pub fn test_collatz() {
     return steps;\
     }\
     var result = this.test_collatz(7);\
-    system.println(result);",expect![[r#"
+    system.println(result);",
+        expect![[r#"
         > 16
-    "#]]);
+    "#]],
+    );
 }
 
 /// 质数计数器
 #[test]
 pub fn test_count_primes() {
-    check(b"import system;\
+    check(
+        b"import system;\
     function count_primes(limit) {\
     var count = 0;\
     var num = 2;\
@@ -84,24 +89,29 @@ pub fn test_count_primes() {
     }num = num + 1;}\
     return count;}\
     var total = this.count_primes(100);\
-    system.println(total);",expect![[r#"
+    system.println(total);",
+        expect![[r#"
         > 25
-    "#]]);
+    "#]],
+    );
 }
 
 /// 递归式斐波那契
 #[test]
 pub fn test_fib_1() {
-    check(b"import system;\
+    check(
+        b"import system;\
     function fib(n) {\
     if (n < 2) {\
     return n;\
     } else {\
     return this.fib(n - 1) + this.fib(n - 2);\
     }}\
-    system.println(this.fib(30));",expect![[r#"
+    system.println(this.fib(30));",
+        expect![[r#"
         > 832040
-    "#]]);
+    "#]],
+    );
     // fib(30) == 832040
     // fib(35) == 9227465
     // fib(40) == 102334155
@@ -110,7 +120,8 @@ pub fn test_fib_1() {
 /// 循环式斐波那契
 #[test]
 pub fn test_fib_2() {
-    check(b"import system;\
+    check(
+        b"import system;\
      function fib(n) {\
     if (n < 2) {\
     return n;\
@@ -126,15 +137,18 @@ pub fn test_fib_2() {
     }\
     return b;\
     }\
-    system.println(this.fib(40));", expect![[r#"
+    system.println(this.fib(40));",
+        expect![[r#"
         > 102334155
-    "#]])
+    "#]],
+    )
 }
 
 /// 数组功能测试
 #[test]
 pub fn test_array() {
-    check(b"import system;\
+    check(
+        b"import system;\
     function test() {\
     var ary = [1,2,3,4];\
     system.println(ary[3]);\
@@ -142,8 +156,10 @@ pub fn test_array() {
     ary[2] = 1111;\
     system.println(ary[3] + \" \" + ary[2]);\
     }\
-    this.test();", expect![[r#"
+    this.test();",
+        expect![[r#"
         > 4
         12 1111
-    "#]])
+    "#]],
+    )
 }

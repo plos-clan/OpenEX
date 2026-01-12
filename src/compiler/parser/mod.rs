@@ -1,27 +1,27 @@
 mod block;
 mod expression;
+mod r#for;
 mod function;
 mod import;
 mod judgment;
 mod r#return;
 pub mod symbol_table;
-mod var;
-mod r#while;
-mod r#for;
 #[cfg(test)]
 mod tests;
+mod var;
+mod r#while;
 
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::file::SourceFile;
 use crate::compiler::lexer::TokenType::LP;
 use crate::compiler::lexer::{LexerError, Token, TokenType};
 use crate::compiler::parser::expression::expr_eval;
+use crate::compiler::parser::r#for::for_eval;
 use crate::compiler::parser::function::func_eval;
 use crate::compiler::parser::import::import_eval;
 use crate::compiler::parser::judgment::if_eval;
-use crate::compiler::parser::r#for::for_eval;
-use crate::compiler::parser::r#while::while_eval;
 use crate::compiler::parser::var::var_eval;
+use crate::compiler::parser::r#while::while_eval;
 
 #[derive(Debug)]
 pub enum ParserError {
@@ -52,11 +52,7 @@ pub struct Parser<'a> {
     file: &'a mut SourceFile,
 }
 
-pub fn check_char(
-    token: &Token,
-    type_: TokenType,
-    c: char,
-) -> Result<(), ParserError> {
+pub fn check_char(token: &Token, type_: TokenType, c: char) -> Result<(), ParserError> {
     if !(token.t_type == type_ && token.text() == c.encode_utf8(&mut [0; 4])) {
         return Err(ParserError::Expected(token.clone(), c));
     }
@@ -82,15 +78,15 @@ impl<'a> Parser<'a> {
     // 解析 () 括号内的表达式 - 需要括号
     pub fn parser_cond(&mut self, last_token: Option<Token>) -> Result<ASTExprTree, ParserError> {
         let mut token;
-        
+
         let last_token = if let Some(token) = last_token {
             token
-        }else {
+        } else {
             token = self.next_parser_token()?;
             check_char(&token, LP, '(')?;
             token
         };
-        
+
         let mut parentheses_count: usize = 0;
         let mut cond: Vec<Token> = Vec::new();
 
@@ -180,7 +176,8 @@ impl<'a> Parser<'a> {
                     }
                     tokens.push(token);
                 }
-                expr_eval(self, tokens)?.map_or(Ok(ASTStmtTree::Empty), |expr| Ok(ASTStmtTree::Expr(expr)))
+                expr_eval(self, tokens)?
+                    .map_or(Ok(ASTStmtTree::Empty), |expr| Ok(ASTStmtTree::Expr(expr)))
             }
         }
     }

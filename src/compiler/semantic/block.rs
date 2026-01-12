@@ -1,15 +1,15 @@
+use crate::compiler::Compiler;
+use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::ast::ssa_ir::OpCode::Push;
 use crate::compiler::ast::ssa_ir::{LocalMap, OpCode, OpCodeTable, Operand, ValueAlloc};
-use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::lints::Lint::UnusedExpression;
 use crate::compiler::parser::ParserError;
+use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic, lower_expr};
 use crate::compiler::semantic::judgment::judgment_semantic;
 use crate::compiler::semantic::loop_back::loop_back_semantic;
-use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::{array_semantic, var_semantic};
-use crate::compiler::semantic::Semantic;
-use crate::compiler::Compiler;
+use crate::compiler::semantic::r#while::while_semantic;
 
 pub fn block_semantic(
     semantic: &mut Semantic,
@@ -24,15 +24,14 @@ pub fn block_semantic(
                 unreachable!()
             }
             ASTStmtTree::Block(stmts) => {
-                opcodes.append_code(&block_semantic(semantic, stmts, code,locals)?);
+                opcodes.append_code(&block_semantic(semantic, stmts, code, locals)?);
             }
             ASTStmtTree::Var { name, value } => {
-                let opcode = var_semantic(semantic, name, value, code, false,locals)?;
+                let opcode = var_semantic(semantic, name, value, code, false, locals)?;
                 opcodes.append_code(&opcode);
             }
             ASTStmtTree::Array { token, elements } => {
-                let ret_m =
-                    array_semantic(semantic, token, elements, code, locals, false)?;
+                let ret_m = array_semantic(semantic, token, elements, code, locals, false)?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Expr(expr) => {
@@ -48,7 +47,11 @@ pub fn block_semantic(
                 }
                 opcodes.append_code(&ret_m.2);
             }
-            ASTStmtTree::If {cond,then_body,else_body} => {
+            ASTStmtTree::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
                 let ret_m = judgment_semantic(semantic, &cond, then_body, else_body, code, locals)?;
                 opcodes.append_code(&ret_m);
             }
@@ -61,21 +64,21 @@ pub fn block_semantic(
                 let ret_m = while_semantic(semantic, &cond, body, code, locals, is_easy)?;
                 opcodes.append_code(&ret_m);
             }
-            ASTStmtTree::Break(token) =>{
+            ASTStmtTree::Break(token) => {
                 let ret_m = loop_back_semantic(semantic, true, token)?;
                 opcodes.append_code(&ret_m);
-            },
-            ASTStmtTree::Continue(token) =>{
+            }
+            ASTStmtTree::Continue(token) => {
                 let ret_m = loop_back_semantic(semantic, false, token)?;
                 opcodes.append_code(&ret_m);
-            },
+            }
             ASTStmtTree::Return(expr) => {
                 if let Some(expr) = expr {
                     let ref_expr = lower_expr(semantic, &expr, code, None)?;
                     opcodes.append_code(&ref_expr.2);
                     opcodes.add_opcode(OpCode::Return(None));
-                }else {
-                    opcodes.add_opcode(Push(None,Operand::Null));
+                } else {
+                    opcodes.add_opcode(Push(None, Operand::Null));
                     opcodes.add_opcode(OpCode::Return(None));
                 }
             }
