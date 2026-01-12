@@ -1,10 +1,10 @@
 use crate::compiler::lexer::Token;
+use dashu::float::FBig;
+use dashu::float::round::mode::HalfAway;
 use linked_hash_map::LinkedHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smol_str::SmolStr;
 use std::collections::{BTreeMap, HashMap};
-use dashu::float::FBig;
-use dashu::float::round::mode::HalfAway;
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct LocalAddr {
@@ -60,6 +60,7 @@ pub enum OpCode {
     SetArrayLocal(Option<LocalAddr>, DefaultKey),          // 将栈顶元素设置进数组指定索引
     SetArrayGlobal(Option<LocalAddr>, DefaultKey),         // 将栈顶元素设置进数组指定索引
     Push(Option<LocalAddr>, Operand),                      // 将值压入操作栈
+    Pop(Option<LocalAddr>, usize),                         // 弹出操作栈顶部的值
     Call(Option<LocalAddr>, SmolStr),                      // 函数调用
     Jump(Option<LocalAddr>, Option<LocalAddr>),            // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
@@ -373,6 +374,7 @@ macro_rules! match_opcodes {
             | OpCode::SetArrayGlobal($slot, ..)
             | OpCode::LazyJump($slot, ..)
             | OpCode::Push($slot, ..)
+            | OpCode::Pop($slot, ..)
             | OpCode::Call($slot, ..)
             | OpCode::Jump($slot, ..)
             | OpCode::JumpTrue($slot, ..)

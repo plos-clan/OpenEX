@@ -1,15 +1,15 @@
-use crate::compiler::ast::vm_ir::{ssa_to_vm, VMIRTable};
+use crate::compiler::ast::vm_ir::{VMIRTable, ssa_to_vm};
 use crate::compiler::lexer::{LexerAnalysis, LexerError, Token};
 use crate::compiler::lints::Lint;
-use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::ParserError::LexError;
+use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::{Parser, ParserError};
-use crate::compiler::semantic::Semantic;
+use crate::compiler::semantic::{Semantic, const_prop_linear, eliminate_dead_locals};
 use crate::compiler::{Compiler, CompilerData};
 use smol_str::ToSmolStr;
 use std::collections::HashSet;
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)] // TODO
 pub struct SourceFile {
     pub name: String,
@@ -58,12 +58,13 @@ impl SourceFile {
     }
 
     /// # Errors
-    pub fn compiler(&mut self,compiler: &mut Compiler) -> Result<VMIRTable, ParserError> {
+    pub fn compiler(&mut self, compiler: &mut Compiler) -> Result<VMIRTable, ParserError> {
         let parser = Parser::new(self);
         let ast_tree = parser.parser()?;
-        let mut semantic = Semantic::new(self,compiler);
-        let ssa_ir = semantic.semantic(ast_tree)?;
-
+        let mut semantic = Semantic::new(self, compiler);
+        let mut ssa_ir = semantic.semantic(ast_tree)?;
+        const_prop_linear(&mut ssa_ir.0);
+        eliminate_dead_locals(&mut ssa_ir.0);
         let vm_ir = ssa_to_vm(ssa_ir.0, &ssa_ir.1, &self.name.to_smolstr());
         Ok(vm_ir)
     }

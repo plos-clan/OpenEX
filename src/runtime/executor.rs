@@ -168,6 +168,12 @@ fn run_code<'a>(
     while let Some(code) = stack_frame.current_code() {
         match code {
             ByteCode::Push(const_index) => push_stack(stack_frame, *const_index),
+            ByteCode::Pop(len) => {
+                for _ in 0..*len {
+                    let _ = stack_frame.pop_op_stack();
+                }
+                stack_frame.next_pc();
+            }
             ByteCode::Load(local_index) => load_local(stack_frame, *local_index),
             ByteCode::Store(local_index) => store_local(stack_frame, *local_index),
             ByteCode::GetRef => get_ref(stack_frame),

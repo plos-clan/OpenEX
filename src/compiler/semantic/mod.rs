@@ -6,20 +6,21 @@ mod loop_back;
 mod optimizer;
 mod var;
 mod r#while;
+pub(crate) use optimizer::{const_prop_linear, eliminate_dead_locals};
 
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::ASTStmtTree;
+use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, ValueAlloc, ValueGuessType};
 use crate::compiler::file::SourceFile;
 use crate::compiler::lints::Lint::UnusedExpression;
-use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::parser::ParserError;
+use crate::compiler::parser::symbol_table::ElementType;
+use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic};
 use crate::compiler::semantic::function::{function_semantic, native_function_semantic};
 use crate::compiler::semantic::judgment::judgment_semantic;
-use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::{array_semantic, var_semantic};
+use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::{Compiler, CompilerData};
-use crate::compiler::semantic::block::block_semantic;
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,
@@ -61,7 +62,7 @@ impl<'a> Semantic<'a> {
                             );
                         }
                     }
-                    ASTStmtTree::Import(token,use_name, imp_name) => {
+                    ASTStmtTree::Import(token, use_name, imp_name) => {
                         let lib_name = imp_name.clone();
                         if self.compiler.find_file(lib_name.as_str()).is_none() {
                             return Err(ParserError::NotFoundLibrary(token));

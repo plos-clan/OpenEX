@@ -1,16 +1,17 @@
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
+use dashu::float::round::mode::HalfAway;
+use dashu::float::{DBig, FBig};
 use smol_str::{SmolStr, ToSmolStr};
 use std::fmt::Display;
 use std::str::FromStr;
-use dashu::float::{DBig, FBig};
-use dashu::float::round::mode::HalfAway;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 #[allow(dead_code)] //TODO
 pub enum ByteCode {
     Push(usize),                   // 将常量表中的元素压入操作栈 (常量表索引)
+    Pop(usize),                    // 弹出操作栈顶部的元素
     Load(usize),                   // 栈顶元素加载到局部变量表 (变量表索引)
     Store(usize),                  // 将局部变量加载到栈顶 (变量表索引)
     LoadGlobal(usize),             // 栈顶元素加载到全局变量表 (变量表索引)
@@ -166,6 +167,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::BRight(_) => ByteCode::BRight,
         OpCode::Equ(_) => ByteCode::Equ,
         OpCode::Call(_, _imm) => ByteCode::Call,
+        OpCode::Pop(_, len) => ByteCode::Pop(len),
         OpCode::Ref(_) => ByteCode::GetRef,
         OpCode::Nop(_) => ByteCode::Nol,
         OpCode::Return(_) => ByteCode::Return,
