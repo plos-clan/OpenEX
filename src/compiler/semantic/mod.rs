@@ -19,6 +19,7 @@ use crate::compiler::semantic::judgment::judgment_semantic;
 use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::semantic::var::{array_semantic, var_semantic};
 use crate::compiler::{Compiler, CompilerData};
+use crate::compiler::semantic::block::block_semantic;
 
 pub struct Semantic<'a> {
     file: &'a mut SourceFile,
@@ -105,6 +106,10 @@ impl<'a> Semantic<'a> {
                     ASTStmtTree::Array { token, elements } => {
                         let ret_m =
                             array_semantic(self, token, elements, value_alloc, &mut global, true)?;
+                        code.get_code_table().append_code(&ret_m);
+                    }
+                    ASTStmtTree::Context(stmts) => {
+                        let ret_m = block_semantic(self, stmts, value_alloc, &mut global)?;
                         code.get_code_table().append_code(&ret_m);
                     }
                     _ => todo!(),

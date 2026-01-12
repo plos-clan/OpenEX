@@ -43,7 +43,7 @@ fn parser_elif(parser: &mut Parser) -> Result<Option<ASTStmtTree>, ParserError> 
         parser.cache = Some(token);
         return Ok(None);
     }
-    let cond = parser.parser_cond()?;
+    let cond = parser.parser_cond(None)?;
     let then = blk_eval(parser)?;
 
     let mut else_body: Vec<ASTStmtTree> = vec![];
@@ -69,7 +69,7 @@ fn parser_else(parser: &mut Parser) -> Result<Option<ASTStmtTree>, ParserError> 
 }
 
 pub fn if_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
-    let cond = parser.parser_cond()?;
+    let cond = parser.parser_cond(None)?;
     let then = blk_eval(parser)?;
 
     let mut else_body: Vec<ASTStmtTree> = vec![];

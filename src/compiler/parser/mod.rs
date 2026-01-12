@@ -7,7 +7,7 @@ mod r#return;
 pub mod symbol_table;
 mod var;
 mod r#while;
-
+mod r#for;
 #[cfg(test)]
 mod tests;
 
@@ -19,6 +19,7 @@ use crate::compiler::parser::expression::expr_eval;
 use crate::compiler::parser::function::func_eval;
 use crate::compiler::parser::import::import_eval;
 use crate::compiler::parser::judgment::if_eval;
+use crate::compiler::parser::r#for::for_eval;
 use crate::compiler::parser::r#while::while_eval;
 use crate::compiler::parser::var::var_eval;
 
@@ -29,6 +30,7 @@ pub enum ParserError {
     IdentifierExpected(Token),     // 需要标识符
     Expected(Token, char),         // 需要指定字符
     MissingFunctionBody(Token),    // 缺少函数体
+    MissingLoopBody(Token),        // 缺少循环体
     MissingStatement(Token),       // 语句定义不完整
     MissingCondition(Token),       // 缺少条件表达式
     IllegalArgument(Token),        // 非法参数组合
@@ -78,10 +80,17 @@ impl<'a> Parser<'a> {
     }
 
     // 解析 () 括号内的表达式 - 需要括号
-    pub fn parser_cond(&mut self) -> Result<ASTExprTree, ParserError> {
-        let mut token = self.next_parser_token()?;
-        check_char(&token, LP, '(')?;
-        let last_token = token;
+    pub fn parser_cond(&mut self, last_token: Option<Token>) -> Result<ASTExprTree, ParserError> {
+        let mut token;
+        
+        let last_token = if let Some(token) = last_token {
+            token
+        }else {
+            token = self.next_parser_token()?;
+            check_char(&token, LP, '(')?;
+            token
+        };
+        
         let mut parentheses_count: usize = 0;
         let mut cond: Vec<Token> = Vec::new();
 
@@ -148,6 +157,13 @@ impl<'a> Parser<'a> {
             TokenType::While => {
                 let saved_token = root_token;
                 Ok(while_eval(self).map_err(|e| match e {
+                    ParserError::Eof => ParserError::MissingStatement(saved_token),
+                    _ => e,
+                })?)
+            }
+            TokenType::For => {
+                let saved_token = root_token;
+                Ok(for_eval(self).map_err(|e| match e {
                     ParserError::Eof => ParserError::MissingStatement(saved_token),
                     _ => e,
                 })?)

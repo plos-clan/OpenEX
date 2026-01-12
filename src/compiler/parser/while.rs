@@ -27,7 +27,7 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
             } else {
                 is_easy = false;
                 parser.cache = Some(token);
-                cond = parser.parser_cond()?;
+                cond = parser.parser_cond(None)?;
             }
         }
         _ => return Err(ParserError::Expected(token, '(')),
@@ -35,7 +35,7 @@ pub fn while_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
 
     let result = parser.next_parser_token();
     if matches!(result, Err(ParserError::Eof)) {
-        return Err(ParserError::MissingFunctionBody(parser.get_last().unwrap()));
+        return Err(ParserError::MissingLoopBody(parser.get_last().unwrap()));
     }
     token = result?;
     parser.cache = Some(token);

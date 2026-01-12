@@ -7,6 +7,7 @@ use crate::compiler::parser::judgment::if_eval;
 use crate::compiler::parser::var::var_eval;
 use crate::compiler::parser::r#while::while_eval;
 use crate::compiler::parser::{check_char, Parser, ParserError};
+use crate::compiler::parser::r#for::for_eval;
 use crate::compiler::parser::r#return::return_eval;
 
 fn parser_expr(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
@@ -43,6 +44,10 @@ pub fn blk_eval(parser: &mut Parser) -> Result<Vec<ASTStmtTree>, ParserError> {
             TokenType::While => {
                 parser.last = Some(token);
                 stmt.push(while_eval(parser)?);
+            }
+            TokenType::For => {
+                parser.last = Some(token);
+                stmt.push(for_eval(parser)?);
             }
             TokenType::End => {
             }

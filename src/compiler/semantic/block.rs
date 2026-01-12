@@ -79,6 +79,9 @@ pub fn block_semantic(
                     opcodes.add_opcode(OpCode::Return(None));
                 }
             }
+            ASTStmtTree::Context(stmts) => {
+                opcodes.append_code(&block_semantic(semantic, stmts, code, locals)?);
+            }
             _ => todo!(),
         }
     }

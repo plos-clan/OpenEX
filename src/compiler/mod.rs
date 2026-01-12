@@ -207,6 +207,11 @@ impl Compiler {
                 column = token.column;
                 message = String::from("not found import library.");
             }
+            ParserError::MissingLoopBody(token) => {
+                line = token.line;
+                column = token.column;
+                message = String::from("missing loop body.");
+            }
         }
 
         Self::dump_error_info(&message, line, column, file);
