@@ -470,6 +470,9 @@ fn expr_call(
     match name {
         ASTExprTree::Var(token) => {
             let path = token.clone().value::<SmolStr>().unwrap();
+            opcode_table.add_opcode(Push(None, Operand::This));
+            opcode_table.add_opcode(Push(None, Operand::Reference(path.clone())));
+            opcode_table.add_opcode(OpCode::Ref(None));
             opcode_table.add_opcode(OpCode::Call(None, path.clone()));
             Ok((Operand::Call(path), Unknown, opcode_table))
         }
