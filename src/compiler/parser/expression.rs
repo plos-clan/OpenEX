@@ -116,8 +116,8 @@ macro_rules! match_opcode {
             "&=" => ExprOp::BAndS,
             "|=" => ExprOp::BOrS,
             "^=" => ExprOp::BXorS,
-            ">>" => ExprOp::BLeft,
-            "<<" => ExprOp::BRight,
+            "<<" => ExprOp::BLeft,
+            ">>" => ExprOp::BRight,
             "." => ExprOp::Ref,
             _ => return Err(IllegalExpression($token)),
         }

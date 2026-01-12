@@ -258,3 +258,68 @@ pub fn or_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
         Err(RuntimeError::TypeException("unknown to bool.".to_smolstr()))
     }
 }
+
+pub fn bit_left_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    match (left,right) {
+        (Int(i), Int(r)) => {
+            stack_frame.push_op_stack(Int(i << r));
+        },
+        _=> return Err(RuntimeError::TypeException("bit left need number".to_smolstr())),
+    };
+    stack_frame.next_pc();
+    Ok(())
+}
+
+pub fn bit_right_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    match (left,right) {
+        (Int(i), Int(r)) => {
+            stack_frame.push_op_stack(Int(i >> r));
+        },
+        _=> return Err(RuntimeError::TypeException("bit right need number".to_smolstr())),
+    };
+    stack_frame.next_pc();
+    Ok(())
+}
+
+pub fn bit_and_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    match (left,right) {
+        (Int(i), Int(r)) => {
+            stack_frame.push_op_stack(Int(i & r));
+        },
+        _=> return Err(RuntimeError::TypeException("bit and need number".to_smolstr())),
+    };
+    stack_frame.next_pc();
+    Ok(())
+}
+
+pub fn bit_or_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    match (left,right) {
+        (Int(i), Int(r)) => {
+            stack_frame.push_op_stack(Int(i | r));
+        },
+        _=> return Err(RuntimeError::TypeException("bit or need number".to_smolstr())),
+    };
+    stack_frame.next_pc();
+    Ok(())
+}
+
+pub fn bit_xor_value(stack_frame: &mut StackFrame) -> Result<(), RuntimeError> {
+    let right = stack_frame.pop_op_stack();
+    let left = stack_frame.pop_op_stack();
+    match (left,right) {
+        (Int(i), Int(r)) => {
+            stack_frame.push_op_stack(Int(i ^ r));
+        },
+        _=> return Err(RuntimeError::TypeException("bit xor need number".to_smolstr())),
+    };
+    stack_frame.next_pc();
+    Ok(())
+}

@@ -1,11 +1,7 @@
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
-use crate::runtime::vm_operation::{
-    add_value, and_value, big_value, div_value, equ_value, get_ref, less_equ_value, less_value,
-    mul_value, neg_value, not_equ_value, not_value, or_value, rmd_value, self_add_value,
-    self_sub_value, sub_value,
-};
+use crate::runtime::vm_operation::{add_value, and_value, big_value, bit_and_value, bit_left_value, bit_or_value, bit_right_value, bit_xor_value, div_value, equ_value, get_ref, less_equ_value, less_value, mul_value, neg_value, not_equ_value, not_value, or_value, rmd_value, self_add_value, self_sub_value, sub_value};
 use crate::runtime::vm_table_opt::{
     call_func, get_index_array, jump, jump_false, jump_true, load_array_local, load_local,
     push_stack, set_index_array, store_local,
@@ -150,7 +146,7 @@ impl<'a> StackFrame<'a> {
 }
 
 pub enum RunState<'a> {
-    CallRequest(StackFrame<'a>), // 函数调用请求
+    CallRequest(StackFrame<'a>), // 函数调用请求 
     Return,                      // 返回需要将子栈帧栈顶压入父栈帧操作栈
     None,                        // 空操作
 }
@@ -196,6 +192,11 @@ fn run_code<'a>(
             ByteCode::Big => do_bin_op!(stack_frame, big_value),
             ByteCode::Less => do_bin_op!(stack_frame, less_value),
             ByteCode::LesEqu => do_bin_op!(stack_frame, less_equ_value),
+            ByteCode::BLeft => bit_left_value(stack_frame)?,
+            ByteCode::BRight => bit_right_value(stack_frame)?,
+            ByteCode::BitAnd => bit_and_value(stack_frame)?,
+            ByteCode::BitOr => bit_or_value(stack_frame)?,
+            ByteCode::BitXor => bit_xor_value(stack_frame)?,
             ByteCode::LoadGlobal(var_index) => {
                 let index = *var_index;
                 let result = stack_frame.pop_op_stack();
