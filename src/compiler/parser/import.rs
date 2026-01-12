@@ -6,6 +6,11 @@ use smol_str::ToSmolStr;
 pub fn import_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
 
+    if token.t_type == LiteralString {
+        let name = token.text().to_smolstr();
+        return Ok(ASTStmtTree::Import(token, name.clone(), name));
+    }
+
     if token.t_type != Identifier {
         return Err(ParserError::IdentifierExpected(token));
     }
