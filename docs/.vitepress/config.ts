@@ -17,6 +17,7 @@ export default defineConfig({
                 items: [
                     {text: '简介', link: '/started'},
                     {text: '命令行参数', link: '/started/argument'},
+                    {text: '优化选项', link: '/started/optimizer'},
                 ]
             },
             {

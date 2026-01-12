@@ -1,6 +1,5 @@
 pub mod ssa_ir;
 pub mod vm_ir;
-mod node_ir;
 
 use crate::compiler::lexer::Token;
 use smol_str::SmolStr;
