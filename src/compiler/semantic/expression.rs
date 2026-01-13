@@ -130,7 +130,7 @@ fn guess_type(
     }
 
     if matches!(op, ExprOp::AIndex) {
-        return if *first == ValueGuessType::Array && second == Number {
+        return if (*first == ValueGuessType::Array || *first == Unknown) && second == Number {
             Ok(Unknown)
         } else {
             Err(ParserError::IllegalTypeCombination(token.clone()))
@@ -487,6 +487,30 @@ fn expr_call(
     code: &mut ValueAlloc,
     mut opcode_table: OpCodeTable,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
+    if args.is_empty()
+        && let ASTExprTree::Expr {
+            op: ExprOp::Ref,
+            left,
+            right,
+            ..
+        } = name
+        && let ASTExprTree::Var(token) = right.as_ref()
+        && token.text() == "length"
+    {
+        let target = lower_expr(semantic, left, code, None)?;
+        opcode_table.append_code(&target.2);
+        opcode_table.add_opcode(Push(
+            None,
+            Operand::Reference(SmolStr::new("type/array_length")),
+        ));
+        opcode_table.add_opcode(OpCode::Call(None, SmolStr::new("array_length")));
+        return Ok((
+            Operand::Call(SmolStr::new("array_length")),
+            Unknown,
+            opcode_table,
+        ));
+    }
+
     for arg in args {
         let expr = lower_expr(semantic, arg, code, None)?;
         opcode_table.append_code(&expr.2);
@@ -607,7 +631,7 @@ pub fn lower_expr(
                 && matches!(op, ExprOp::AIndex)
             {
                 opcode_table.append_code(&right.2); // 赋值数据 expression
-                let index = lower_expr(semantic, ex_right, code, stores)?;
+                let index = lower_expr(semantic, ex_right, code, None)?;
                 opcode_table.append_code(&index.2); // 索引 index
                 let ASTExprTree::Var(name) = ex_left.as_ref() else {
                     unreachable!()

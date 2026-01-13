@@ -147,18 +147,30 @@ pub fn test_fib_2() {
 #[test]
 pub fn test_array() {
     check(
-        b"import system;\
-    function test() {\
-    var ary = [1,2,3,4];\
-    system.println(ary[3]);\
-    ary[3] = 12;\
-    ary[2] = 1111;\
-    system.println(ary[3] + \" \" + ary[2]);\
+        b"\
+    import system;\
+    var ary = [64, 34, 25, 12, 22, 11, 90];\
+    function bubble_sort(arr) {\
+        var i = 0;\
+        var n = arr.length();\
+        while (i < n - 1) {\
+            var j = 0;\
+            var limit = n - 1 - i;\
+            while (j < limit) {\
+                if (arr[j] > arr[j + 1]) {\
+                    var temp = arr[j];\
+                    arr[j] = arr[j + 1];\
+                    arr[j + 1] = temp;\
+                }\
+                j = j + 1;\
+            }\
+            i = i + 1;\
+        }\
+        return arr;\
     }\
-    this.test();",
+    system.println(bubble_sort(ary));",
         expect![[r#"
-        > 4
-        12 1111
+        > [11, 12, 22, 25, 34, 64, 90, ]
     "#]],
     )
 }

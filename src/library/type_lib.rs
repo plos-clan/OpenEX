@@ -74,6 +74,24 @@ fn reg_check_type() -> ModuleFunc {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
+fn type_array_length(args: &[Value]) -> Result<Value, RuntimeError> {
+    let Value::Array(len, _) = args.first().unwrap().clone() else {
+        return Err(RuntimeError::TypeException(
+            "array_length: arg is not array.".to_smolstr(),
+        ));
+    };
+    Ok(Value::Int(i64::try_from(len).unwrap()))
+}
+
+fn reg_array_length() -> ModuleFunc {
+    ModuleFunc {
+        name: SmolStr::new("array_length"),
+        arity: 1,
+        func: type_array_length,
+    }
+}
+
 pub fn register_type_lib() {
     let mut type_lib = LibModule {
         name: SmolStr::new("type"),
@@ -82,5 +100,6 @@ pub fn register_type_lib() {
     type_lib.functions.push(reg_to_number());
     type_lib.functions.push(reg_to_float());
     type_lib.functions.push(reg_check_type());
+    type_lib.functions.push(reg_array_length());
     register_library(type_lib);
 }
