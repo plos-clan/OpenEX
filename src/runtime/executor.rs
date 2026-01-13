@@ -1,4 +1,5 @@
-use smol_str::{SmolStr, ToSmolStr};
+use smol_str::{SmolStr, ToSmolStr, format_smolstr};
+use dashu::float::DBig;
 
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
@@ -17,6 +18,8 @@ pub struct StackFrame<'a> {
     pub name: &'a str,
     pub r_name: &'a str, // 栈帧所属脚本的名称
     args: usize,
+    memo_target: Option<(usize, usize)>,
+    memo_key: Option<Vec<MemoKey>>,
 }
 
 pub struct Executor<'a> {
@@ -76,6 +79,8 @@ impl<'a> StackFrame<'a> {
             name,
             is_native,
             args,
+            memo_target: None,
+            memo_key: None,
         }
     }
 
@@ -107,6 +112,15 @@ impl<'a> StackFrame<'a> {
 
     pub fn push_op_stack(&mut self, value: Value) {
         self.op_stack.push(value);
+    }
+
+    pub fn peek_args(&self, count: usize) -> Option<&[Value]> {
+        let len = self.op_stack.len();
+        if len < count {
+            None
+        } else {
+            Some(&self.op_stack[len - count..])
+        }
     }
 
     /// # Panics
@@ -141,11 +155,24 @@ impl<'a> StackFrame<'a> {
     pub const fn is_native(&self) -> Option<&SmolStr> {
         self.is_native.as_ref()
     }
+
+    pub fn set_memo(&mut self, target: (usize, usize), key: Vec<MemoKey>) {
+        self.memo_target = Some(target);
+        self.memo_key = Some(key);
+    }
+
+    pub fn take_memo(&mut self) -> Option<(usize, usize, Vec<MemoKey>)> {
+        match (self.memo_target.take(), self.memo_key.take()) {
+            (Some(target), Some(key)) => Some((target.0, target.1, key)),
+            _ => None,
+        }
+    }
 }
 
 pub enum RunState<'a> {
     CallRequest(StackFrame<'a>), // 函数调用请求
     Return,                      // 返回需要将子栈帧栈顶压入父栈帧操作栈
+    Continue,                    // 继续执行当前栈帧
     None,                        // 空操作
 }
 
@@ -162,6 +189,7 @@ fn run_code<'a>(
     units: &'a [MetadataUnit<'_>],
     stack_frame: &mut StackFrame,
     mut root_frame: Option<&mut StackFrame>,
+    call_cache: &CallCache,
 ) -> Result<RunState<'a>, RuntimeError> {
     while let Some(code) = stack_frame.current_code() {
         match code {
@@ -169,6 +197,25 @@ fn run_code<'a>(
             ByteCode::Pop(len) => {
                 for _ in 0..*len {
                     let _ = stack_frame.pop_op_stack();
+                }
+                stack_frame.next_pc();
+            }
+            ByteCode::AddLocalImm(index, imm) => {
+                let index = *index;
+                let imm = *imm;
+                let value = stack_frame.get_local_mut(index);
+                match value {
+                    Value::Int(i) => {
+                        *i += imm;
+                    }
+                    Value::Float(f) => {
+                        *f += DBig::from(imm);
+                    }
+                    auto => {
+                        return Err(RuntimeError::TypeException(format_smolstr!(
+                            "{auto} to int or float"
+                        )));
+                    }
                 }
                 stack_frame.next_pc();
             }
@@ -180,7 +227,11 @@ fn run_code<'a>(
             ByteCode::Mul => do_bin_op!(stack_frame, mul_value),
             ByteCode::Div => do_bin_op!(stack_frame, div_value),
             ByteCode::Rmd => do_bin_op!(stack_frame, rmd_value),
-            ByteCode::Call => return call_func(stack_frame, units),
+            ByteCode::Call => match call_func(stack_frame, units, call_cache) {
+                Ok(RunState::Continue) => continue,
+                Ok(state) => return Ok(state),
+                Err(err) => return Err(err),
+            },
             ByteCode::Return => return Ok(RunState::Return),
             ByteCode::Jump(pc) => jump(stack_frame, *pc),
             ByteCode::JumpTrue(pc) => jump_true(stack_frame, *pc),
@@ -305,6 +356,7 @@ pub fn call_function(
     arguments: Vec<Value>,
 ) -> Value {
     let mut executor = Executor::new();
+    let mut call_cache = CallCache::new(units);
     executor.push_frame(StackFrame::new(
         globals,
         codes,
@@ -360,7 +412,7 @@ pub fn call_function(
                 break;
             }
         } else {
-            match run_code(units, stack_frame, root_frame) {
+            match run_code(units, stack_frame, root_frame, &call_cache) {
                 Ok(state) => match state {
                     RunState::CallRequest(frame) => {
                         executor.push_frame(frame);
@@ -376,19 +428,19 @@ pub fn call_function(
                         executor.call_stack.push(stack_frame);
                     }
                     RunState::Return => {
-                        let frame = executor.call_stack.pop().unwrap();
+                        let mut frame = executor.call_stack.pop().unwrap();
                         executor.frame_index -= 1;
-                        if let Some(ret_var) = frame.get_op_stack_top() {
-                            if executor.call_stack.is_empty() {
-                                return ret_var.clone();
+                        if let Some(ret_var) = frame.get_op_stack_top().cloned() {
+                            if let Some((unit_index, func_index, key)) = frame.take_memo() {
+                                call_cache.store_memo(unit_index, func_index, key, ret_var.clone());
                             }
-                            executor
-                                .call_stack
-                                .last_mut()
-                                .unwrap()
-                                .push_op_stack(ret_var.clone());
+                            if executor.call_stack.is_empty() {
+                                return ret_var;
+                            }
+                            executor.call_stack.last_mut().unwrap().push_op_stack(ret_var);
                         }
                     }
+                    RunState::Continue => {}
                     RunState::None => {
                         executor.call_stack.pop();
                         executor.frame_index -= 1;

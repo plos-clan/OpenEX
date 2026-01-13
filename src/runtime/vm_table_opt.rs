@@ -1,8 +1,137 @@
-use smol_str::ToSmolStr;
+use smol_str::{SmolStr, ToSmolStr, format_smolstr};
+use std::collections::{HashMap, HashSet};
 
-use crate::compiler::ast::vm_ir::Value;
+use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::runtime::executor::{RunState, StackFrame};
 use crate::runtime::{MetadataUnit, RuntimeError};
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub enum MemoKey {
+    Int(i64),
+    Bool(bool),
+    String(SmolStr),
+    Ref(SmolStr),
+    Null,
+}
+
+impl MemoKey {
+    fn from_value(value: &Value) -> Option<Self> {
+        match value {
+            Value::Int(v) => Some(MemoKey::Int(*v)),
+            Value::Bool(v) => Some(MemoKey::Bool(*v)),
+            Value::String(v) => Some(MemoKey::String(v.clone())),
+            Value::Ref(v) => Some(MemoKey::Ref(v.clone())),
+            Value::Null => Some(MemoKey::Null),
+            _ => None,
+        }
+    }
+}
+
+pub struct CallCache {
+    map: HashMap<SmolStr, (usize, usize)>,
+    memoizable: HashSet<(usize, usize)>,
+    memo: HashMap<(usize, usize), HashMap<Vec<MemoKey>, Value>>,
+}
+
+impl CallCache {
+    pub fn new(units: &[MetadataUnit]) -> Self {
+        let mut map = HashMap::new();
+        let mut memoizable = HashSet::new();
+        let mut memo = HashMap::new();
+        for (unit_index, unit) in units.iter().enumerate() {
+            for (func_index, func) in unit.methods.iter().enumerate() {
+                let self_path = format_smolstr!("{}/{}", unit.names, func.name);
+                map.insert(self_path.clone(), (unit_index, func_index));
+                if is_pure_self_recursive(unit, func, &self_path) {
+                    let idx = (unit_index, func_index);
+                    memoizable.insert(idx);
+                    memo.insert(idx, HashMap::new());
+                }
+            }
+        }
+        Self {
+            map,
+            memoizable,
+            memo,
+        }
+    }
+
+    pub fn resolve(&self, path: &SmolStr) -> Option<(usize, usize)> {
+        self.map.get(path).copied()
+    }
+
+    pub fn is_memoizable(&self, unit_index: usize, func_index: usize) -> bool {
+        self.memoizable.contains(&(unit_index, func_index))
+    }
+
+    pub fn make_key(values: &[Value]) -> Option<Vec<MemoKey>> {
+        let mut key = Vec::with_capacity(values.len());
+        for value in values {
+            key.push(MemoKey::from_value(value)?);
+        }
+        Some(key)
+    }
+
+    pub fn get_memo(
+        &self,
+        unit_index: usize,
+        func_index: usize,
+        key: &[MemoKey],
+    ) -> Option<Value> {
+        self.memo
+            .get(&(unit_index, func_index))
+            .and_then(|map| map.get(key).cloned())
+    }
+
+    pub fn store_memo(
+        &mut self,
+        unit_index: usize,
+        func_index: usize,
+        key: Vec<MemoKey>,
+        value: Value,
+    ) {
+        if let Some(map) = self.memo.get_mut(&(unit_index, func_index)) {
+            map.entry(key).or_insert(value);
+        }
+    }
+}
+
+fn is_pure_self_recursive(
+    unit: &MetadataUnit,
+    func: &crate::runtime::MethodInfo,
+    self_path: &SmolStr,
+) -> bool {
+    if func.is_native {
+        return false;
+    }
+    let codes = func.get_codes();
+    for (idx, code) in codes.iter().enumerate() {
+        match code {
+            ByteCode::StoreGlobal(_)
+            | ByteCode::LoadGlobal(_)
+            | ByteCode::LoadArrayGlobal(_, _)
+            | ByteCode::SetArrayGlobal(_) => {
+                return false;
+            }
+            ByteCode::Call => {
+                if idx == 0 {
+                    return false;
+                }
+                match codes.get(idx - 1) {
+                    Some(ByteCode::Push(const_index)) => {
+                        match unit.constant_table.get(*const_index) {
+                            Some(Value::Ref(path)) if path == self_path => {}
+                            _ => return false,
+                        }
+                    }
+                    _ => return false,
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
 
 pub fn push_stack(stack_frame: &mut StackFrame, index: usize) {
     let Some(value_ref) = stack_frame.get_const(index) else {
@@ -67,24 +196,30 @@ pub const fn jump(stack_frame: &mut StackFrame, jpc: usize) {
 pub fn call_func<'a>(
     stack_frame: &mut StackFrame,
     units: &'a [MetadataUnit],
+    call_cache: &CallCache,
 ) -> Result<RunState<'a>, RuntimeError> {
     let result = stack_frame.pop_op_stack();
 
     if let Value::Ref(path) = result {
-        let panic_path = path.clone();
-
-        let mut sp = path.split('/');
-        let file = sp.next().unwrap();
-        let func_name = sp.next().unwrap();
-
-        for unit in units {
-            if unit.names == file {
-                for func in &unit.methods {
-                    if func.name == func_name {
-                        let codes = func.get_codes();
-                        stack_frame.next_pc();
+        if let Some((unit_index, func_index)) = call_cache.resolve(&path) {
+            let unit = &units[unit_index];
+            let func = &unit.methods[func_index];
+            let codes = func.get_codes();
+            if call_cache.is_memoizable(unit_index, func_index) {
+                if let Some(args) = stack_frame.peek_args(func.args) {
+                    if let Some(key) = CallCache::make_key(args) {
+                        if let Some(value) =
+                            call_cache.get_memo(unit_index, func_index, &key)
+                        {
+                            for _ in 0..func.args {
+                                let _ = stack_frame.pop_op_stack();
+                            }
+                            stack_frame.push_op_stack(value);
+                            stack_frame.next_pc();
+                            return Ok(RunState::Continue);
+                        }
                         let native = if func.is_native { Some(path) } else { None };
-                        return Ok(RunState::CallRequest(StackFrame::new(
+                        let mut frame = StackFrame::new(
                             func.locals,
                             codes,
                             unit.constant_table,
@@ -92,12 +227,27 @@ pub fn call_func<'a>(
                             func.r_name.as_str(),
                             native,
                             func.args,
-                        )));
+                        );
+                        frame.set_memo((unit_index, func_index), key);
+                        stack_frame.next_pc();
+                        return Ok(RunState::CallRequest(frame));
                     }
                 }
             }
+            stack_frame.next_pc();
+            let native = if func.is_native { Some(path) } else { None };
+            Ok(RunState::CallRequest(StackFrame::new(
+                func.locals,
+                codes,
+                unit.constant_table,
+                func.name.as_str(),
+                func.r_name.as_str(),
+                native,
+                func.args,
+            )))
+        } else {
+            Err(RuntimeError::NoSuchFunctionException(path))
         }
-        Err(RuntimeError::NoSuchFunctionException(panic_path))
     } else {
         Err(RuntimeError::VMError)
     }

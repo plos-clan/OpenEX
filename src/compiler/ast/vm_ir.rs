@@ -13,6 +13,7 @@ use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String}
 pub enum ByteCode {
     Push(usize),                   // 将常量表中的元素压入操作栈 (常量表索引)
     Pop(usize),                    // 弹出操作栈顶部的元素
+    AddLocalImm(usize, i64),       // 局部变量 += 立即数
     Load(usize),                   // 栈顶元素加载到局部变量表 (变量表索引)
     Store(usize),                  // 将局部变量加载到栈顶 (变量表索引)
     LoadGlobal(usize),             // 栈顶元素加载到全局变量表 (变量表索引)
@@ -252,6 +253,10 @@ impl IrFunction {
                     let index = locals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::LoadArrayGlobal(*index, len));
                 }
+                OpCode::AddLocalImm(_, key, imm) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::AddLocalImm(*index, imm));
+                }
                 OpCode::SetArrayLocal(_, key) => {
                     let index = locals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::SetArray(*index));
@@ -377,6 +382,10 @@ impl VMIRTable {
                 OpCode::LoadArrayGlobal(_, key, len) | OpCode::LoadArrayLocal(_, key, len) => {
                     let index = locals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::LoadArrayGlobal(*index, len));
+                }
+                OpCode::AddLocalImm(_, key, imm) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::AddLocalImm(*index, imm));
                 }
                 OpCode::SetArrayLocal(_, key) | OpCode::SetArrayGlobal(_, key) => {
                     let index = locals.get_index(key).unwrap();

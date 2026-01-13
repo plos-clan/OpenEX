@@ -7,7 +7,7 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::ParserError::LexError;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::{Parser, ParserError};
-use crate::compiler::semantic::{Semantic, const_prop_linear, eliminate_dead_locals};
+use crate::compiler::semantic::{Semantic, const_prop_linear, eliminate_dead_locals, local_arith_peephole};
 use crate::compiler::{Compiler, CompilerData};
 
 #[derive(Debug, Clone)]
@@ -64,6 +64,7 @@ impl SourceFile {
         let mut semantic = Semantic::new(self, compiler);
         let mut ssa_ir = semantic.semantic(ast_tree)?;
         const_prop_linear(&mut ssa_ir.0);
+        local_arith_peephole(&mut ssa_ir.0);
         eliminate_dead_locals(&mut ssa_ir.0);
         let vm_ir = ssa_to_vm(ssa_ir.0, &ssa_ir.1, &self.name.to_smolstr());
         Ok(vm_ir)

@@ -106,9 +106,9 @@ pub fn test_fib_1() {
     } else {\
     return this.fib(n - 1) + this.fib(n - 2);\
     }}\
-    system.println(this.fib(30));",
+    system.println(this.fib(35));",
         expect![[r#"
-        > 832040
+        > 9227465
     "#]],
     );
     // fib(30) == 832040

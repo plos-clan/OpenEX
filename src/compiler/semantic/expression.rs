@@ -10,7 +10,7 @@ use crate::compiler::parser::ParserError;
 use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
-use smol_str::{SmolStr, SmolStrBuilder, ToSmolStr};
+use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 
 macro_rules! check_bool_expr {
     ($op:expr,$second:expr) => {
@@ -279,7 +279,13 @@ fn lower_ref(
     code: &mut ValueAlloc,
 ) -> Result<(SmolStr, OpCodeTable), ParserError> {
     let mut opcode_table = OpCodeTable::new();
-    let mut path = SmolStrBuilder::new();
+    let file_base = semantic
+        .file
+        .name
+        .split('.')
+        .next()
+        .unwrap_or(semantic.file.name.as_str())
+        .to_smolstr();
 
     if let ASTExprTree::Expr {
         token: _,
@@ -291,6 +297,27 @@ fn lower_ref(
         let left_tree = left.as_ref();
         let right_tree = right.as_ref();
 
+        if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree {
+            let base = match left_tree {
+                ASTExprTree::This(_) => Some(file_base.clone()),
+                ASTExprTree::Var(name) => match semantic
+                    .compiler_data()
+                    .symbol_table
+                    .get_element_type(name.text())
+                {
+                    Some(ElementType::Library(lib_name)) => Some(lib_name.clone()),
+                    _ => None,
+                },
+                _ => None,
+            };
+
+            if let Some(base) = base {
+                let full_path = format_smolstr!("{}/{}", base, token.text());
+                opcode_table.add_opcode(Push(None, Operand::Reference(full_path)));
+                return Ok((token.text().to_smolstr(), opcode_table));
+            }
+        }
+
         if matches!(left_tree, ASTExprTree::Call { .. })
             || matches!(left_tree, ASTExprTree::This(_token))
             || matches!(left_tree, ASTExprTree::Var(_token))
@@ -301,25 +328,24 @@ fn lower_ref(
             unreachable!()
         }
 
-        if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree {
-            path.push_str(format!("/{}", token.text()).as_str());
-            let code = match right_tree {
-                ASTExprTree::Var(token) => {
-                    Push(None, Operand::Reference(token.text().to_smolstr()))
-                }
-                ASTExprTree::This(_token) => Push(None, Operand::This),
-                _ => unreachable!(),
-            };
-            opcode_table.add_opcode(code);
-        } else {
-            unreachable!()
-        }
+        let code = match right_tree {
+            ASTExprTree::Var(token) => Push(None, Operand::Reference(token.text().to_smolstr())),
+            ASTExprTree::This(_token) => Push(None, Operand::This),
+            _ => unreachable!(),
+        };
+        opcode_table.add_opcode(code);
         opcode_table.add_opcode(OpCode::Ref(None));
     } else {
         unreachable!()
     }
 
-    Ok((path.finish(), opcode_table))
+    if let ASTExprTree::Expr { right, .. } = expr_tree
+        && let ASTExprTree::Var(token) | ASTExprTree::This(token) = right.as_ref()
+    {
+        Ok((token.text().to_smolstr(), opcode_table))
+    } else {
+        Ok((SmolStr::new_static(""), opcode_table))
+    }
 }
 
 const fn operand_to_guess(operand: &Operand) -> ValueGuessType {
@@ -470,9 +496,14 @@ fn expr_call(
     match name {
         ASTExprTree::Var(token) => {
             let path = token.clone().value::<SmolStr>().unwrap();
-            opcode_table.add_opcode(Push(None, Operand::This));
-            opcode_table.add_opcode(Push(None, Operand::Reference(path.clone())));
-            opcode_table.add_opcode(OpCode::Ref(None));
+            let file_base = semantic
+                .file
+                .name
+                .split('.')
+                .next()
+                .unwrap_or(semantic.file.name.as_str());
+            let full_path = format_smolstr!("{file_base}/{path}");
+            opcode_table.add_opcode(Push(None, Operand::Reference(full_path)));
             opcode_table.add_opcode(OpCode::Call(None, path.clone()));
             Ok((Operand::Call(path), Unknown, opcode_table))
         }

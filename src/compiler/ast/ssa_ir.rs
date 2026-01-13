@@ -62,6 +62,7 @@ pub enum OpCode {
     SetArrayGlobal(Option<LocalAddr>, DefaultKey),         // 将栈顶元素设置进数组指定索引
     Push(Option<LocalAddr>, Operand),                      // 将值压入操作栈
     Pop(Option<LocalAddr>, usize),                         // 弹出操作栈顶部的值
+    AddLocalImm(Option<LocalAddr>, DefaultKey, i64),       // 局部变量 += 立即数
     Call(Option<LocalAddr>, SmolStr),                      // 函数调用
     Jump(Option<LocalAddr>, Option<LocalAddr>),            // 无条件跳转
     JumpTrue(Option<LocalAddr>, Option<LocalAddr>, Operand), // 栈顶结果为真则跳转
@@ -376,6 +377,7 @@ macro_rules! match_opcodes {
             | OpCode::LazyJump($slot, ..)
             | OpCode::Push($slot, ..)
             | OpCode::Pop($slot, ..)
+            | OpCode::AddLocalImm($slot, ..)
             | OpCode::Call($slot, ..)
             | OpCode::Jump($slot, ..)
             | OpCode::JumpTrue($slot, ..)

@@ -6,7 +6,7 @@ mod loop_back;
 mod optimizer;
 mod var;
 mod r#while;
-pub(crate) use optimizer::{const_prop_linear, eliminate_dead_locals};
+pub(crate) use optimizer::{const_prop_linear, eliminate_dead_locals, local_arith_peephole};
 
 use crate::compiler::ast::ASTStmtTree;
 use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, ValueAlloc, ValueGuessType};
