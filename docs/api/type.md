@@ -44,3 +44,10 @@ function to_string(auto) {
     return auto + "";
 }
 ```
+
+## `array_length` 获取数组长度
+
+* 形参: `auto` : 数组类型
+* 返回值: 数组长度
+
+> `array_length` 函数是一个本地方法, 由解释器进行实现.

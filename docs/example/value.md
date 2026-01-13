@@ -44,6 +44,19 @@ OpenEX 中不要求数组中的元素类型相同, 一个数组可以存在多�
 var arr_type = [true, 1, 3, 4, null];
 ```
 
+::: tip 简化写法
+
+OpenEX 支持直接使用数组内的方法来直接获取数组长度 `array.length()`
+
+```js
+var arr_type = [true, 1, 3, 4, null];
+var len = arr_type.length();
+```
+
+> 这种简化写法最终会被编译器翻译成 `type.array_length()` 的函数调用
+
+:::
+
 ## 作用域
 
 在脚本根作用域定义的变量为全局变量, 在脚本根栈帧的变量表开辟空间.
