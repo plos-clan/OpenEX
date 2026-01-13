@@ -54,6 +54,8 @@ function example() {
 this.example();
 ```
 
+> 在 `openex` v0.0.2 版本 `17630d8` 修复型递交后, 可以使用 `example()` 的简写写法来调用本脚本定义的函数.
+
 ## 递归
 
 OpenEX 支持函数的递归调用写法, \
