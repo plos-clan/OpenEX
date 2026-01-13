@@ -648,6 +648,35 @@ pub fn lower_expr(
                 return Ok((Operand::Call("".to_smolstr()), Unknown, opcode_table));
             }
 
+            // 该 if 用于特判数组取值 arr[index]，避免加载并克隆整个数组
+            if matches!(e_op, ExprOp::AIndex)
+                && let ASTExprTree::Var(name) = e_left.as_ref()
+            {
+                let var_name = name.text().to_smolstr();
+                if !semantic
+                    .compiler_data()
+                    .symbol_table
+                    .check_element(&var_name)
+                {
+                    return Err(ParserError::UnableResolveSymbols(name.clone()));
+                }
+                let key = code
+                    .find_value_key(&var_name)
+                    .map_or_else(|| unreachable!(), |key| key);
+                let left_type = code
+                    .find_value(key)
+                    .map_or(Unknown, |value| value.type_.clone());
+                let guess_type = guess_type(e_token, &left_type, right.1, *e_op)?;
+                opcode_table.append_code(&right.2); // 索引 index
+                opcode_table.add_opcode(OpCode::GetIndexLocal(None, key));
+                let n_operand = Operand::Expression(
+                    Box::new(Operand::Val(key)),
+                    right_opd,
+                    Box::new(OpCode::AIndex(None)),
+                );
+                return Ok((n_operand, guess_type, opcode_table));
+            }
+
             let left = lower_expr(semantic, e_left.as_ref(), code, stores)?;
 
             let left_opd = Box::new(left.0.clone());

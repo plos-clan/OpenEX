@@ -318,6 +318,7 @@ fn run_code<'a>(
             }
             ByteCode::LoadArray(var_index, len) => load_array_local(stack_frame, *len, *var_index),
             ByteCode::GetIndex => get_index_array(stack_frame)?,
+            ByteCode::GetIndexLocal(var_index) => get_index_local(stack_frame, *var_index)?,
             ByteCode::Nol | ByteCode::Pos => stack_frame.next_pc(),
             _ => todo!(),
         }

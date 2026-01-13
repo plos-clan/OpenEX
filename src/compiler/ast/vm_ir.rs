@@ -30,6 +30,7 @@ pub enum ByteCode {
     GetRef,                        // 拼接引用路径
     Return,                        // 退出当前栈帧 (并将栈顶元素压入父栈帧操作栈)
     GetIndex,                      // 取出数组的元素并压入栈顶 (会消费掉操作栈里的数组和索引)
+    GetIndexLocal(usize),          // 取出局部数组指定索引的元素并压入栈顶
     Pos,
     Neg,
     Add,
@@ -177,6 +178,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
         OpCode::Pos(_) => ByteCode::Pos,
         OpCode::Neg(_) => ByteCode::Neg,
         OpCode::AIndex(_) => ByteCode::GetIndex,
+        OpCode::GetIndexLocal(_, _) => unreachable!(),
         c => {
             dbg!(c);
             todo!()
@@ -264,6 +266,10 @@ impl IrFunction {
                 OpCode::SetArrayGlobal(_, key) => {
                     let index = globals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::SetArrayGlobal(*index));
+                }
+                OpCode::GetIndexLocal(_, key) => {
+                    let index = locals.get_index(key).unwrap();
+                    codes_builder.push(ByteCode::GetIndexLocal(*index));
                 }
                 OpCode::Jump(_, addr) | OpCode::LazyJump(_, addr, ..) => {
                     codes_builder.push(ByteCode::Jump(addr.unwrap().offset));

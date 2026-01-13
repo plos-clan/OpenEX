@@ -350,6 +350,11 @@ fn const_prop_step(
             stack.push(None);
             None
         }
+        OpCode::GetIndexLocal(_, _) => {
+            let _ = stack_pop(stack);
+            stack.push(None);
+            None
+        }
         OpCode::Call(_, name) => {
             if let Some(arity) = arity_map.get(name) {
                 stack_pop_n(stack, *arity + 1);
@@ -483,46 +488,62 @@ fn rewrite_block(
     }
 }
 
-fn const_prop_table(table: &mut OpCodeTable, arity_map: &HashMap<SmolStr, usize>) {
+#[derive(Clone)]
+struct Block {
+    start: usize,
+    end: usize,
+    succs: Vec<usize>,
+}
+
+fn build_order(table: &OpCodeTable) -> Vec<LocalAddr> {
     let mut order: Vec<LocalAddr> = table.opcodes.keys().cloned().collect();
     order.sort_unstable_by_key(|addr| addr.offset);
-    if order.is_empty() {
-        return;
-    }
+    order
+}
 
+fn build_offset_index(order: &[LocalAddr]) -> HashMap<usize, usize> {
     let mut offset_to_index = HashMap::new();
     for (idx, addr) in order.iter().enumerate() {
         offset_to_index.insert(addr.offset, idx);
+    }
+    offset_to_index
+}
+
+fn collect_leaders(
+    order: &[LocalAddr],
+    table: &OpCodeTable,
+    offset_to_index: &HashMap<usize, usize>,
+) -> Vec<usize> {
+    if order.is_empty() {
+        return Vec::new();
     }
 
     let mut leaders: HashSet<usize> = HashSet::new();
     leaders.insert(0);
     for (idx, addr) in order.iter().enumerate() {
         let op = table.opcodes.get(addr).unwrap();
-        if let Some(target) = jump_target(op)
-            && let Some(target_idx) = offset_to_index.get(&target.offset)
-        {
-            leaders.insert(*target_idx);
+        let target_idx =
+            jump_target(op).and_then(|target| offset_to_index.get(&target.offset).copied());
+        if let Some(target_idx) = target_idx {
+            leaders.insert(target_idx);
         }
         if is_boundary(op) && idx + 1 < order.len() {
             leaders.insert(idx + 1);
         }
     }
+
     let mut leader_vec: Vec<usize> = leaders.into_iter().collect();
     leader_vec.sort_unstable();
+    leader_vec
+}
 
-    #[derive(Clone)]
-    struct Block {
-        start: usize,
-        end: usize,
-        succs: Vec<usize>,
-    }
-
+fn build_blocks(order: &[LocalAddr], leaders: &[usize]) -> (Vec<Block>, Vec<usize>) {
     let mut blocks: Vec<Block> = Vec::new();
     let mut instr_block = vec![0; order.len()];
-    for (bi, start) in leader_vec.iter().enumerate() {
-        let end = if bi + 1 < leader_vec.len() {
-            leader_vec[bi + 1] - 1
+
+    for (bi, start) in leaders.iter().enumerate() {
+        let end = if bi + 1 < leaders.len() {
+            leaders[bi + 1] - 1
         } else {
             order.len() - 1
         };
@@ -536,42 +557,101 @@ fn const_prop_table(table: &mut OpCodeTable, arity_map: &HashMap<SmolStr, usize>
         });
     }
 
-    for bi in 0..blocks.len() {
+    (blocks, instr_block)
+}
+
+fn add_jump_succ(
+    succs: &mut Vec<usize>,
+    op: &OpCode,
+    offset_to_index: &HashMap<usize, usize>,
+    instr_block: &[usize],
+) {
+    let Some(target) = jump_target(op) else {
+        return;
+    };
+    let Some(target_idx) = offset_to_index.get(&target.offset) else {
+        return;
+    };
+    succs.push(instr_block[*target_idx]);
+}
+
+fn add_fallthrough_succ(succs: &mut Vec<usize>, bi: usize, blocks_len: usize) {
+    if bi + 1 < blocks_len {
+        succs.push(bi + 1);
+    }
+}
+
+fn block_successors(
+    op: &OpCode,
+    bi: usize,
+    blocks_len: usize,
+    offset_to_index: &HashMap<usize, usize>,
+    instr_block: &[usize],
+) -> Vec<usize> {
+    let mut succs = Vec::new();
+    match op {
+        OpCode::Jump(_, _) | OpCode::LazyJump(_, _, _) => {
+            add_jump_succ(&mut succs, op, offset_to_index, instr_block);
+        }
+        OpCode::JumpTrue(_, _, _) | OpCode::JumpFalse(_, _, _) => {
+            add_jump_succ(&mut succs, op, offset_to_index, instr_block);
+            add_fallthrough_succ(&mut succs, bi, blocks_len);
+        }
+        OpCode::Return(_) => {}
+        _ => add_fallthrough_succ(&mut succs, bi, blocks_len),
+    }
+    succs.sort_unstable();
+    succs.dedup();
+    succs
+}
+
+fn fill_successors(
+    blocks: &mut [Block],
+    order: &[LocalAddr],
+    table: &OpCodeTable,
+    offset_to_index: &HashMap<usize, usize>,
+    instr_block: &[usize],
+) {
+    let blocks_len = blocks.len();
+    for bi in 0..blocks_len {
         let end = blocks[bi].end;
         let addr = order[end];
         let op = table.opcodes.get(&addr).unwrap();
-        let mut succs = Vec::new();
-        match op {
-            OpCode::Jump(_, _) | OpCode::LazyJump(_, _, _) => {
-                if let Some(target) = jump_target(op)
-                    && let Some(target_idx) = offset_to_index.get(&target.offset)
-                {
-                    succs.push(instr_block[*target_idx]);
-                }
-            }
-            OpCode::JumpTrue(_, _, _) | OpCode::JumpFalse(_, _, _) => {
-                if let Some(target) = jump_target(op)
-                    && let Some(target_idx) = offset_to_index.get(&target.offset)
-                {
-                    succs.push(instr_block[*target_idx]);
-                }
-                if bi + 1 < blocks.len() {
-                    succs.push(bi + 1);
-                }
-            }
-            OpCode::Return(_) => {}
-            _ => {
-                if bi + 1 < blocks.len() {
-                    succs.push(bi + 1);
-                }
-            }
+        blocks[bi].succs = block_successors(op, bi, blocks_len, offset_to_index, instr_block);
+    }
+}
+
+fn update_successors(
+    bi: usize,
+    env_out: &HashMap<DefaultKey, Option<Operand>>,
+    blocks: &[Block],
+    in_env: &mut [Option<HashMap<DefaultKey, Option<Operand>>>],
+    worklist: &mut VecDeque<usize>,
+) {
+    for &succ in &blocks[bi].succs {
+        let merged = match &in_env[succ] {
+            Some(prev) => merge_env(prev, env_out),
+            None => env_out.clone(),
+        };
+        let changed = in_env[succ].as_ref().map_or(true, |prev| prev != &merged);
+        if changed {
+            in_env[succ] = Some(merged);
+            worklist.push_back(succ);
         }
-        succs.sort_unstable();
-        succs.dedup();
-        blocks[bi].succs = succs;
+    }
+}
+
+fn propagate_constants(
+    table: &OpCodeTable,
+    order: &[LocalAddr],
+    blocks: &[Block],
+    arity_map: &HashMap<SmolStr, usize>,
+) -> Vec<Option<HashMap<DefaultKey, Option<Operand>>>> {
+    let mut in_env: Vec<Option<HashMap<DefaultKey, Option<Operand>>>> = vec![None; blocks.len()];
+    if blocks.is_empty() {
+        return in_env;
     }
 
-    let mut in_env: Vec<Option<HashMap<DefaultKey, Option<Operand>>>> = vec![None; blocks.len()];
     in_env[0] = Some(HashMap::new());
     let mut worklist: VecDeque<usize> = VecDeque::new();
     worklist.push_back(0);
@@ -580,26 +660,30 @@ fn const_prop_table(table: &mut OpCodeTable, arity_map: &HashMap<SmolStr, usize>
         let env_in = in_env[bi].clone().unwrap_or_default();
         let env_out = analyze_block(
             table,
-            &order,
+            order,
             blocks[bi].start,
             blocks[bi].end,
             &env_in,
             arity_map,
         );
-
-        for &succ in &blocks[bi].succs {
-            let merged = match &in_env[succ] {
-                Some(prev) => merge_env(prev, &env_out),
-                None => env_out.clone(),
-            };
-            let changed = in_env[succ].as_ref().map_or(true, |prev| prev != &merged);
-            if changed {
-                in_env[succ] = Some(merged);
-                worklist.push_back(succ);
-            }
-        }
+        update_successors(bi, &env_out, blocks, &mut in_env, &mut worklist);
     }
 
+    in_env
+}
+
+fn const_prop_table(table: &mut OpCodeTable, arity_map: &HashMap<SmolStr, usize>) {
+    let order = build_order(table);
+    if order.is_empty() {
+        return;
+    }
+
+    let offset_to_index = build_offset_index(&order);
+    let leaders = collect_leaders(&order, table, &offset_to_index);
+    let (mut blocks, instr_block) = build_blocks(&order, &leaders);
+    fill_successors(&mut blocks, &order, table, &offset_to_index, &instr_block);
+
+    let in_env = propagate_constants(table, &order, &blocks, arity_map);
     for (bi, block) in blocks.iter().enumerate() {
         let env_in = in_env[bi].clone().unwrap_or_default();
         rewrite_block(table, &order, block.start, block.end, &env_in, arity_map);
@@ -629,108 +713,154 @@ pub(crate) fn const_prop_linear(code: &mut Code) {
     }
 }
 
-fn local_arith_peephole_table(table: &mut OpCodeTable) {
-    if table.opcodes.is_empty() {
-        return;
-    }
-    let mut order: Vec<LocalAddr> = table.opcodes.keys().cloned().collect();
-    order.sort_unstable_by_key(|addr| addr.offset);
-
+fn collect_jump_targets(table: &OpCodeTable) -> HashSet<LocalAddr> {
     let mut jump_targets: HashSet<LocalAddr> = HashSet::new();
     for (_addr, op) in table.opcodes.iter() {
         if let Some(target) = jump_target(op) {
             jump_targets.insert(target);
         }
     }
+    jump_targets
+}
+
+fn has_jump_target(jump_targets: &HashSet<LocalAddr>, addrs: &[LocalAddr]) -> bool {
+    addrs.iter().any(|addr| jump_targets.contains(addr))
+}
+
+fn fold_store_inc_dec(
+    table: &OpCodeTable,
+    order: &[LocalAddr],
+    index: usize,
+    jump_targets: &HashSet<LocalAddr>,
+) -> Option<(LocalAddr, OpCode, usize)> {
+    let addr0 = *order.get(index)?;
+    let op0 = table.opcodes.get(&addr0)?;
+    let OpCode::StoreLocal(_, key0, _) = op0 else {
+        return None;
+    };
+
+    let addr1 = *order.get(index + 1)?;
+    let addr2 = *order.get(index + 2)?;
+    if has_jump_target(jump_targets, &[addr1, addr2]) {
+        return None;
+    }
+
+    let op1 = table.opcodes.get(&addr1)?;
+    let op2 = table.opcodes.get(&addr2)?;
+    let OpCode::LoadLocal(_, key2, _) = op2 else {
+        return None;
+    };
+    if key2 != key0 {
+        return None;
+    }
+
+    let imm = match op1 {
+        OpCode::SAdd(_) => 1,
+        OpCode::SSub(_) => -1,
+        _ => return None,
+    };
+    Some((addr0, OpCode::AddLocalImm(Some(addr0), *key0, imm), 3))
+}
+
+fn fold_store_add_imm(
+    table: &OpCodeTable,
+    order: &[LocalAddr],
+    index: usize,
+    jump_targets: &HashSet<LocalAddr>,
+) -> Option<(LocalAddr, OpCode, usize)> {
+    let addr0 = *order.get(index)?;
+    let op0 = table.opcodes.get(&addr0)?;
+    let OpCode::StoreLocal(_, key0, _) = op0 else {
+        return None;
+    };
+
+    let addr1 = *order.get(index + 1)?;
+    let addr2 = *order.get(index + 2)?;
+    let addr3 = *order.get(index + 3)?;
+    if has_jump_target(jump_targets, &[addr1, addr2, addr3]) {
+        return None;
+    }
+
+    let op1 = table.opcodes.get(&addr1)?;
+    let op2 = table.opcodes.get(&addr2)?;
+    let op3 = table.opcodes.get(&addr3)?;
+    let (OpCode::Push(_, Operand::ImmNum(imm)), OpCode::LoadLocal(_, key3, _)) = (op1, op3) else {
+        return None;
+    };
+    if key3 != key0 {
+        return None;
+    }
+
+    let delta = match op2 {
+        OpCode::Add(_) => *imm,
+        OpCode::Sub(_) => -*imm,
+        _ => return None,
+    };
+    Some((addr0, OpCode::AddLocalImm(Some(addr0), *key0, delta), 4))
+}
+
+fn fold_push_add_local(
+    table: &OpCodeTable,
+    order: &[LocalAddr],
+    index: usize,
+    jump_targets: &HashSet<LocalAddr>,
+) -> Option<(LocalAddr, OpCode, usize)> {
+    let addr0 = *order.get(index)?;
+    let op0 = table.opcodes.get(&addr0)?;
+    let OpCode::Push(_, Operand::ImmNum(imm)) = op0 else {
+        return None;
+    };
+
+    let addr1 = *order.get(index + 1)?;
+    let addr2 = *order.get(index + 2)?;
+    let addr3 = *order.get(index + 3)?;
+    if has_jump_target(jump_targets, &[addr1, addr2, addr3]) {
+        return None;
+    }
+
+    let op1 = table.opcodes.get(&addr1)?;
+    let op2 = table.opcodes.get(&addr2)?;
+    let op3 = table.opcodes.get(&addr3)?;
+    let (OpCode::StoreLocal(_, key1, _), OpCode::Add(_), OpCode::LoadLocal(_, key3, _)) =
+        (op1, op2, op3)
+    else {
+        return None;
+    };
+    if key1 != key3 {
+        return None;
+    }
+
+    Some((addr0, OpCode::AddLocalImm(Some(addr0), *key1, *imm), 4))
+}
+
+fn local_arith_peephole_table(table: &mut OpCodeTable) {
+    let order = build_order(table);
+    if order.is_empty() {
+        return;
+    }
+    let jump_targets = collect_jump_targets(table);
 
     let mut kept = OpCodeTable::new();
     let mut i = 0;
     while i < order.len() {
+        if let Some((addr, op, skip)) = fold_store_inc_dec(table, &order, i, &jump_targets) {
+            kept.opcodes.insert(addr, op);
+            i += skip;
+            continue;
+        }
+        if let Some((addr, op, skip)) = fold_store_add_imm(table, &order, i, &jump_targets) {
+            kept.opcodes.insert(addr, op);
+            i += skip;
+            continue;
+        }
+        if let Some((addr, op, skip)) = fold_push_add_local(table, &order, i, &jump_targets) {
+            kept.opcodes.insert(addr, op);
+            i += skip;
+            continue;
+        }
+
         let addr0 = order[i];
         let op0 = table.opcodes.get(&addr0).unwrap();
-
-        if let OpCode::StoreLocal(_, key0, _) = op0 {
-            if let (Some(addr1), Some(addr2)) = (order.get(i + 1), order.get(i + 2)) {
-                if !jump_targets.contains(addr1) && !jump_targets.contains(addr2) {
-                    let op1 = table.opcodes.get(addr1).unwrap();
-                    let op2 = table.opcodes.get(addr2).unwrap();
-                    if let OpCode::LoadLocal(_, key2, _) = op2
-                        && key2 == key0
-                    {
-                        let imm = match op1 {
-                            OpCode::SAdd(_) => Some(1),
-                            OpCode::SSub(_) => Some(-1),
-                            _ => None,
-                        };
-                        if let Some(imm) = imm {
-                            kept.opcodes
-                                .insert(addr0, OpCode::AddLocalImm(Some(addr0), *key0, imm));
-                            i += 3;
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            if let (Some(addr1), Some(addr2), Some(addr3)) =
-                (order.get(i + 1), order.get(i + 2), order.get(i + 3))
-            {
-                if !jump_targets.contains(addr1)
-                    && !jump_targets.contains(addr2)
-                    && !jump_targets.contains(addr3)
-                {
-                    let op1 = table.opcodes.get(addr1).unwrap();
-                    let op2 = table.opcodes.get(addr2).unwrap();
-                    let op3 = table.opcodes.get(addr3).unwrap();
-                    if let (OpCode::Push(_, Operand::ImmNum(imm)), OpCode::LoadLocal(_, key3, _)) =
-                        (op1, op3)
-                    {
-                        if key3 == key0 {
-                            let delta = match op2 {
-                                OpCode::Add(_) => Some(*imm),
-                                OpCode::Sub(_) => Some(-*imm),
-                                _ => None,
-                            };
-                            if let Some(delta) = delta {
-                                kept.opcodes
-                                    .insert(addr0, OpCode::AddLocalImm(Some(addr0), *key0, delta));
-                                i += 4;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if let OpCode::Push(_, Operand::ImmNum(imm)) = op0 {
-            if let (Some(addr1), Some(addr2), Some(addr3)) =
-                (order.get(i + 1), order.get(i + 2), order.get(i + 3))
-            {
-                if !jump_targets.contains(addr1)
-                    && !jump_targets.contains(addr2)
-                    && !jump_targets.contains(addr3)
-                {
-                    let op1 = table.opcodes.get(addr1).unwrap();
-                    let op2 = table.opcodes.get(addr2).unwrap();
-                    let op3 = table.opcodes.get(addr3).unwrap();
-                    if let (
-                        OpCode::StoreLocal(_, key1, _),
-                        OpCode::Add(_),
-                        OpCode::LoadLocal(_, key3, _),
-                    ) = (op1, op2, op3)
-                    {
-                        if key1 == key3 {
-                            kept.opcodes
-                                .insert(addr0, OpCode::AddLocalImm(Some(addr0), *key1, *imm));
-                            i += 4;
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-
         kept.opcodes.insert(addr0, op0.clone());
         i += 1;
     }
@@ -756,6 +886,9 @@ fn collect_local_reads(table: &OpCodeTable) -> HashSet<DefaultKey> {
                 reads.insert(*key);
             }
             OpCode::Push(_, Operand::Val(key)) => {
+                reads.insert(*key);
+            }
+            OpCode::GetIndexLocal(_, key) => {
                 reads.insert(*key);
             }
             _ => {}
@@ -816,6 +949,7 @@ fn stack_effect(op: &OpCode) -> i32 {
         OpCode::LoadArrayLocal(_, _, len) | OpCode::LoadArrayGlobal(_, _, len) => -(*len as i32),
         OpCode::SetArrayLocal(_, _) | OpCode::SetArrayGlobal(_, _) => -2,
         OpCode::AIndex(_) | OpCode::Ref(_) => -1,
+        OpCode::GetIndexLocal(_, _) => 0,
         OpCode::Not(_)
         | OpCode::Neg(_)
         | OpCode::Pos(_)

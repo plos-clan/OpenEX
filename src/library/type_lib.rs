@@ -92,6 +92,58 @@ fn reg_array_length() -> ModuleFunc {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
+fn type_array_fill(args: &[Value]) -> Result<Value, RuntimeError> {
+    let Some(value) = args.first().cloned() else {
+        return Err(RuntimeError::TypeException(
+            "array_fill: missing value.".to_smolstr(),
+        ));
+    };
+    let Some(count) = args.get(1) else {
+        return Err(RuntimeError::TypeException(
+            "array_fill: missing length.".to_smolstr(),
+        ));
+    };
+    let Value::Int(len) = count else {
+        return Err(RuntimeError::TypeException(
+            "array_fill: length is not int.".to_smolstr(),
+        ));
+    };
+    let len = usize::try_from(*len)
+        .map_err(|_| RuntimeError::TypeException("array_fill: length is negative.".to_smolstr()))?;
+    Ok(Value::Array(len, vec![value; len]))
+}
+
+fn reg_array_fill() -> ModuleFunc {
+    ModuleFunc {
+        name: SmolStr::new("array_fill"),
+        arity: 2,
+        func: type_array_fill,
+    }
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn type_length(args: &[Value]) -> Result<Value, RuntimeError> {
+    if let Value::String(raw_str) = args.first().unwrap() {
+        return Ok(Value::Int(raw_str.len() as i64));
+    }
+
+    let Value::Array(len, _) = args.first().unwrap().clone() else {
+        return Err(RuntimeError::TypeException(
+            "_length: arg is not array or string".to_smolstr(),
+        ));
+    };
+    Ok(Value::Int(i64::try_from(len).unwrap()))
+}
+
+fn reg_length() -> ModuleFunc {
+    ModuleFunc {
+        name: SmolStr::new("_length"),
+        arity: 1,
+        func: type_length,
+    }
+}
+
 pub fn register_type_lib() {
     let mut type_lib = LibModule {
         name: SmolStr::new("type"),
@@ -101,5 +153,7 @@ pub fn register_type_lib() {
     type_lib.functions.push(reg_to_float());
     type_lib.functions.push(reg_check_type());
     type_lib.functions.push(reg_array_length());
+    type_lib.functions.push(reg_array_fill());
+    type_lib.functions.push(reg_length());
     register_library(type_lib);
 }

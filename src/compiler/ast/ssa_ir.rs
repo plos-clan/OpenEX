@@ -112,8 +112,9 @@ pub enum OpCode {
     BLeft(Option<LocalAddr>),  // <<
     BRight(Option<LocalAddr>), // >>
 
-    Ref(Option<LocalAddr>),    // .
-    AIndex(Option<LocalAddr>), // 数组索引
+    Ref(Option<LocalAddr>),                       // .
+    AIndex(Option<LocalAddr>),                    // 数组索引
+    GetIndexLocal(Option<LocalAddr>, DefaultKey), // 从局部数组取索引值
 }
 
 impl OpCode {
@@ -416,6 +417,7 @@ macro_rules! match_opcodes {
             | OpCode::BRight($slot)
             | OpCode::Ref($slot)
             | OpCode::AIndex($slot)
+            | OpCode::GetIndexLocal($slot, ..)
             | OpCode::Nop($slot) => $stmt,
         }
     };

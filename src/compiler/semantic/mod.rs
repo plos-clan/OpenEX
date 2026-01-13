@@ -18,7 +18,7 @@ use crate::compiler::semantic::block::block_semantic;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic};
 use crate::compiler::semantic::function::{function_semantic, native_function_semantic};
 use crate::compiler::semantic::judgment::judgment_semantic;
-use crate::compiler::semantic::var::{array_semantic, var_semantic};
+use crate::compiler::semantic::var::{array_fill_semantic, array_semantic, var_semantic};
 use crate::compiler::semantic::r#while::while_semantic;
 use crate::compiler::{Compiler, CompilerData};
 
@@ -109,6 +109,22 @@ impl<'a> Semantic<'a> {
                 ASTStmtTree::Array { token, elements } => {
                     let ret_m =
                         array_semantic(self, token, elements, value_alloc, &mut global, true)?;
+                    code.get_code_table().append_code(&ret_m);
+                }
+                ASTStmtTree::ArrayFill {
+                    token,
+                    value,
+                    count,
+                } => {
+                    let ret_m = array_fill_semantic(
+                        self,
+                        token,
+                        value,
+                        count,
+                        value_alloc,
+                        &mut global,
+                        true,
+                    )?;
                     code.get_code_table().append_code(&ret_m);
                 }
                 ASTStmtTree::Context(stmts) => {

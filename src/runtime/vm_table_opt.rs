@@ -302,3 +302,26 @@ pub fn get_index_array(stack_frame: &mut StackFrame) -> Result<(), RuntimeError>
         ))
     }
 }
+
+pub fn get_index_local(stack_frame: &mut StackFrame, index: usize) -> Result<(), RuntimeError> {
+    let arr_index = stack_frame.pop_op_stack();
+    let array = stack_frame.get_local(index);
+    if let Value::Int(arr_index) = arr_index
+        && let Value::Array { 0: len, 1: element } = array
+    {
+        let usize_index = usize::try_from(arr_index).unwrap();
+        if usize_index >= *len {
+            return Err(RuntimeError::IndexOutOfBounds(
+                format_args!("Index {arr_index} out of bounds for length {len}").to_smolstr(),
+            ));
+        }
+        let result = element.get(usize_index).unwrap().clone();
+        stack_frame.push_op_stack(result);
+        stack_frame.next_pc();
+        Ok(())
+    } else {
+        Err(RuntimeError::TypeException(
+            "cannot get_index unknown type.".to_smolstr(),
+        ))
+    }
+}

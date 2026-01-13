@@ -104,6 +104,11 @@ pub enum ASTStmtTree {
         token: Token,
         elements: Vec<ASTExprTree>,
     },
+    ArrayFill {
+        token: Token,
+        value: ASTExprTree,
+        count: ASTExprTree,
+    },
     Break(Token),
     Continue(Token),
     Empty, // 空语句需要剔除

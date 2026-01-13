@@ -8,7 +8,7 @@ use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::expression::{check_expr_operand, expr_semantic, lower_expr};
 use crate::compiler::semantic::judgment::judgment_semantic;
 use crate::compiler::semantic::loop_back::loop_back_semantic;
-use crate::compiler::semantic::var::{array_semantic, var_semantic};
+use crate::compiler::semantic::var::{array_fill_semantic, array_semantic, var_semantic};
 use crate::compiler::semantic::r#while::while_semantic;
 
 pub fn block_semantic(
@@ -32,6 +32,15 @@ pub fn block_semantic(
             }
             ASTStmtTree::Array { token, elements } => {
                 let ret_m = array_semantic(semantic, token, elements, code, locals, false)?;
+                opcodes.append_code(&ret_m);
+            }
+            ASTStmtTree::ArrayFill {
+                token,
+                value,
+                count,
+            } => {
+                let ret_m =
+                    array_fill_semantic(semantic, token, value, count, code, locals, false)?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Expr(expr) => {
