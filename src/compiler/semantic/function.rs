@@ -74,18 +74,17 @@ pub fn function_semantic(
 
     let args_len = arguments.len();
     for i in arguments {
-        if let ASTExprTree::Var(token) = i {
-            let token_c = token.clone();
-            let key = value_alloc.alloc_value(token, ValueGuessType::Unknown);
-            locals.add_local(key);
-            semantic
-                .compiler_data()
-                .symbol_table
-                .add_element(token_c.value().unwrap(), Argument);
-            tables.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
-        } else {
+        let ASTExprTree::Var(token) = i else {
             unreachable!()
-        }
+        };
+        let token_c = token.clone();
+        let key = value_alloc.alloc_value(token, ValueGuessType::Unknown);
+        locals.add_local(key);
+        semantic
+            .compiler_data()
+            .symbol_table
+            .add_element(token_c.value().unwrap(), Argument);
+        tables.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
     }
 
     let blk = block_semantic(semantic, body, &mut value_alloc, &mut locals)?;

@@ -7,7 +7,9 @@ use crate::compiler::lints::Lint;
 use crate::compiler::parser::ParserError::LexError;
 use crate::compiler::parser::symbol_table::SymbolTable;
 use crate::compiler::parser::{Parser, ParserError};
-use crate::compiler::semantic::{Semantic, const_prop_linear, eliminate_dead_locals, local_arith_peephole};
+use crate::compiler::semantic::{
+    Semantic, const_prop_linear, eliminate_dead_locals, local_arith_peephole,
+};
 use crate::compiler::{Compiler, CompilerData};
 
 #[derive(Debug, Clone)]

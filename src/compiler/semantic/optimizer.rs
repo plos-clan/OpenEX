@@ -118,12 +118,7 @@ where
     }
 }
 
-fn fold_num_cmp<F, G>(
-    left: &Operand,
-    right: &Operand,
-    int_cmp: F,
-    float_cmp: G,
-) -> Option<Operand>
+fn fold_num_cmp<F, G>(left: &Operand, right: &Operand, int_cmp: F, float_cmp: G) -> Option<Operand>
 where
     F: Fn(i64, i64) -> bool,
     G: Fn(&DBig, &DBig) -> bool,
@@ -370,11 +365,7 @@ fn const_prop_step(
         }
         OpCode::Jump(_, _) | OpCode::LazyJump(_, _, _) | OpCode::Return(_) => None,
         OpCode::Nop(_) => None,
-        OpCode::Not(_)
-        | OpCode::Neg(_)
-        | OpCode::Pos(_)
-        | OpCode::SAdd(_)
-        | OpCode::SSub(_) => {
+        OpCode::Not(_) | OpCode::Neg(_) | OpCode::Pos(_) | OpCode::SAdd(_) | OpCode::SSub(_) => {
             let value = stack_pop(stack);
             let folded = eval_unary(op, value);
             stack.push(folded);
@@ -672,10 +663,8 @@ fn local_arith_peephole_table(table: &mut OpCodeTable) {
                             _ => None,
                         };
                         if let Some(imm) = imm {
-                            kept.opcodes.insert(
-                                addr0,
-                                OpCode::AddLocalImm(Some(addr0), *key0, imm),
-                            );
+                            kept.opcodes
+                                .insert(addr0, OpCode::AddLocalImm(Some(addr0), *key0, imm));
                             i += 3;
                             continue;
                         }
@@ -703,10 +692,8 @@ fn local_arith_peephole_table(table: &mut OpCodeTable) {
                                 _ => None,
                             };
                             if let Some(delta) = delta {
-                                kept.opcodes.insert(
-                                    addr0,
-                                    OpCode::AddLocalImm(Some(addr0), *key0, delta),
-                                );
+                                kept.opcodes
+                                    .insert(addr0, OpCode::AddLocalImm(Some(addr0), *key0, delta));
                                 i += 4;
                                 continue;
                             }
@@ -727,14 +714,15 @@ fn local_arith_peephole_table(table: &mut OpCodeTable) {
                     let op1 = table.opcodes.get(addr1).unwrap();
                     let op2 = table.opcodes.get(addr2).unwrap();
                     let op3 = table.opcodes.get(addr3).unwrap();
-                    if let (OpCode::StoreLocal(_, key1, _), OpCode::Add(_), OpCode::LoadLocal(_, key3, _)) =
-                        (op1, op2, op3)
+                    if let (
+                        OpCode::StoreLocal(_, key1, _),
+                        OpCode::Add(_),
+                        OpCode::LoadLocal(_, key3, _),
+                    ) = (op1, op2, op3)
                     {
                         if key1 == key3 {
-                            kept.opcodes.insert(
-                                addr0,
-                                OpCode::AddLocalImm(Some(addr0), *key1, *imm),
-                            );
+                            kept.opcodes
+                                .insert(addr0, OpCode::AddLocalImm(Some(addr0), *key1, *imm));
                             i += 4;
                             continue;
                         }

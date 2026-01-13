@@ -72,12 +72,7 @@ impl CallCache {
         Some(key)
     }
 
-    pub fn get_memo(
-        &self,
-        unit_index: usize,
-        func_index: usize,
-        key: &[MemoKey],
-    ) -> Option<Value> {
+    pub fn get_memo(&self, unit_index: usize, func_index: usize, key: &[MemoKey]) -> Option<Value> {
         self.memo
             .get(&(unit_index, func_index))
             .and_then(|map| map.get(key).cloned())
@@ -165,27 +160,25 @@ pub fn store_local(stack_frame: &mut StackFrame, index: usize) {
 
 pub fn jump_true(stack_frame: &mut StackFrame, jpc: usize) {
     let top = stack_frame.pop_op_stack();
-    if let Value::Bool(value) = top {
-        if value {
-            stack_frame.set_next_pc(jpc);
-        } else {
-            stack_frame.next_pc();
-        }
-    } else {
+    let Value::Bool(value) = top else {
         unreachable!()
+    };
+    if value {
+        stack_frame.set_next_pc(jpc);
+    } else {
+        stack_frame.next_pc();
     }
 }
 
 pub fn jump_false(stack_frame: &mut StackFrame, jpc: usize) {
     let top = stack_frame.pop_op_stack();
-    if let Value::Bool(value) = top {
-        if value {
-            stack_frame.next_pc();
-        } else {
-            stack_frame.set_next_pc(jpc);
-        }
-    } else {
+    let Value::Bool(value) = top else {
         unreachable!()
+    };
+    if value {
+        stack_frame.next_pc();
+    } else {
+        stack_frame.set_next_pc(jpc);
     }
 }
 
@@ -200,57 +193,54 @@ pub fn call_func<'a>(
 ) -> Result<RunState<'a>, RuntimeError> {
     let result = stack_frame.pop_op_stack();
 
-    if let Value::Ref(path) = result {
-        if let Some((unit_index, func_index)) = call_cache.resolve(&path) {
-            let unit = &units[unit_index];
-            let func = &unit.methods[func_index];
-            let codes = func.get_codes();
-            if call_cache.is_memoizable(unit_index, func_index) {
-                if let Some(args) = stack_frame.peek_args(func.args) {
-                    if let Some(key) = CallCache::make_key(args) {
-                        if let Some(value) =
-                            call_cache.get_memo(unit_index, func_index, &key)
-                        {
-                            for _ in 0..func.args {
-                                let _ = stack_frame.pop_op_stack();
-                            }
-                            stack_frame.push_op_stack(value);
-                            stack_frame.next_pc();
-                            return Ok(RunState::Continue);
-                        }
-                        let native = if func.is_native { Some(path) } else { None };
-                        let mut frame = StackFrame::new(
-                            func.locals,
-                            codes,
-                            unit.constant_table,
-                            func.name.as_str(),
-                            func.r_name.as_str(),
-                            native,
-                            func.args,
-                        );
-                        frame.set_memo((unit_index, func_index), key);
-                        stack_frame.next_pc();
-                        return Ok(RunState::CallRequest(frame));
-                    }
-                }
+    let Value::Ref(path) = result else {
+        return Err(RuntimeError::VMError);
+    };
+
+    let Some((unit_index, func_index)) = call_cache.resolve(&path) else {
+        return Err(RuntimeError::NoSuchFunctionException(path));
+    };
+
+    let unit = &units[unit_index];
+    let func = &unit.methods[func_index];
+    let codes = func.get_codes();
+    if call_cache.is_memoizable(unit_index, func_index)
+        && let Some(args) = stack_frame.peek_args(func.args)
+        && let Some(key) = CallCache::make_key(args)
+    {
+        if let Some(value) = call_cache.get_memo(unit_index, func_index, &key) {
+            for _ in 0..func.args {
+                let _ = stack_frame.pop_op_stack();
             }
+            stack_frame.push_op_stack(value);
             stack_frame.next_pc();
-            let native = if func.is_native { Some(path) } else { None };
-            Ok(RunState::CallRequest(StackFrame::new(
-                func.locals,
-                codes,
-                unit.constant_table,
-                func.name.as_str(),
-                func.r_name.as_str(),
-                native,
-                func.args,
-            )))
-        } else {
-            Err(RuntimeError::NoSuchFunctionException(path))
+            return Ok(RunState::Continue);
         }
-    } else {
-        Err(RuntimeError::VMError)
+        let native = if func.is_native { Some(path) } else { None };
+        let mut frame = StackFrame::new(
+            func.locals,
+            codes,
+            unit.constant_table,
+            func.name.as_str(),
+            func.r_name.as_str(),
+            native,
+            func.args,
+        );
+        frame.set_memo((unit_index, func_index), key);
+        stack_frame.next_pc();
+        return Ok(RunState::CallRequest(frame));
     }
+    stack_frame.next_pc();
+    let native = if func.is_native { Some(path) } else { None };
+    Ok(RunState::CallRequest(StackFrame::new(
+        func.locals,
+        codes,
+        unit.constant_table,
+        func.name.as_str(),
+        func.r_name.as_str(),
+        native,
+        func.args,
+    )))
 }
 
 pub fn load_array_local(stack_frame: &mut StackFrame, len: usize, index: usize) {

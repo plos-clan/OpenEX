@@ -192,8 +192,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.parse_step() {
                 Ok(node) => {
-                    if matches!(node, ASTStmtTree::Empty) {
-                    } else {
+                    if !matches!(node, ASTStmtTree::Empty) {
                         root_tree.push(node);
                     }
                 }

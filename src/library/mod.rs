@@ -72,19 +72,20 @@ pub fn load_libraries(
     for entry in fs::read_dir(lib_path)? {
         let entry = entry?;
         let path = entry.path();
-
-        if path.is_file() {
-            let mut buf = Vec::new();
-            File::open(&path)?.read_to_end(&mut buf)?;
-
-            let name = path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("<invalid>")
-                .to_string();
-            let data = SmolStr::new(std::str::from_utf8(&buf).expect("error: file not UTF-8"));
-            compiler.add_file(SourceFile::new(name, data.to_string(), lints.clone(), true));
+        if !path.is_file() {
+            continue;
         }
+
+        let mut buf = Vec::new();
+        File::open(&path)?.read_to_end(&mut buf)?;
+
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("<invalid>")
+            .to_string();
+        let data = SmolStr::new(std::str::from_utf8(&buf).expect("error: file not UTF-8"));
+        compiler.add_file(SourceFile::new(name, data.to_string(), lints.clone(), true));
     }
 
     register_system_lib();

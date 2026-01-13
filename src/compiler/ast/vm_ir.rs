@@ -350,11 +350,10 @@ impl VMIRTable {
             match code.1 {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
-                        if let Some(index) = locals.get_index(key) {
-                            codes_builder.push(ByteCode::StoreGlobal(*index));
-                        } else {
+                        let Some(index) = locals.get_index(key) else {
                             unreachable!()
-                        }
+                        };
+                        codes_builder.push(ByteCode::StoreGlobal(*index));
                     } else {
                         let index = const_table.add_operand(imm, code0);
                         codes_builder.push(ByteCode::Push(index));

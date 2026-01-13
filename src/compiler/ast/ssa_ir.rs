@@ -166,11 +166,10 @@ impl OpCodeTable {
         let addr = self.alloc_addr;
         self.opcodes.insert(addr, opcode);
         self.alloc_addr.offset += 1;
-        if let Some(op) = self.opcodes.get_mut(&addr) {
-            op.set_id(addr);
-        } else {
-            unreachable!()
-        }
+        let Some(op) = self.opcodes.get_mut(&addr) else {
+            unreachable!();
+        };
+        op.set_id(addr);
         addr
     }
 

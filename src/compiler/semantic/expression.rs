@@ -287,57 +287,56 @@ fn lower_ref(
         .unwrap_or(semantic.file.name.as_str())
         .to_smolstr();
 
-    if let ASTExprTree::Expr {
+    let ASTExprTree::Expr {
         token: _,
         op: _op,
         left,
         right,
     } = expr_tree
-    {
-        let left_tree = left.as_ref();
-        let right_tree = right.as_ref();
+    else {
+        unreachable!()
+    };
 
-        if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree {
-            let base = match left_tree {
-                ASTExprTree::This(_) => Some(file_base.clone()),
-                ASTExprTree::Var(name) => match semantic
-                    .compiler_data()
-                    .symbol_table
-                    .get_element_type(name.text())
-                {
-                    Some(ElementType::Library(lib_name)) => Some(lib_name.clone()),
-                    _ => None,
-                },
+    let left_tree = left.as_ref();
+    let right_tree = right.as_ref();
+
+    if let ASTExprTree::Var(token) | ASTExprTree::This(token) = right_tree {
+        let base = match left_tree {
+            ASTExprTree::This(_) => Some(file_base.clone()),
+            ASTExprTree::Var(name) => match semantic
+                .compiler_data()
+                .symbol_table
+                .get_element_type(name.text())
+            {
+                Some(ElementType::Library(lib_name)) => Some(lib_name.clone()),
                 _ => None,
-            };
+            },
+            _ => None,
+        };
 
-            if let Some(base) = base {
-                let full_path = format_smolstr!("{}/{}", base, token.text());
-                opcode_table.add_opcode(Push(None, Operand::Reference(full_path)));
-                return Ok((token.text().to_smolstr(), opcode_table));
-            }
+        if let Some(base) = base {
+            let full_path = format_smolstr!("{}/{}", base, token.text());
+            opcode_table.add_opcode(Push(None, Operand::Reference(full_path)));
+            return Ok((token.text().to_smolstr(), opcode_table));
         }
+    }
 
-        if matches!(left_tree, ASTExprTree::Call { .. })
+    assert!(
+        matches!(left_tree, ASTExprTree::Call { .. })
             || matches!(left_tree, ASTExprTree::This(_token))
             || matches!(left_tree, ASTExprTree::Var(_token))
-        {
-            let table = lower_expr(semantic, left_tree, code, None)?.2;
-            opcode_table.append_code(&table);
-        } else {
-            unreachable!()
-        }
+    );
 
-        let code = match right_tree {
-            ASTExprTree::Var(token) => Push(None, Operand::Reference(token.text().to_smolstr())),
-            ASTExprTree::This(_token) => Push(None, Operand::This),
-            _ => unreachable!(),
-        };
-        opcode_table.add_opcode(code);
-        opcode_table.add_opcode(OpCode::Ref(None));
-    } else {
-        unreachable!()
-    }
+    let table = lower_expr(semantic, left_tree, code, None)?.2;
+    opcode_table.append_code(&table);
+
+    let code = match right_tree {
+        ASTExprTree::Var(token) => Push(None, Operand::Reference(token.text().to_smolstr())),
+        ASTExprTree::This(_token) => Push(None, Operand::This),
+        _ => unreachable!(),
+    };
+    opcode_table.add_opcode(code);
+    opcode_table.add_opcode(OpCode::Ref(None));
 
     if let ASTExprTree::Expr { right, .. } = expr_tree
         && let ASTExprTree::Var(token) | ASTExprTree::This(token) = right.as_ref()
@@ -610,16 +609,17 @@ pub fn lower_expr(
                 opcode_table.append_code(&right.2); // 赋值数据 expression
                 let index = lower_expr(semantic, ex_right, code, stores)?;
                 opcode_table.append_code(&index.2); // 索引 index
-                if let ASTExprTree::Var(name) = ex_left.as_ref() {
-                    code.find_value_key(&name.text().to_smolstr()).map_or_else(
-                        || unreachable!(),
-                        |key| {
-                            opcode_table.add_opcode(OpCode::SetArrayLocal(None, key));
-                        },
-                    );
-                } else {
+                let ASTExprTree::Var(name) = ex_left.as_ref() else {
                     unreachable!()
-                }
+                };
+
+                code.find_value_key(&name.text().to_smolstr()).map_or_else(
+                    || unreachable!(),
+                    |key| {
+                        opcode_table.add_opcode(OpCode::SetArrayLocal(None, key));
+                    },
+                );
+
                 //TODO CALL 占位符
                 return Ok((Operand::Call("".to_smolstr()), Unknown, opcode_table));
             }

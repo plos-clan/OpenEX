@@ -1,5 +1,5 @@
-use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 use dashu::float::DBig;
+use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
@@ -437,7 +437,11 @@ pub fn call_function(
                             if executor.call_stack.is_empty() {
                                 return ret_var;
                             }
-                            executor.call_stack.last_mut().unwrap().push_op_stack(ret_var);
+                            executor
+                                .call_stack
+                                .last_mut()
+                                .unwrap()
+                                .push_op_stack(ret_var);
                         }
                     }
                     RunState::Continue => {}
