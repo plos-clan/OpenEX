@@ -10,6 +10,7 @@ use crate::compiler::parser::ParserError;
 use crate::compiler::parser::symbol_table::ElementType;
 use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
+use slotmap::DefaultKey;
 use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 
 macro_rules! check_bool_expr {
@@ -30,6 +31,41 @@ macro_rules! check_bool_expr {
             Ok($second)
         }
     };
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ValueScope {
+    Local,
+    Global,
+}
+
+fn resolve_value_key(
+    code: &ValueAlloc,
+    global_values: Option<&ValueAlloc>,
+    name: &SmolStr,
+) -> Option<(DefaultKey, ValueScope)> {
+    if let Some(key) = code.find_value_key(name) {
+        return Some((key, ValueScope::Local));
+    }
+    global_values
+        .and_then(|values| values.find_value_key(name))
+        .map(|key| (key, ValueScope::Global))
+}
+
+fn resolve_value_type(
+    code: &ValueAlloc,
+    global_values: Option<&ValueAlloc>,
+    key: DefaultKey,
+    scope: ValueScope,
+) -> ValueGuessType {
+    match scope {
+        ValueScope::Local => code
+            .find_value(key)
+            .map_or(Unknown, |value| value.type_.clone()),
+        ValueScope::Global => global_values
+            .and_then(|values| values.find_value(key))
+            .map_or(Unknown, |value| value.type_.clone()),
+    }
 }
 
 fn astop_to_opcode(astop: ExprOp) -> OpCode {
@@ -277,6 +313,7 @@ fn lower_ref(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
 ) -> Result<(SmolStr, OpCodeTable), ParserError> {
     let mut opcode_table = OpCodeTable::new();
     let file_base = semantic
@@ -327,7 +364,7 @@ fn lower_ref(
             || matches!(left_tree, ASTExprTree::Var(_token))
     );
 
-    let table = lower_expr(semantic, left_tree, code, None)?.2;
+    let table = lower_expr(semantic, left_tree, code, global_values, None)?.2;
     opcode_table.append_code(&table);
 
     let code = match right_tree {
@@ -401,10 +438,11 @@ fn expr_unary(
     u_op: ExprOp,
     u_code: &ASTExprTree,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     mut opcode_table: OpCodeTable,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
-    let load = lower_expr(semantic, u_code, code, None)?;
-    let store = lower_expr(semantic, u_code, code, Some(ImmNumFlot))?;
+    let load = lower_expr(semantic, u_code, code, global_values, None)?;
+    let store = lower_expr(semantic, u_code, code, global_values, Some(ImmNumFlot))?;
     let g_type = guess_type_unary(u_token, store.1, u_op)?;
     if let Some(operand) = unary_optimizer(u_op, &store.0) {
         opcode_table.add_opcode(Push(None, operand));
@@ -420,6 +458,7 @@ fn expr_var(
     semantic: &mut Semantic,
     u_token: &Token,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     mut opcode_table: OpCodeTable,
     store: Option<Operand>,
     check_urs: bool, // 是否检查符号未定义 (引用不检查)
@@ -433,50 +472,62 @@ fn expr_var(
         return Err(ParserError::UnableResolveSymbols(u_token.clone()));
     }
 
-    if check_urs {
-        code.find_value_key(&var_name).map_or_else(
-            || unreachable!(),
-            |key| {
-                let value = code.find_value(key).unwrap();
-                value.variable = true;
-                let type_ = value.type_.clone();
-                match value.type_ {
-                    Ref => {
-                        let name = match semantic
-                            .compiler_data()
-                            .symbol_table
-                            .get_element_type(var_name.clone().as_str())
-                        {
-                            Some(ElementType::Library(names)) => names.clone(),
-                            _ => var_name,
-                        };
-                        opcode_table.add_opcode(Push(None, Operand::Library(name)));
-                    }
-                    _ => {
-                        if let Some(operand) = store {
-                            if operand != ImmNumFlot {
-                                value.type_ = operand_to_guess(&operand);
-                            }
-                            opcode_table.add_opcode(OpCode::LoadLocal(
-                                None,
-                                key,
-                                Operand::Val(key),
-                            ));
-                        } else {
-                            opcode_table.add_opcode(OpCode::StoreLocal(
-                                None,
-                                key,
-                                Operand::Val(key),
-                            ));
+    if !check_urs {
+        opcode_table.add_opcode(Push(None, Operand::Reference(var_name.clone())));
+        return Ok((Operand::Reference(var_name), Ref, opcode_table));
+    }
+
+    let (key, scope) = resolve_value_key(code, global_values, &var_name).unwrap();
+    match scope {
+        ValueScope::Local => {
+            let value = code.find_value_mut(key).unwrap();
+            value.variable = true;
+            let mut type_ = value.type_.clone();
+            match value.type_ {
+                Ref => {
+                    let name = match semantic
+                        .compiler_data()
+                        .symbol_table
+                        .get_element_type(var_name.clone().as_str())
+                    {
+                        Some(ElementType::Library(names)) => names.clone(),
+                        _ => var_name,
+                    };
+                    opcode_table.add_opcode(Push(None, Operand::Library(name)));
+                }
+                _ => {
+                    if let Some(operand) = store {
+                        if operand != ImmNumFlot {
+                            value.type_ = operand_to_guess(&operand);
+                            type_ = value.type_.clone();
                         }
+                        opcode_table.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
+                    } else {
+                        opcode_table.add_opcode(OpCode::StoreLocal(None, key, Operand::Val(key)));
                     }
                 }
-                Ok((Operand::Val(key), type_, opcode_table))
-            },
-        )
-    } else {
-        opcode_table.add_opcode(Push(None, Operand::Reference(var_name.clone())));
-        Ok((Operand::Reference(var_name), Ref, opcode_table))
+            }
+            Ok((Operand::Val(key), type_, opcode_table))
+        }
+        ValueScope::Global => {
+            let type_ = resolve_value_type(code, global_values, key, scope);
+            if type_ == Ref {
+                let name = match semantic
+                    .compiler_data()
+                    .symbol_table
+                    .get_element_type(var_name.clone().as_str())
+                {
+                    Some(ElementType::Library(names)) => names.clone(),
+                    _ => var_name,
+                };
+                opcode_table.add_opcode(Push(None, Operand::Library(name)));
+            } else if store.is_some() {
+                opcode_table.add_opcode(OpCode::LoadGlobal(None, key, Operand::Val(key)));
+            } else {
+                opcode_table.add_opcode(OpCode::StoreGlobal(None, key, Operand::Val(key)));
+            }
+            Ok((Operand::Val(key), type_, opcode_table))
+        }
     }
 }
 
@@ -485,6 +536,7 @@ fn expr_call(
     name: &ASTExprTree,
     args: &Vec<ASTExprTree>,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     mut opcode_table: OpCodeTable,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
     if args.is_empty()
@@ -497,7 +549,7 @@ fn expr_call(
         && let ASTExprTree::Var(token) = right.as_ref()
         && token.text() == "length"
     {
-        let target = lower_expr(semantic, left, code, None)?;
+        let target = lower_expr(semantic, left, code, global_values, None)?;
         opcode_table.append_code(&target.2);
         opcode_table.add_opcode(Push(
             None,
@@ -512,7 +564,7 @@ fn expr_call(
     }
 
     for arg in args {
-        let expr = lower_expr(semantic, arg, code, None)?;
+        let expr = lower_expr(semantic, arg, code, global_values, None)?;
         opcode_table.append_code(&expr.2);
     }
 
@@ -536,7 +588,7 @@ fn expr_call(
             left: _left,
             right: _right,
         } => {
-            let refs = lower_ref(semantic, name, code)?;
+            let refs = lower_ref(semantic, name, code, global_values)?;
             opcode_table.append_code(&refs.1);
             let cl_str = refs.0.clone();
             opcode_table.add_opcode(OpCode::Call(None, refs.0));
@@ -555,16 +607,25 @@ fn exp_compound(
     left: &ASTExprTree,
     expr_op: &ExprOp,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     mut opcode_table: OpCodeTable,
     stores: Option<Operand>,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
-    let left_exp = lower_expr(semantic, left, code, stores)?;
+    let left_exp = lower_expr(semantic, left, code, global_values, stores)?;
     opcode_table.append_code(&left_exp.2);
     opcode_table.append_code(right_table);
     opcode_table.add_opcode(astop_to_opcode(*expr_op));
 
     if let ASTExprTree::Var(token) = left {
-        expr_var(semantic, token, code, opcode_table, Some(ImmNumFlot), true)
+        expr_var(
+            semantic,
+            token,
+            code,
+            global_values,
+            opcode_table,
+            Some(ImmNumFlot),
+            true,
+        )
     } else {
         Err(ParserError::IllegalExpression(token))
     }
@@ -574,6 +635,7 @@ pub fn lower_expr(
     semantic: &mut Semantic,
     expr_tree: &ASTExprTree,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     store: Option<Operand>,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
     let mut opcode_table = OpCodeTable::new();
@@ -587,14 +649,22 @@ pub fn lower_expr(
             token: u_token,
             op: u_op,
             code: u_code,
-        } => expr_unary(semantic, u_token, *u_op, u_code, code, opcode_table),
+        } => expr_unary(
+            semantic,
+            u_token,
+            *u_op,
+            u_code,
+            code,
+            global_values,
+            opcode_table,
+        ),
         ASTExprTree::Expr {
             token: e_token,
             op: e_op,
             left: e_left,
             right: e_right,
         } => {
-            let right = lower_expr(semantic, e_right.as_ref(), code, None)?;
+            let right = lower_expr(semantic, e_right.as_ref(), code, global_values, None)?;
             let right_opd = Box::new(right.0.clone());
             let stores = if matches!(e_op, ExprOp::Store) {
                 Some(right.0.clone())
@@ -615,6 +685,7 @@ pub fn lower_expr(
                     e_left.as_ref(),
                     e_op,
                     code,
+                    global_values,
                     opcode_table,
                     store,
                 );
@@ -631,18 +702,21 @@ pub fn lower_expr(
                 && matches!(op, ExprOp::AIndex)
             {
                 opcode_table.append_code(&right.2); // 赋值数据 expression
-                let index = lower_expr(semantic, ex_right, code, None)?;
+                let index = lower_expr(semantic, ex_right, code, global_values, None)?;
                 opcode_table.append_code(&index.2); // 索引 index
                 let ASTExprTree::Var(name) = ex_left.as_ref() else {
                     unreachable!()
                 };
-
-                code.find_value_key(&name.text().to_smolstr()).map_or_else(
-                    || unreachable!(),
-                    |key| {
+                let var_name = name.text().to_smolstr();
+                let (key, scope) = resolve_value_key(code, global_values, &var_name).unwrap();
+                match scope {
+                    ValueScope::Local => {
                         opcode_table.add_opcode(OpCode::SetArrayLocal(None, key));
-                    },
-                );
+                    }
+                    ValueScope::Global => {
+                        opcode_table.add_opcode(OpCode::SetArrayGlobal(None, key));
+                    }
+                }
 
                 //TODO CALL 占位符
                 return Ok((Operand::Call("".to_smolstr()), Unknown, opcode_table));
@@ -660,24 +734,24 @@ pub fn lower_expr(
                 {
                     return Err(ParserError::UnableResolveSymbols(name.clone()));
                 }
-                let key = code
-                    .find_value_key(&var_name)
-                    .map_or_else(|| unreachable!(), |key| key);
-                let left_type = code
-                    .find_value(key)
-                    .map_or(Unknown, |value| value.type_.clone());
-                let guess_type = guess_type(e_token, &left_type, right.1, *e_op)?;
-                opcode_table.append_code(&right.2); // 索引 index
-                opcode_table.add_opcode(OpCode::GetIndexLocal(None, key));
-                let n_operand = Operand::Expression(
-                    Box::new(Operand::Val(key)),
-                    right_opd,
-                    Box::new(OpCode::AIndex(None)),
-                );
-                return Ok((n_operand, guess_type, opcode_table));
+                let (key, scope) = resolve_value_key(code, global_values, &var_name).unwrap();
+                if scope == ValueScope::Local {
+                    let left_type = code
+                        .find_value(key)
+                        .map_or(Unknown, |value| value.type_.clone());
+                    let guess_type = guess_type(e_token, &left_type, right.1, *e_op)?;
+                    opcode_table.append_code(&right.2); // 索引 index
+                    opcode_table.add_opcode(OpCode::GetIndexLocal(None, key));
+                    let n_operand = Operand::Expression(
+                        Box::new(Operand::Val(key)),
+                        right_opd,
+                        Box::new(OpCode::AIndex(None)),
+                    );
+                    return Ok((n_operand, guess_type, opcode_table));
+                }
             }
 
-            let left = lower_expr(semantic, e_left.as_ref(), code, stores)?;
+            let left = lower_expr(semantic, e_left.as_ref(), code, global_values, stores)?;
 
             let left_opd = Box::new(left.0.clone());
             let guess_type = guess_type(e_token, &left.1, right.1, *e_op)?;
@@ -700,8 +774,18 @@ pub fn lower_expr(
             }
             Ok((n_operand, guess_type, opcode_table))
         }
-        ASTExprTree::Var(u_token) => expr_var(semantic, u_token, code, opcode_table, store, true),
-        ASTExprTree::Call { name, args } => expr_call(semantic, name, args, code, opcode_table),
+        ASTExprTree::Var(u_token) => expr_var(
+            semantic,
+            u_token,
+            code,
+            global_values,
+            opcode_table,
+            store,
+            true,
+        ),
+        ASTExprTree::Call { name, args } => {
+            expr_call(semantic, name, args, code, global_values, opcode_table)
+        }
     }
 }
 
@@ -733,13 +817,14 @@ pub fn expr_semantic(
     semantic: &mut Semantic,
     expr: Option<ASTExprTree>,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
 ) -> Result<(Operand, ValueGuessType, OpCodeTable), ParserError> {
     let guess_type;
     let operand: Operand;
     let mut opcode_vec = OpCodeTable::new();
 
     if let Some(expr) = expr {
-        let exp = lower_expr(semantic, &expr, code, None)?;
+        let exp = lower_expr(semantic, &expr, code, global_values, None)?;
         opcode_vec.append_code(&exp.2);
         operand = exp.0;
         guess_type = exp.1;

@@ -36,6 +36,38 @@ pub struct MetadataUnit<'a> {
     pub library: bool,
 }
 
+pub struct GlobalStore {
+    globals: Vec<Vec<Value>>,
+}
+
+impl GlobalStore {
+    pub fn new(units: &[MetadataUnit<'_>]) -> Self {
+        let globals = units
+            .iter()
+            .map(|unit| vec![Value::Null; unit.globals])
+            .collect();
+        Self { globals }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            globals: Vec::new(),
+        }
+    }
+
+    pub fn get(&self, unit_index: usize, index: usize) -> Option<&Value> {
+        self.globals
+            .get(unit_index)
+            .and_then(|unit| unit.get(index))
+    }
+
+    pub fn get_mut(&mut self, unit_index: usize, index: usize) -> Option<&mut Value> {
+        self.globals
+            .get_mut(unit_index)
+            .and_then(|unit| unit.get_mut(index))
+    }
+}
+
 impl MethodInfo {
     pub const fn get_codes(&self) -> &[ByteCode] {
         self.codes.as_slice()
@@ -69,16 +101,11 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         });
     }
 
-    let main_metadata = {
-        let mut ret_file = None;
-        for file in &metadata {
-            if !file.library {
-                ret_file = Some(file);
-                break;
-            }
-        }
-        ret_file.unwrap()
-    };
+    let (main_index, main_metadata) = metadata
+        .iter()
+        .enumerate()
+        .find(|(_, file)| !file.library)
+        .unwrap();
 
     let main_method = &MethodInfo {
         name: "<main_root>".to_smolstr(),
@@ -89,8 +116,15 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         args: 0,
     };
 
+    let mut globals = GlobalStore::new(&metadata);
     std::thread::scope(|scope| {
         let thread_manager = ThreadManager::new(scope);
-        thread_manager.submit_join_thread(main_metadata, main_method, metadata.as_slice());
+        thread_manager.submit_join_thread(
+            main_index,
+            main_metadata,
+            main_method,
+            metadata.as_slice(),
+            &mut globals,
+        );
     });
 }

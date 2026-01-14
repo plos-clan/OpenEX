@@ -14,6 +14,7 @@ pub enum ByteCode {
     Push(usize),                   // 将常量表中的元素压入操作栈 (常量表索引)
     Pop(usize),                    // 弹出操作栈顶部的元素
     AddLocalImm(usize, i64),       // 局部变量 += 立即数
+    AddGlobalImm(usize, i64),      // 全局变量 += 立即数
     Load(usize),                   // 栈顶元素加载到局部变量表 (变量表索引)
     Store(usize),                  // 将局部变量加载到栈顶 (变量表索引)
     LoadGlobal(usize),             // 栈顶元素加载到全局变量表 (变量表索引)
@@ -232,12 +233,22 @@ impl IrFunction {
                     }
                 }
                 OpCode::LoadLocal(_, key, _) => {
-                    let index = locals.get_index(key).unwrap();
-                    codes_builder.push(ByteCode::Load(*index));
+                    if let Some(index) = locals.get_index(key) {
+                        codes_builder.push(ByteCode::Load(*index));
+                    } else if let Some(index) = globals.get_index(key) {
+                        codes_builder.push(ByteCode::LoadGlobal(*index));
+                    } else {
+                        unreachable!();
+                    }
                 }
                 OpCode::StoreLocal(_, key, _) => {
-                    let index = locals.get_index(key).unwrap();
-                    codes_builder.push(ByteCode::Store(*index));
+                    if let Some(index) = locals.get_index(key) {
+                        codes_builder.push(ByteCode::Store(*index));
+                    } else if let Some(index) = globals.get_index(key) {
+                        codes_builder.push(ByteCode::StoreGlobal(*index));
+                    } else {
+                        unreachable!();
+                    }
                 }
                 OpCode::LoadGlobal(_, key, _) => {
                     let index = globals.get_index(key).unwrap();
@@ -252,12 +263,17 @@ impl IrFunction {
                     codes_builder.push(ByteCode::LoadArray(*index, len));
                 }
                 OpCode::LoadArrayGlobal(_, key, len) => {
-                    let index = locals.get_index(key).unwrap();
+                    let index = globals.get_index(key).unwrap();
                     codes_builder.push(ByteCode::LoadArrayGlobal(*index, len));
                 }
                 OpCode::AddLocalImm(_, key, imm) => {
-                    let index = locals.get_index(key).unwrap();
-                    codes_builder.push(ByteCode::AddLocalImm(*index, imm));
+                    if let Some(index) = locals.get_index(key) {
+                        codes_builder.push(ByteCode::AddLocalImm(*index, imm));
+                    } else if let Some(index) = globals.get_index(key) {
+                        codes_builder.push(ByteCode::AddGlobalImm(*index, imm));
+                    } else {
+                        unreachable!();
+                    }
                 }
                 OpCode::SetArrayLocal(_, key) => {
                     let index = locals.get_index(key).unwrap();
@@ -390,7 +406,7 @@ impl VMIRTable {
                 }
                 OpCode::AddLocalImm(_, key, imm) => {
                     let index = locals.get_index(key).unwrap();
-                    codes_builder.push(ByteCode::AddLocalImm(*index, imm));
+                    codes_builder.push(ByteCode::AddGlobalImm(*index, imm));
                 }
                 OpCode::SetArrayLocal(_, key) | OpCode::SetArrayGlobal(_, key) => {
                     let index = locals.get_index(key).unwrap();

@@ -48,12 +48,13 @@ impl<'a> Semantic<'a> {
         for stmt in stmts {
             match stmt {
                 ASTStmtTree::Var { name, value } => {
-                    let opcode = var_semantic(self, name, value, value_alloc, true, &mut global)?;
+                    let opcode =
+                        var_semantic(self, name, value, value_alloc, None, true, &mut global)?;
                     code.get_code_table().append_code(&opcode);
                 }
                 ASTStmtTree::Expr(expr) => {
                     let ref_expr = expr.clone();
-                    let ret_m = expr_semantic(self, Some(expr), value_alloc)?;
+                    let ret_m = expr_semantic(self, Some(expr), value_alloc, None)?;
                     code.get_code_table().append_code(&ret_m.2);
                     if !check_expr_operand(&ret_m.0, &OpCode::Store(None), 0) {
                         Compiler::warning_info_expr(
@@ -82,7 +83,7 @@ impl<'a> Semantic<'a> {
                     is_easy,
                 } => {
                     let ret_m =
-                        while_semantic(self, &cond, body, value_alloc, &mut global, is_easy)?;
+                        while_semantic(self, &cond, body, value_alloc, None, &mut global, is_easy)?;
                     code.get_code_table().append_code(&ret_m);
                 }
                 ASTStmtTree::Function { name, args, body } => {
@@ -102,13 +103,21 @@ impl<'a> Semantic<'a> {
                         then_body,
                         else_body,
                         value_alloc,
+                        None,
                         &mut global,
                     )?;
                     code.get_code_table().append_code(&ret_m);
                 }
                 ASTStmtTree::Array { token, elements } => {
-                    let ret_m =
-                        array_semantic(self, token, elements, value_alloc, &mut global, true)?;
+                    let ret_m = array_semantic(
+                        self,
+                        token,
+                        elements,
+                        value_alloc,
+                        None,
+                        &mut global,
+                        true,
+                    )?;
                     code.get_code_table().append_code(&ret_m);
                 }
                 ASTStmtTree::ArrayFill {
@@ -122,13 +131,14 @@ impl<'a> Semantic<'a> {
                         value,
                         count,
                         value_alloc,
+                        None,
                         &mut global,
                         true,
                     )?;
                     code.get_code_table().append_code(&ret_m);
                 }
                 ASTStmtTree::Context(stmts) => {
-                    let ret_m = block_semantic(self, stmts, value_alloc, &mut global)?;
+                    let ret_m = block_semantic(self, stmts, value_alloc, None, &mut global)?;
                     code.get_code_table().append_code(&ret_m);
                 }
                 _ => todo!(),

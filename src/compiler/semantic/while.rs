@@ -15,6 +15,7 @@ pub fn while_semantic(
     expr: &ASTExprTree,
     body: Vec<ASTStmtTree>,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     locals: &mut LocalMap,
     is_easy: bool,
 ) -> Result<OpCodeTable, ParserError> {
@@ -23,7 +24,7 @@ pub fn while_semantic(
         .symbol_table
         .add_context(ContextType::Loop);
 
-    let exp = lower_expr(semantic, expr, code, None)?;
+    let exp = lower_expr(semantic, expr, code, global_values, None)?;
     let mut code_table = OpCodeTable::new();
 
     if exp.1 != ValueGuessType::Bool {
@@ -45,7 +46,7 @@ pub fn while_semantic(
     code_table.append_code(&exp.2);
     let k = code_table.add_opcode(OpCode::JumpFalse(None, None, exp.0));
 
-    let blk_table = block_semantic(semantic, body, code, locals)?;
+    let blk_table = block_semantic(semantic, body, code, global_values, locals)?;
     code_table.append_code(&blk_table);
     code_table.add_opcode(OpCode::Jump(None, Some(start)));
     let end_addr = code_table.add_opcode(OpCode::Nop(None));

@@ -6,7 +6,7 @@ use crate::compiler::parser::ParserError;
 use crate::library::find_library;
 use crate::runtime::vm_operation::*;
 use crate::runtime::vm_table_opt::*;
-use crate::runtime::{MetadataUnit, RuntimeError};
+use crate::runtime::{GlobalStore, MetadataUnit, RuntimeError};
 
 pub struct StackFrame<'a> {
     pc: usize,
@@ -17,6 +17,7 @@ pub struct StackFrame<'a> {
     is_native: Option<SmolStr>,
     pub name: &'a str,
     pub r_name: &'a str, // 栈帧所属脚本的名称
+    unit_index: usize,
     args: usize,
     memo_target: Option<(usize, usize)>,
     memo_key: Option<Vec<MemoKey>>,
@@ -61,6 +62,7 @@ impl<'a> Executor<'a> {
 
 impl<'a> StackFrame<'a> {
     pub fn new(
+        unit_index: usize,
         local_size: usize,
         codes: &'a [ByteCode],
         const_table: &'a [Value],
@@ -78,6 +80,7 @@ impl<'a> StackFrame<'a> {
             const_table,
             name,
             is_native,
+            unit_index,
             args,
             memo_target: None,
             memo_key: None,
@@ -90,6 +93,10 @@ impl<'a> StackFrame<'a> {
 
     pub const fn get_args(&self) -> usize {
         self.args
+    }
+
+    pub const fn get_unit_index(&self) -> usize {
+        self.unit_index
     }
 
     #[must_use]
@@ -188,7 +195,7 @@ macro_rules! do_bin_op {
 fn run_code<'a>(
     units: &'a [MetadataUnit<'_>],
     stack_frame: &mut StackFrame,
-    mut root_frame: Option<&mut StackFrame>,
+    globals: &mut GlobalStore,
     call_cache: &CallCache,
 ) -> Result<RunState<'a>, RuntimeError> {
     while let Some(code) = stack_frame.current_code() {
@@ -204,6 +211,28 @@ fn run_code<'a>(
                 let index = *index;
                 let imm = *imm;
                 let value = stack_frame.get_local_mut(index);
+                match value {
+                    Value::Int(i) => {
+                        *i += imm;
+                    }
+                    Value::Float(f) => {
+                        *f += DBig::from(imm);
+                    }
+                    auto => {
+                        return Err(RuntimeError::TypeException(format_smolstr!(
+                            "{auto} to int or float"
+                        )));
+                    }
+                }
+                stack_frame.next_pc();
+            }
+            ByteCode::AddGlobalImm(index, imm) => {
+                let index = *index;
+                let imm = *imm;
+                let unit_index = stack_frame.get_unit_index();
+                let Some(value) = globals.get_mut(unit_index, index) else {
+                    return Err(RuntimeError::VMError);
+                };
                 match value {
                     Value::Int(i) => {
                         *i += imm;
@@ -255,20 +284,20 @@ fn run_code<'a>(
             ByteCode::LoadGlobal(var_index) => {
                 let index = *var_index;
                 let result = stack_frame.pop_op_stack();
-                if let Some(ref mut root) = root_frame {
-                    root.set_local(index, result);
-                } else {
-                    stack_frame.set_local(index, result);
-                }
+                let unit_index = stack_frame.get_unit_index();
+                let Some(slot) = globals.get_mut(unit_index, index) else {
+                    return Err(RuntimeError::VMError);
+                };
+                *slot = result;
                 stack_frame.next_pc();
             }
             ByteCode::StoreGlobal(var_index) => {
                 let index = *var_index;
-                let result = root_frame.as_ref().map_or_else(
-                    || stack_frame.get_local(index),
-                    |root| root.get_local(index),
-                );
-                stack_frame.push_op_stack(result.clone());
+                let unit_index = stack_frame.get_unit_index();
+                let Some(value) = globals.get(unit_index, index) else {
+                    return Err(RuntimeError::VMError);
+                };
+                stack_frame.push_op_stack(value.clone());
                 stack_frame.next_pc();
             }
             ByteCode::LoadArrayGlobal(var_index, len) => {
@@ -282,11 +311,11 @@ fn run_code<'a>(
                 let reversed_values: Vec<Value> = elements.into_iter().rev().collect();
 
                 let result = Value::Array(len_s, reversed_values);
-                if let Some(ref mut root) = root_frame {
-                    root.set_local(index, result);
-                } else {
-                    stack_frame.set_local(index, result);
-                }
+                let unit_index = stack_frame.get_unit_index();
+                let Some(slot) = globals.get_mut(unit_index, index) else {
+                    return Err(RuntimeError::VMError);
+                };
+                *slot = result;
                 stack_frame.next_pc();
             }
             ByteCode::SetArray(var_index) => set_index_array(stack_frame, *var_index)?,
@@ -294,10 +323,10 @@ fn run_code<'a>(
                 let index = *var_index;
                 let arr_index = stack_frame.pop_op_stack();
                 let value = stack_frame.pop_op_stack();
-                let result = root_frame.as_mut().map_or_else(
-                    || stack_frame.get_local_mut(index),
-                    |root| root.get_local_mut(index),
-                );
+                let unit_index = stack_frame.get_unit_index();
+                let Some(result) = globals.get_mut(unit_index, index) else {
+                    return Err(RuntimeError::VMError);
+                };
                 if let Value::Array(len, elements) = result
                     && let Value::Int(a_index) = arr_index
                 {
@@ -353,13 +382,16 @@ pub fn call_function(
     const_table: &[Value],
     name: &str,
     units: &[MetadataUnit],
-    globals: usize,
+    unit_index: usize,
+    local_size: usize,
+    globals: &mut GlobalStore,
     arguments: Vec<Value>,
 ) -> Value {
     let mut executor = Executor::new();
     let mut call_cache = CallCache::new(units);
     executor.push_frame(StackFrame::new(
-        globals,
+        unit_index,
+        local_size,
         codes,
         const_table,
         name,
@@ -373,17 +405,10 @@ pub fn call_function(
     }
 
     loop {
-        let size = executor.call_stack.len();
-        let (root_frame, stack_frame) = if size > 2 {
-            let stack_frame = executor.get_top_frame().unwrap();
-            (None, stack_frame)
-        } else {
-            if size < 1 {
-                break;
-            }
-            let (left, right) = executor.call_stack.split_at_mut(size - 1);
-            (left.get_mut(0), right.get_mut(0).unwrap())
-        };
+        if executor.call_stack.is_empty() {
+            break;
+        }
+        let stack_frame = executor.get_top_frame().unwrap();
 
         if let Some(path) = stack_frame.is_native() {
             let path = path.clone();
@@ -413,7 +438,7 @@ pub fn call_function(
                 break;
             }
         } else {
-            match run_code(units, stack_frame, root_frame, &call_cache) {
+            match run_code(units, stack_frame, globals, &call_cache) {
                 Ok(state) => match state {
                     RunState::CallRequest(frame) => {
                         executor.push_frame(frame);
@@ -468,7 +493,18 @@ pub fn interpretive(
     const_table: &[Value],
     name: &str,
     units: &[MetadataUnit],
-    globals: usize,
+    unit_index: usize,
+    local_size: usize,
+    globals: &mut GlobalStore,
 ) {
-    call_function(codes, const_table, name, units, globals, Vec::new());
+    call_function(
+        codes,
+        const_table,
+        name,
+        units,
+        unit_index,
+        local_size,
+        globals,
+        Vec::new(),
+    );
 }

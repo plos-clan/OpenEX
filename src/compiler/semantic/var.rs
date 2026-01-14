@@ -15,6 +15,7 @@ pub fn array_semantic(
     name: Token,
     elements: Vec<ASTExprTree>,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     locals: &mut LocalMap,
     root: bool,
 ) -> Result<OpCodeTable, ParserError> {
@@ -30,7 +31,7 @@ pub fn array_semantic(
     let array_length = elements.len();
 
     for element in elements {
-        let ret_m = expr_semantic(semantic, Some(element), code)?;
+        let ret_m = expr_semantic(semantic, Some(element), code, global_values)?;
         opcode_vec.append_code(&ret_m.2);
     }
 
@@ -49,6 +50,7 @@ pub fn array_fill_semantic(
     value: ASTExprTree,
     count: ASTExprTree,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     locals: &mut LocalMap,
     root: bool,
 ) -> Result<OpCodeTable, ParserError> {
@@ -61,9 +63,9 @@ pub fn array_fill_semantic(
     locals.add_local(key);
     let mut opcode_vec = OpCodeTable::new();
 
-    let value_expr = expr_semantic(semantic, Some(value), code)?;
+    let value_expr = expr_semantic(semantic, Some(value), code, global_values)?;
     opcode_vec.append_code(&value_expr.2);
-    let count_expr = expr_semantic(semantic, Some(count), code)?;
+    let count_expr = expr_semantic(semantic, Some(count), code, global_values)?;
     opcode_vec.append_code(&count_expr.2);
     opcode_vec.add_opcode(Push(
         None,
@@ -85,6 +87,7 @@ pub fn var_semantic(
     name: Token,
     init_var: Option<ASTExprTree>,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     root: bool,
     locals: &mut LocalMap,
 ) -> Result<OpCodeTable, ParserError> {
@@ -94,7 +97,7 @@ pub fn var_semantic(
     }
     symbol_table.add_element(name.value().unwrap(), Value);
     let mut opcode_vec = OpCodeTable::new();
-    let ret_m = expr_semantic(semantic, init_var, code)?;
+    let ret_m = expr_semantic(semantic, init_var, code, global_values)?;
     opcode_vec.append_code(&ret_m.2);
     let opread = ret_m.clone();
     let key = code.alloc_value(name, ret_m.1);

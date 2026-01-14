@@ -105,7 +105,8 @@ fn is_pure_self_recursive(
             ByteCode::StoreGlobal(_)
             | ByteCode::LoadGlobal(_)
             | ByteCode::LoadArrayGlobal(_, _)
-            | ByteCode::SetArrayGlobal(_) => {
+            | ByteCode::SetArrayGlobal(_)
+            | ByteCode::AddGlobalImm(_, _) => {
                 return false;
             }
             ByteCode::Call => {
@@ -218,6 +219,7 @@ pub fn call_func<'a>(
         }
         let native = if func.is_native { Some(path) } else { None };
         let mut frame = StackFrame::new(
+            unit_index,
             func.locals,
             codes,
             unit.constant_table,
@@ -233,6 +235,7 @@ pub fn call_func<'a>(
     stack_frame.next_pc();
     let native = if func.is_native { Some(path) } else { None };
     Ok(RunState::CallRequest(StackFrame::new(
+        unit_index,
         func.locals,
         codes,
         unit.constant_table,

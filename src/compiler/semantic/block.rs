@@ -15,6 +15,7 @@ pub fn block_semantic(
     semantic: &mut Semantic,
     stmt_tree: Vec<ASTStmtTree>,
     code: &mut ValueAlloc,
+    global_values: Option<&ValueAlloc>,
     locals: &mut LocalMap,
 ) -> Result<OpCodeTable, ParserError> {
     let mut opcodes = OpCodeTable::new();
@@ -24,14 +25,29 @@ pub fn block_semantic(
                 unreachable!()
             }
             ASTStmtTree::Block(stmts) => {
-                opcodes.append_code(&block_semantic(semantic, stmts, code, locals)?);
+                opcodes.append_code(&block_semantic(
+                    semantic,
+                    stmts,
+                    code,
+                    global_values,
+                    locals,
+                )?);
             }
             ASTStmtTree::Var { name, value } => {
-                let opcode = var_semantic(semantic, name, value, code, false, locals)?;
+                let opcode =
+                    var_semantic(semantic, name, value, code, global_values, false, locals)?;
                 opcodes.append_code(&opcode);
             }
             ASTStmtTree::Array { token, elements } => {
-                let ret_m = array_semantic(semantic, token, elements, code, locals, false)?;
+                let ret_m = array_semantic(
+                    semantic,
+                    token,
+                    elements,
+                    code,
+                    global_values,
+                    locals,
+                    false,
+                )?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::ArrayFill {
@@ -39,13 +55,21 @@ pub fn block_semantic(
                 value,
                 count,
             } => {
-                let ret_m =
-                    array_fill_semantic(semantic, token, value, count, code, locals, false)?;
+                let ret_m = array_fill_semantic(
+                    semantic,
+                    token,
+                    value,
+                    count,
+                    code,
+                    global_values,
+                    locals,
+                    false,
+                )?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Expr(expr) => {
                 let ref_expr = expr.clone();
-                let ret_m = expr_semantic(semantic, Some(expr), code)?;
+                let ret_m = expr_semantic(semantic, Some(expr), code, global_values)?;
                 if !check_expr_operand(&ret_m.0, &OpCode::Store(None), 0) {
                     Compiler::warning_info_expr(
                         semantic.file,
@@ -61,7 +85,15 @@ pub fn block_semantic(
                 then_body,
                 else_body,
             } => {
-                let ret_m = judgment_semantic(semantic, &cond, then_body, else_body, code, locals)?;
+                let ret_m = judgment_semantic(
+                    semantic,
+                    &cond,
+                    then_body,
+                    else_body,
+                    code,
+                    global_values,
+                    locals,
+                )?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Loop {
@@ -70,7 +102,8 @@ pub fn block_semantic(
                 body,
                 is_easy,
             } => {
-                let ret_m = while_semantic(semantic, &cond, body, code, locals, is_easy)?;
+                let ret_m =
+                    while_semantic(semantic, &cond, body, code, global_values, locals, is_easy)?;
                 opcodes.append_code(&ret_m);
             }
             ASTStmtTree::Break(token) => {
@@ -83,7 +116,7 @@ pub fn block_semantic(
             }
             ASTStmtTree::Return(expr) => {
                 if let Some(expr) = expr {
-                    let ref_expr = lower_expr(semantic, &expr, code, None)?;
+                    let ref_expr = lower_expr(semantic, &expr, code, global_values, None)?;
                     opcodes.append_code(&ref_expr.2);
                     opcodes.add_opcode(OpCode::Return(None));
                 } else {
@@ -92,7 +125,13 @@ pub fn block_semantic(
                 }
             }
             ASTStmtTree::Context(stmts) => {
-                opcodes.append_code(&block_semantic(semantic, stmts, code, locals)?);
+                opcodes.append_code(&block_semantic(
+                    semantic,
+                    stmts,
+                    code,
+                    global_values,
+                    locals,
+                )?);
             }
             _ => todo!(),
         }

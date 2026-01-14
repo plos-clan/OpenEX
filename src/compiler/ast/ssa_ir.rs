@@ -293,8 +293,8 @@ impl ValueAlloc {
         }
     }
 
-    pub fn find_value_key(&mut self, name: &SmolStr) -> Option<DefaultKey> {
-        for (key, value) in &mut self.values {
+    pub fn find_value_key(&self, name: &SmolStr) -> Option<DefaultKey> {
+        for (key, value) in &self.values {
             if value.token.text() == name {
                 return Some(key);
             }
@@ -302,8 +302,12 @@ impl ValueAlloc {
         None
     }
 
-    pub fn find_value(&mut self, key: DefaultKey) -> Option<&mut Value> {
+    pub fn find_value_mut(&mut self, key: DefaultKey) -> Option<&mut Value> {
         self.values.get_mut(key)
+    }
+
+    pub fn find_value(&self, key: DefaultKey) -> Option<&Value> {
+        self.values.get(key)
     }
 
     pub fn alloc_value(&mut self, token: Token, type_: ValueGuessType) -> DefaultKey {

@@ -10,7 +10,7 @@ use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::file::SourceFile;
 use crate::library::load_libraries;
 use crate::runtime::executor::call_function;
-use crate::runtime::{MetadataUnit, MethodInfo};
+use crate::runtime::{GlobalStore, MetadataUnit, MethodInfo};
 
 pub mod compiler;
 pub mod library;
@@ -19,6 +19,7 @@ pub mod runtime;
 pub struct OpenEX {
     compiler: Compiler,
     metadata: Vec<MetadataUnit<'static>>,
+    globals: GlobalStore,
 }
 
 #[repr(C)]
@@ -163,6 +164,7 @@ pub unsafe extern "C" fn openex_init(lib_path: *const c_char) -> *mut OpenEX {
     Box::into_raw(Box::new(OpenEX {
         compiler,
         metadata: Vec::new(),
+        globals: GlobalStore::empty(),
     }))
 }
 
@@ -260,6 +262,7 @@ pub unsafe extern "C" fn openex_initialize_executor(handle_raw: *mut OpenEX) -> 
         }
 
         handle.metadata = metadata;
+        handle.globals = GlobalStore::new(handle.metadata.as_slice());
         OpenExStatus::Success
     } else {
         OpenExStatus::FfiError
@@ -309,11 +312,11 @@ pub unsafe extern "C" fn openex_call_function(
         .collect();
 
     if let Some(handle) = unsafe { handle_raw.as_mut() } {
-        let main_metadata = {
+        let (unit_index, main_metadata) = {
             let mut ret_file = None;
-            for file in &handle.metadata {
+            for (idx, file) in handle.metadata.iter().enumerate() {
                 if file.names == r_file.as_str() {
-                    ret_file = Some(file);
+                    ret_file = Some((idx, file));
                     break;
                 }
             }
@@ -342,7 +345,9 @@ pub unsafe extern "C" fn openex_call_function(
             main_metadata.constant_table,
             main_metadata.names,
             handle.metadata.as_slice(),
+            unit_index,
             main_method.locals + args.len(),
+            &mut handle.globals,
             args,
         );
         let ret_raw = into_c_value(ret_var);

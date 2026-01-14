@@ -87,7 +87,13 @@ pub fn function_semantic(
         tables.add_opcode(OpCode::LoadLocal(None, key, Operand::Val(key)));
     }
 
-    let blk = block_semantic(semantic, body, &mut value_alloc, &mut locals)?;
+    let blk = block_semantic(
+        semantic,
+        body,
+        &mut value_alloc,
+        Some(global_value),
+        &mut locals,
+    )?;
     tables.append_code(&blk);
 
     semantic.compiler_data().symbol_table.exit_context();
