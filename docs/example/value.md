@@ -57,7 +57,7 @@ var len = arr_type.length();
 
 :::
 
-## 作用域
+## 全局变量
 
 在脚本根作用域定义的变量为全局变量, 在脚本根栈帧的变量表开辟空间.
 
@@ -72,3 +72,36 @@ function example() {
     var local = 0; // 局部变量
 }
 ```
+
+OpenEX 不允许直接对非本脚本内的全局变量进行操作, 这将带来不可控的风险. \
+如果要使其他脚本可以操作全局变量, 可以对操作方式进行封装.
+
+::: code-group
+
+
+```js [example_1.exf]
+import sys from "system";
+import exa from "example_2";
+
+exa.set(12);
+
+system.println(exa.get());
+
+```
+
+```js [example_2.exf]
+
+var global_var = 0;
+
+function set(auto) {
+    // 可以在这里添加类型检查等措施.
+    global_var = auto;
+}
+
+function get() {
+    return global_var;
+}
+
+```
+
+:::
