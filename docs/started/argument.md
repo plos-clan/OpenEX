@@ -62,3 +62,4 @@ openex --allow=<警告条目>
 |   `unused-value`    | 关闭未使用的变量提示    |
 |  `unused-library`   | 关闭未使用的库导入提示   |
 | `unused-expression` | 关闭未使用的表达式提示   |
+|  `sync-recursion`   | 关闭同步函数自递归警告   |
