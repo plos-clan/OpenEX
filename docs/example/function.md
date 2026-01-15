@@ -98,6 +98,10 @@ function native no_impl_native();
 ```
 :::
 
+## 同步函数
+
+* 详见 [线程安全 - 函数](/example/sync#函数安全)
+
 ## 函数返回
 
 在 OpenEX 中, 使用 `return` 关键字定义一个返回语句.

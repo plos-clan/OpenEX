@@ -30,6 +30,7 @@ export default defineConfig({
                     {text: '判断语句', link: '/example/conditional'},
                     {text: '循环语句', link: '/example/loop'},
                     {text: '变量', link: '/example/value'},
+                    {text: '线程安全', link: '/example/sync'},
                 ]
             },
             {
