@@ -123,6 +123,7 @@ pub struct ConstantTable {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrFunction {
+    pub sync: bool,
     pub codes: Vec<ByteCode>,
     pub name: SmolStr,
     pub filename: SmolStr,
@@ -190,6 +191,7 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
 impl IrFunction {
     #[must_use]
     pub const fn new(
+        sync: bool,
         name: SmolStr,
         args: usize,
         locals: usize,
@@ -197,6 +199,7 @@ impl IrFunction {
         is_native: bool,
     ) -> Self {
         Self {
+            sync,
             codes: vec![],
             name,
             args,
@@ -477,6 +480,7 @@ pub fn ssa_to_vm(mut code: Code, locals: &LocalMap, filename: &SmolStr) -> VMIRT
 
     for func in code.clone().funcs {
         let mut ir_func = IrFunction::new(
+            func.sync,
             func.name,
             func.args,
             func.locals.now_index,

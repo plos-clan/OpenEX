@@ -21,6 +21,7 @@ pub struct StackFrame<'a> {
     args: usize,
     memo_target: Option<(usize, usize)>,
     memo_key: Option<Vec<MemoKey>>,
+    sync_lock: Option<(usize, usize)>,
 }
 
 pub struct Executor<'a> {
@@ -84,6 +85,7 @@ impl<'a> StackFrame<'a> {
             args,
             memo_target: None,
             memo_key: None,
+            sync_lock: None,
         }
     }
 
@@ -173,6 +175,14 @@ impl<'a> StackFrame<'a> {
             (Some(target), Some(key)) => Some((target.0, target.1, key)),
             _ => None,
         }
+    }
+
+    pub fn set_sync_lock(&mut self, target: (usize, usize)) {
+        self.sync_lock = Some(target);
+    }
+
+    pub fn take_sync_lock(&mut self) -> Option<(usize, usize)> {
+        self.sync_lock.take()
     }
 }
 
@@ -430,7 +440,10 @@ pub fn call_function(
                     Err(ParserError::Empty)
                 }
             }) {
-                executor.call_stack.pop().unwrap();
+                let mut frame = executor.call_stack.pop().unwrap();
+                if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                    call_cache.unlock_sync(unit_index, func_index);
+                }
                 executor.call_stack.last_mut().unwrap().push_op_stack(lib);
                 executor.frame_index -= 1;
             } else {
@@ -456,6 +469,9 @@ pub fn call_function(
                     RunState::Return => {
                         let mut frame = executor.call_stack.pop().unwrap();
                         executor.frame_index -= 1;
+                        if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                            call_cache.unlock_sync(unit_index, func_index);
+                        }
                         if let Some(ret_var) = frame.get_op_stack_top().cloned() {
                             if let Some((unit_index, func_index, key)) = frame.take_memo() {
                                 call_cache.store_memo(unit_index, func_index, key, ret_var.clone());
@@ -472,12 +488,20 @@ pub fn call_function(
                     }
                     RunState::Continue => {}
                     RunState::None => {
-                        executor.call_stack.pop();
+                        let mut frame = executor.call_stack.pop().unwrap();
+                        if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                            call_cache.unlock_sync(unit_index, func_index);
+                        }
                         executor.frame_index -= 1;
                     }
                 },
                 Err(state) => {
                     //TODO 需要做栈帧异常回溯
+                    for frame in executor.call_stack.iter_mut() {
+                        if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                            call_cache.unlock_sync(unit_index, func_index);
+                        }
+                    }
                     failed_status = Some(state);
                     break;
                 }

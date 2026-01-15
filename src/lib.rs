@@ -4,7 +4,6 @@ use smol_str::{SmolStr, ToSmolStr};
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, c_char};
 use std::{ptr, slice};
-
 use crate::compiler::Compiler;
 use crate::compiler::ast::vm_ir::Value;
 use crate::compiler::file::SourceFile;
@@ -242,6 +241,7 @@ pub unsafe extern "C" fn openex_initialize_executor(handle_raw: *mut OpenEX) -> 
                     locals: func.locals,
                     codes: func.clone_codes().unwrap_or_default(),
                     is_native: func.is_native,
+                    sync: func.sync,
                     args: func.args,
                 });
             }

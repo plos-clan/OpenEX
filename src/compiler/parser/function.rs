@@ -43,10 +43,12 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     let mut token = parser.next_parser_token()?;
     let name;
     let is_native;
+    let is_sync;
     match token.t_type {
         TokenType::Identifier => {
             name = token;
             is_native = false;
+            is_sync = false;
         }
         TokenType::Native => {
             token = parser.next_parser_token()?;
@@ -55,6 +57,16 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
             }
             name = token;
             is_native = true;
+            is_sync = false;
+        }
+        TokenType::Sync => {
+            token = parser.next_parser_token()?;
+            if token.t_type != TokenType::Identifier {
+                return Err(IdentifierExpected(token));
+            }
+            name = token;
+            is_native = false;
+            is_sync = true;
         }
         _ => {
             return Err(IdentifierExpected(token));
@@ -96,6 +108,6 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     } else {
         parser.cache = Some(token);
         let body = blk_eval(parser)?;
-        Ok(ASTStmtTree::Function { name, args, body })
+        Ok(ASTStmtTree::Function { name, sync: is_sync, args, body })
     }
 }

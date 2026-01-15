@@ -268,6 +268,7 @@ impl LocalMap {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
+    pub(crate) sync: bool,
     pub(crate) name: SmolStr,
     pub(crate) args: usize,
     pub(crate) codes: Option<OpCodeTable>, // 为 None 代表本地方法实现

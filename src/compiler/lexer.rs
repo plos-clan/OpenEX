@@ -63,9 +63,10 @@ pub enum TokenType {
     Null,
     Native,
     From,
+    Sync,
 }
 
-const KEYWORDS: [(&str, TokenType); 17] = [
+const KEYWORDS: [(&str, TokenType); 18] = [
     ("for", TokenType::For),
     ("while", TokenType::While),
     ("if", TokenType::If),
@@ -83,6 +84,7 @@ const KEYWORDS: [(&str, TokenType); 17] = [
     ("null", TokenType::Null),
     ("native", TokenType::Native),
     ("from", TokenType::From),
+    ("sync", TokenType::Sync),
 ];
 
 impl Token {

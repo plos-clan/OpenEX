@@ -24,6 +24,7 @@ pub struct MethodInfo {
     pub codes: Vec<ByteCode>,
     pub locals: usize, // 局部变量表
     pub is_native: bool,
+    pub sync: bool,
     pub args: usize, // 形参个数
 }
 
@@ -87,6 +88,7 @@ pub fn initialize_executor(compiler: &mut Compiler) {
                 locals: func.locals,
                 codes: func.clone_codes().unwrap_or_default(),
                 is_native: func.is_native,
+                sync: func.sync,
                 args: func.args,
             });
         }
@@ -113,6 +115,7 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         locals: main_metadata.globals,
         codes: main_metadata.root_code.clone(),
         is_native: false,
+        sync: false,
         args: 0,
     };
 

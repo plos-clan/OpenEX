@@ -86,8 +86,8 @@ impl<'a> Semantic<'a> {
                         while_semantic(self, &cond, body, value_alloc, None, &mut global, is_easy)?;
                     code.get_code_table().append_code(&ret_m);
                 }
-                ASTStmtTree::Function { name, args, body } => {
-                    function_semantic(self, name, args, body, code, value_alloc)?;
+                ASTStmtTree::Function { name, sync, args, body } => {
+                    function_semantic(self, name, sync, args, body, code, value_alloc)?;
                 }
                 ASTStmtTree::NativeFunction { name, args } => {
                     native_function_semantic(self, name, &args, code)?;

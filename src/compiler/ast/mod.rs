@@ -87,6 +87,7 @@ pub enum ASTStmtTree {
     Function {
         // function identifier() {}
         name: Token,
+        sync: bool,
         args: Vec<ASTExprTree>,
         body: Vec<ASTStmtTree>,
     },

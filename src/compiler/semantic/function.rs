@@ -38,6 +38,7 @@ pub fn native_function_semantic(
         {
             code.add_function(Function {
                 name: func_name,
+                sync: false,
                 args: func.arity,
                 codes: None,
                 locals: LocalMap::new(),
@@ -53,6 +54,7 @@ pub fn native_function_semantic(
 pub fn function_semantic(
     semantic: &mut Semantic,
     name: Token,
+    sync: bool,
     arguments: Vec<ASTExprTree>,
     body: Vec<ASTStmtTree>,
     code: &mut Code,
@@ -100,6 +102,7 @@ pub fn function_semantic(
 
     code.add_function(Function {
         name: func_name,
+        sync,
         args: args_len,
         codes: Some(tables),
         locals,
