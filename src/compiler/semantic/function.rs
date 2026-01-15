@@ -69,6 +69,14 @@ pub fn function_semantic(
         .compiler_data()
         .symbol_table
         .add_context(ContextType::Func);
+    let context = semantic
+        .compiler_data()
+        .symbol_table
+        .get_context(&ContextType::Func)
+        .unwrap();
+    context.func_sync = sync;
+    context.func_name = name.text().to_smolstr();
+
     let mut tables = OpCodeTable::new();
     let mut locals = LocalMap::new();
     let mut value_alloc = ValueAlloc::new();

@@ -1,3 +1,4 @@
+use crate::compiler::Compiler;
 use crate::compiler::ast::ssa_ir::OpCode::Push;
 use crate::compiler::ast::ssa_ir::Operand::ImmNumFlot;
 use crate::compiler::ast::ssa_ir::ValueGuessType::{
@@ -6,8 +7,9 @@ use crate::compiler::ast::ssa_ir::ValueGuessType::{
 use crate::compiler::ast::ssa_ir::{OpCode, OpCodeTable, Operand, ValueAlloc, ValueGuessType};
 use crate::compiler::ast::{ASTExprTree, ExprOp};
 use crate::compiler::lexer::{Token, TokenType};
+use crate::compiler::lints::Lint::SyncRecursion;
 use crate::compiler::parser::ParserError;
-use crate::compiler::parser::symbol_table::ElementType;
+use crate::compiler::parser::symbol_table::{ContextType, ElementType};
 use crate::compiler::semantic::Semantic;
 use crate::compiler::semantic::optimizer::{expr_optimizer, unary_optimizer};
 use slotmap::DefaultKey;
@@ -352,7 +354,23 @@ fn lower_ref(
         };
 
         if let Some(base) = base {
-            let full_path = format_smolstr!("{}/{}", base, token.text());
+            let full_path = format_smolstr!("{base}/{}", token.text());
+
+            if file_base == base && let Some(context) = semantic
+                .compiler_data()
+                .symbol_table
+                .get_context(&ContextType::Func)
+                && context.func_sync
+                && context.func_name.as_str() == token.text()
+            {
+                Compiler::warning_info_expr(
+                    semantic.file,
+                    "unsafe recursion in synchronized function.",
+                    right_tree,
+                    SyncRecursion,
+                );
+            }
+
             opcode_table.add_opcode(Push(None, Operand::Reference(full_path)));
             return Ok((token.text().to_smolstr(), opcode_table));
         }
@@ -578,6 +596,23 @@ fn expr_call(
                 .next()
                 .unwrap_or(semantic.file.name.as_str());
             let full_path = format_smolstr!("{file_base}/{path}");
+
+            // 检查同步函数递归调用
+            if let Some(context) = semantic
+                .compiler_data()
+                .symbol_table
+                .get_context(&ContextType::Func)
+                && context.func_name == path
+                && context.func_sync
+            {
+                Compiler::warning_info_expr(
+                    semantic.file,
+                    "unsafe recursion in synchronized function.",
+                    name,
+                    SyncRecursion,
+                );
+            }
+
             opcode_table.add_opcode(Push(None, Operand::Reference(full_path)));
             opcode_table.add_opcode(OpCode::Call(None, path.clone()));
             Ok((Operand::Call(path), Unknown, opcode_table))

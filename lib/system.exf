@@ -7,7 +7,7 @@ function println(output) {
     print(output + "\n");
 }
 
-function readline() {
+function readline {
     var line = "";
     var c = "";
     var newline = "\n";

@@ -29,6 +29,8 @@ pub struct Element {
 pub struct Context {
     elements: Vec<Element>,
     ctxt_type: ContextType,
+    pub func_sync: bool, // 仅当上下文类型为 func 时有意义
+    pub func_name: SmolStr, // 同上
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +44,8 @@ impl SymbolTable {
         table.contexts.push(Context {
             elements: vec![],
             ctxt_type: ContextType::Root,
+            func_sync: false,
+            func_name: SmolStr::new(""),
         });
         table
     }
@@ -73,6 +77,8 @@ impl SymbolTable {
         self.contexts.push(Context {
             elements: vec![],
             ctxt_type,
+            func_name: SmolStr::new(""),
+            func_sync: false,
         });
     }
 

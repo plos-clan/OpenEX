@@ -36,4 +36,5 @@ declare_lint! {
     UnusedValue "unused-value",
     UnusedLibrary "unused-library",
     UnusedExpression "unused-expression",
+    SyncRecursion "sync-recursion",
 }

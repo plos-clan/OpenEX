@@ -1,9 +1,12 @@
+use crate::compiler::Compiler;
 use crate::compiler::ast::{ASTExprTree, ASTStmtTree};
 use crate::compiler::lexer::TokenType;
 use crate::compiler::lexer::TokenType::{LP, LR};
+use crate::compiler::lints::Lint::FuncNoArg;
 use crate::compiler::parser::ParserError::{Expected, IdentifierExpected, IllegalArgument};
 use crate::compiler::parser::block::blk_eval;
 use crate::compiler::parser::{Parser, ParserError, check_char};
+use smol_str::format_smolstr;
 
 fn parser_argument(parser: &mut Parser) -> Result<Vec<ASTExprTree>, ParserError> {
     let mut token = parser.next_parser_token()?;
@@ -82,8 +85,22 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
                 parser.cache = Some(token);
                 args = vec![];
             } else {
+                let pt = token.clone();
                 parser.cache = Some(token);
                 args = parser_argument(parser)?;
+                if args.is_empty() && !is_native {
+                    Compiler::warning_info_expr(
+                        parser.file,
+                        format_smolstr!(
+                            "'function {}()' can be written as 'function {}'",
+                            name.text(),
+                            name.text()
+                        )
+                        .as_str(),
+                        &ASTExprTree::Literal(pt),
+                        FuncNoArg,
+                    );
+                }
             }
         }
         TokenType::End => {
@@ -108,6 +125,11 @@ pub fn func_eval(parser: &mut Parser) -> Result<ASTStmtTree, ParserError> {
     } else {
         parser.cache = Some(token);
         let body = blk_eval(parser)?;
-        Ok(ASTStmtTree::Function { name, sync: is_sync, args, body })
+        Ok(ASTStmtTree::Function {
+            name,
+            sync: is_sync,
+            args,
+            body,
+        })
     }
 }
