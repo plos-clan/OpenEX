@@ -130,7 +130,7 @@ impl Compiler {
                 Self::dump_lexer_error(&lex_error, file);
                 return;
             }
-            ParserError::Eof | ParserError::Empty => {
+            ParserError::Eof | ParserError::Empty | ParserError::RuntimeError(..) => {
                 return;
             }
             ParserError::IdentifierExpected(token) => {

@@ -1,12 +1,12 @@
-use smol_str::{SmolStr, ToSmolStr};
-use std::io;
-use std::io::Read;
-use std::process::exit;
-
 use crate::compiler::ast::vm_ir::Value;
 use crate::library::{LibModule, ModuleFunc, output_capture::print, register_library};
 use crate::runtime::RuntimeError;
 use crate::runtime::context;
+use smol_str::{SmolStr, ToSmolStr};
+use std::io::Read;
+use std::process::exit;
+use std::time::Duration;
+use std::{io, thread};
 
 fn print_impl(value: Value) {
     match value {
@@ -159,6 +159,33 @@ fn reg_thread_exit() -> ModuleFunc {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
+fn system_nano_sleep(args: &[Value]) -> Result<Value, RuntimeError> {
+    let arg_time = args.first().unwrap().clone();
+    let Value::Int(raw_time) = arg_time else {
+        return Err(RuntimeError::TypeException(
+            "nano_sleep: time not a number.".to_smolstr(),
+        ));
+    };
+    let time = if raw_time >= 0 {
+        raw_time as u64
+    } else {
+        return Err(RuntimeError::TypeException(
+            "nano_sleep: time must > 0.".to_smolstr(),
+        ));
+    };
+    thread::sleep(Duration::from_nanos(time));
+    Ok(Value::Null)
+}
+
+fn reg_nano_sleep() -> ModuleFunc {
+    ModuleFunc {
+        name: SmolStr::new("nano_sleep"),
+        arity: 1,
+        func: system_nano_sleep,
+    }
+}
+
 pub fn register_system_lib() {
     let mut system_lib = LibModule {
         name: SmolStr::new("system"),
@@ -169,5 +196,6 @@ pub fn register_system_lib() {
     system_lib.functions.push(reg_read());
     system_lib.functions.push(reg_thread());
     system_lib.functions.push(reg_thread_exit());
+    system_lib.functions.push(reg_nano_sleep());
     register_library(system_lib);
 }

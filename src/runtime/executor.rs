@@ -9,6 +9,7 @@ use crate::runtime::context::SyncTable;
 use crate::runtime::vm_operation::*;
 use crate::runtime::vm_table_opt::*;
 use crate::runtime::{MetadataUnit, RuntimeError, SharedGlobals, SharedSync};
+use crate::runtime::RuntimeError::NoSuchFunctionException;
 
 pub struct StackFrame<'a> {
     pc: usize,
@@ -388,10 +389,9 @@ fn print_and_return(executor: &Executor, failed_status: Option<RuntimeError>) ->
     Value::Null
 }
 
-fn print_error(executor: &Executor, path: SmolStr) {
+fn print_error(executor: &Executor, error: RuntimeError) {
     eprintln!(
-        "RuntimeError: {:?}",
-        RuntimeError::NoSuchFunctionException(path)
+        "RuntimeError: {error:?}",
     );
     for frame in &executor.call_stack {
         let name = frame.get_frame_name();
@@ -456,24 +456,33 @@ pub fn call_function(
                 argument.push(stack_frame.pop_op_stack());
             }
 
-            if let Ok(lib) = find_library(file, |f| {
+            match find_library(file, |f| {
                 if let Some(lib) = f
                     && let Some(func) = lib.find_func(&SmolStr::new(func))
                 {
-                    (func.func)(&argument).map_or(Err(ParserError::Empty), Ok)
+                    match (func.func)(&argument) {
+                        Err(error) => Err(ParserError::RuntimeError(error)),
+                        Ok(ok ) => Ok(ok),
+                    }
                 } else {
-                    Err(ParserError::Empty)
+                    Err(ParserError::RuntimeError(NoSuchFunctionException(path.clone())))
                 }
             }) {
-                let mut frame = executor.call_stack.pop().unwrap();
-                if let Some((unit_index, func_index)) = frame.take_sync_lock() {
-                    sync_table.unlock(unit_index, func_index);
+                Ok(lib) => {
+                    let mut frame = executor.call_stack.pop().unwrap();
+                    if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                        sync_table.unlock(unit_index, func_index);
+                    }
+                    executor.call_stack.last_mut().unwrap().push_op_stack(lib);
+                    executor.frame_index -= 1;
+                },
+                Err(error) => {
+                    let ParserError::RuntimeError(error) = error else {
+                        unreachable!()
+                    };
+                    print_error(&executor, error);
+                    break;
                 }
-                executor.call_stack.last_mut().unwrap().push_op_stack(lib);
-                executor.frame_index -= 1;
-            } else {
-                print_error(&executor, path);
-                break;
             }
         } else {
             match run_code(units, stack_frame, &globals, &call_cache, &sync_table) {

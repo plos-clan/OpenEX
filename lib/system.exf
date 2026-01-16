@@ -5,6 +5,11 @@ function native read();
 
 function native thread(func);
 function native thread_exit();
+function native nano_sleep(time);
+
+function sleep(time) {
+    nano_sleep(time * 1000000);
+}
 
 function println(output) {
     print(output + "\n");

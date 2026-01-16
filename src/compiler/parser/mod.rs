@@ -23,6 +23,7 @@ use crate::compiler::parser::import::import_eval;
 use crate::compiler::parser::judgment::if_eval;
 use crate::compiler::parser::var::var_eval;
 use crate::compiler::parser::r#while::while_eval;
+use crate::runtime::RuntimeError;
 
 #[derive(Debug)]
 pub enum ParserError {
@@ -44,6 +45,7 @@ pub enum ParserError {
     NoNativeImplement(Token),      // 无本地实现
     NotFoundLibrary(Token),        // 找不到库
     Empty,                         // 占位符
+    RuntimeError(RuntimeError),    // 运行时占位符
     Eof,
 }
 
