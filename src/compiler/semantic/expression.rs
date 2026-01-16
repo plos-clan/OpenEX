@@ -356,10 +356,11 @@ fn lower_ref(
         if let Some(base) = base {
             let full_path = format_smolstr!("{base}/{}", token.text());
 
-            if file_base == base && let Some(context) = semantic
-                .compiler_data()
-                .symbol_table
-                .get_context(&ContextType::Func)
+            if file_base == base
+                && let Some(context) = semantic
+                    .compiler_data()
+                    .symbol_table
+                    .get_context(&ContextType::Func)
                 && context.func_sync
                 && context.func_name.as_str() == token.text()
             {

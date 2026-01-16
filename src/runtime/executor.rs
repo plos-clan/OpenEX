@@ -4,9 +4,11 @@ use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
 use crate::compiler::parser::ParserError;
 use crate::library::find_library;
+use crate::runtime::context;
+use crate::runtime::context::SyncTable;
 use crate::runtime::vm_operation::*;
 use crate::runtime::vm_table_opt::*;
-use crate::runtime::{GlobalStore, MetadataUnit, RuntimeError};
+use crate::runtime::{MetadataUnit, RuntimeError, SharedGlobals, SharedSync};
 
 pub struct StackFrame<'a> {
     pc: usize,
@@ -190,6 +192,7 @@ pub enum RunState<'a> {
     CallRequest(StackFrame<'a>), // 函数调用请求
     Return,                      // 返回需要将子栈帧栈顶压入父栈帧操作栈
     Continue,                    // 继续执行当前栈帧
+    ThreadExit,                  // 结束当前线程
     None,                        // 空操作
 }
 
@@ -205,10 +208,14 @@ macro_rules! do_bin_op {
 fn run_code<'a>(
     units: &'a [MetadataUnit<'_>],
     stack_frame: &mut StackFrame,
-    globals: &mut GlobalStore,
+    globals: &SharedGlobals,
     call_cache: &CallCache,
+    sync_table: &SyncTable,
 ) -> Result<RunState<'a>, RuntimeError> {
     while let Some(code) = stack_frame.current_code() {
+        if context::take_thread_exit() {
+            return Ok(RunState::ThreadExit);
+        }
         match code {
             ByteCode::Push(const_index) => push_stack(stack_frame, *const_index),
             ByteCode::Pop(len) => {
@@ -240,6 +247,7 @@ fn run_code<'a>(
                 let index = *index;
                 let imm = *imm;
                 let unit_index = stack_frame.get_unit_index();
+                let mut globals = globals.lock().unwrap();
                 let Some(value) = globals.get_mut(unit_index, index) else {
                     return Err(RuntimeError::VMError);
                 };
@@ -266,7 +274,7 @@ fn run_code<'a>(
             ByteCode::Mul => do_bin_op!(stack_frame, mul_value),
             ByteCode::Div => do_bin_op!(stack_frame, div_value),
             ByteCode::Rmd => do_bin_op!(stack_frame, rmd_value),
-            ByteCode::Call => match call_func(stack_frame, units, call_cache) {
+            ByteCode::Call => match call_func(stack_frame, units, call_cache, sync_table) {
                 Ok(RunState::Continue) => continue,
                 Ok(state) => return Ok(state),
                 Err(err) => return Err(err),
@@ -295,6 +303,7 @@ fn run_code<'a>(
                 let index = *var_index;
                 let result = stack_frame.pop_op_stack();
                 let unit_index = stack_frame.get_unit_index();
+                let mut globals = globals.lock().unwrap();
                 let Some(slot) = globals.get_mut(unit_index, index) else {
                     return Err(RuntimeError::VMError);
                 };
@@ -304,6 +313,7 @@ fn run_code<'a>(
             ByteCode::StoreGlobal(var_index) => {
                 let index = *var_index;
                 let unit_index = stack_frame.get_unit_index();
+                let globals = globals.lock().unwrap();
                 let Some(value) = globals.get(unit_index, index) else {
                     return Err(RuntimeError::VMError);
                 };
@@ -322,6 +332,7 @@ fn run_code<'a>(
 
                 let result = Value::Array(len_s, reversed_values);
                 let unit_index = stack_frame.get_unit_index();
+                let mut globals = globals.lock().unwrap();
                 let Some(slot) = globals.get_mut(unit_index, index) else {
                     return Err(RuntimeError::VMError);
                 };
@@ -334,6 +345,7 @@ fn run_code<'a>(
                 let arr_index = stack_frame.pop_op_stack();
                 let value = stack_frame.pop_op_stack();
                 let unit_index = stack_frame.get_unit_index();
+                let mut globals = globals.lock().unwrap();
                 let Some(result) = globals.get_mut(unit_index, index) else {
                     return Err(RuntimeError::VMError);
                 };
@@ -394,11 +406,14 @@ pub fn call_function(
     units: &[MetadataUnit],
     unit_index: usize,
     local_size: usize,
-    globals: &mut GlobalStore,
+    globals: SharedGlobals,
+    sync_table: SharedSync,
+    thread_manager: Option<usize>,
     arguments: Vec<Value>,
 ) -> Value {
     let mut executor = Executor::new();
     let mut call_cache = CallCache::new(units);
+    context::set_context(units, globals.clone(), sync_table.clone(), thread_manager);
     executor.push_frame(StackFrame::new(
         unit_index,
         local_size,
@@ -415,6 +430,16 @@ pub fn call_function(
     }
 
     loop {
+        if context::take_thread_exit() {
+            for frame in executor.call_stack.iter_mut() {
+                if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                    sync_table.unlock(unit_index, func_index);
+                }
+            }
+            executor.call_stack.clear();
+            executor.frame_index = 0;
+            break;
+        }
         if executor.call_stack.is_empty() {
             break;
         }
@@ -442,7 +467,7 @@ pub fn call_function(
             }) {
                 let mut frame = executor.call_stack.pop().unwrap();
                 if let Some((unit_index, func_index)) = frame.take_sync_lock() {
-                    call_cache.unlock_sync(unit_index, func_index);
+                    sync_table.unlock(unit_index, func_index);
                 }
                 executor.call_stack.last_mut().unwrap().push_op_stack(lib);
                 executor.frame_index -= 1;
@@ -451,7 +476,7 @@ pub fn call_function(
                 break;
             }
         } else {
-            match run_code(units, stack_frame, globals, &call_cache) {
+            match run_code(units, stack_frame, &globals, &call_cache, &sync_table) {
                 Ok(state) => match state {
                     RunState::CallRequest(frame) => {
                         executor.push_frame(frame);
@@ -470,7 +495,7 @@ pub fn call_function(
                         let mut frame = executor.call_stack.pop().unwrap();
                         executor.frame_index -= 1;
                         if let Some((unit_index, func_index)) = frame.take_sync_lock() {
-                            call_cache.unlock_sync(unit_index, func_index);
+                            sync_table.unlock(unit_index, func_index);
                         }
                         if let Some(ret_var) = frame.get_op_stack_top().cloned() {
                             if let Some((unit_index, func_index, key)) = frame.take_memo() {
@@ -487,10 +512,20 @@ pub fn call_function(
                         }
                     }
                     RunState::Continue => {}
+                    RunState::ThreadExit => {
+                        for frame in executor.call_stack.iter_mut() {
+                            if let Some((unit_index, func_index)) = frame.take_sync_lock() {
+                                sync_table.unlock(unit_index, func_index);
+                            }
+                        }
+                        executor.call_stack.clear();
+                        executor.frame_index = 0;
+                        break;
+                    }
                     RunState::None => {
                         let mut frame = executor.call_stack.pop().unwrap();
                         if let Some((unit_index, func_index)) = frame.take_sync_lock() {
-                            call_cache.unlock_sync(unit_index, func_index);
+                            sync_table.unlock(unit_index, func_index);
                         }
                         executor.frame_index -= 1;
                     }
@@ -499,7 +534,7 @@ pub fn call_function(
                     //TODO 需要做栈帧异常回溯
                     for frame in executor.call_stack.iter_mut() {
                         if let Some((unit_index, func_index)) = frame.take_sync_lock() {
-                            call_cache.unlock_sync(unit_index, func_index);
+                            sync_table.unlock(unit_index, func_index);
                         }
                     }
                     failed_status = Some(state);
@@ -509,6 +544,7 @@ pub fn call_function(
         }
     }
 
+    context::clear_context();
     print_and_return(&executor, failed_status)
 }
 
@@ -519,7 +555,9 @@ pub fn interpretive(
     units: &[MetadataUnit],
     unit_index: usize,
     local_size: usize,
-    globals: &mut GlobalStore,
+    globals: SharedGlobals,
+    sync_table: SharedSync,
+    thread_manager: Option<usize>,
 ) {
     call_function(
         codes,
@@ -529,6 +567,8 @@ pub fn interpretive(
         unit_index,
         local_size,
         globals,
+        sync_table,
+        thread_manager,
         Vec::new(),
     );
 }

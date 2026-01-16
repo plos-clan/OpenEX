@@ -1,15 +1,15 @@
+use crate::compiler::Compiler;
+use crate::compiler::ast::vm_ir::Value;
+use crate::compiler::file::SourceFile;
+use crate::library::load_libraries;
+use crate::runtime::executor::call_function;
+use crate::runtime::{GlobalStore, MetadataUnit, MethodInfo, SharedGlobals, SharedSync};
 use dashu::float::FBig;
 use dashu::float::round::mode::HalfAway;
 use smol_str::{SmolStr, ToSmolStr};
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, c_char};
 use std::{ptr, slice};
-use crate::compiler::Compiler;
-use crate::compiler::ast::vm_ir::Value;
-use crate::compiler::file::SourceFile;
-use crate::library::load_libraries;
-use crate::runtime::executor::call_function;
-use crate::runtime::{GlobalStore, MetadataUnit, MethodInfo};
 
 pub mod compiler;
 pub mod library;
@@ -18,7 +18,8 @@ pub mod runtime;
 pub struct OpenEX {
     compiler: Compiler,
     metadata: Vec<MetadataUnit<'static>>,
-    globals: GlobalStore,
+    globals: SharedGlobals,
+    sync_table: SharedSync,
 }
 
 #[repr(C)]
@@ -163,7 +164,8 @@ pub unsafe extern "C" fn openex_init(lib_path: *const c_char) -> *mut OpenEX {
     Box::into_raw(Box::new(OpenEX {
         compiler,
         metadata: Vec::new(),
-        globals: GlobalStore::empty(),
+        globals: std::sync::Arc::new(std::sync::Mutex::new(GlobalStore::empty())),
+        sync_table: std::sync::Arc::new(crate::runtime::context::SyncTable::new(&[])),
     }))
 }
 
@@ -262,7 +264,9 @@ pub unsafe extern "C" fn openex_initialize_executor(handle_raw: *mut OpenEX) -> 
         }
 
         handle.metadata = metadata;
-        handle.globals = GlobalStore::new(handle.metadata.as_slice());
+        handle.globals = GlobalStore::shared_new(handle.metadata.as_slice());
+        handle.sync_table =
+            crate::runtime::context::SyncTable::shared_new(handle.metadata.as_slice());
         OpenExStatus::Success
     } else {
         OpenExStatus::FfiError
@@ -347,7 +351,9 @@ pub unsafe extern "C" fn openex_call_function(
             handle.metadata.as_slice(),
             unit_index,
             main_method.locals + args.len(),
-            &mut handle.globals,
+            handle.globals.clone(),
+            handle.sync_table.clone(),
+            None,
             args,
         );
         let ret_raw = into_c_value(ret_var);

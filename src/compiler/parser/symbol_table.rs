@@ -29,7 +29,7 @@ pub struct Element {
 pub struct Context {
     elements: Vec<Element>,
     ctxt_type: ContextType,
-    pub func_sync: bool, // 仅当上下文类型为 func 时有意义
+    pub func_sync: bool,    // 仅当上下文类型为 func 时有意义
     pub func_name: SmolStr, // 同上
 }
 

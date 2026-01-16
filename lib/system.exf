@@ -3,6 +3,9 @@ function native print(output);
 function native exit(code);
 function native read();
 
+function native thread(func);
+function native thread_exit();
+
 function println(output) {
     print(output + "\n");
 }

@@ -1,9 +1,12 @@
 use smol_str::{SmolStr, ToSmolStr};
+use std::sync::{Arc, Mutex};
 
 use crate::compiler::Compiler;
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
+use crate::runtime::context::SyncTable;
 use crate::runtime::thread::ThreadManager;
 
+pub mod context;
 pub mod executor;
 pub mod thread;
 mod vm_operation;
@@ -41,6 +44,9 @@ pub struct GlobalStore {
     globals: Vec<Vec<Value>>,
 }
 
+pub type SharedGlobals = Arc<Mutex<GlobalStore>>;
+pub type SharedSync = context::SharedSync;
+
 impl GlobalStore {
     pub fn new(units: &[MetadataUnit<'_>]) -> Self {
         let globals = units
@@ -48,6 +54,10 @@ impl GlobalStore {
             .map(|unit| vec![Value::Null; unit.globals])
             .collect();
         Self { globals }
+    }
+
+    pub fn shared_new(units: &[MetadataUnit<'_>]) -> SharedGlobals {
+        Arc::new(Mutex::new(Self::new(units)))
     }
 
     pub fn empty() -> Self {
@@ -66,6 +76,12 @@ impl GlobalStore {
         self.globals
             .get_mut(unit_index)
             .and_then(|unit| unit.get_mut(index))
+    }
+}
+
+impl Default for GlobalStore {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
@@ -119,7 +135,8 @@ pub fn initialize_executor(compiler: &mut Compiler) {
         args: 0,
     };
 
-    let mut globals = GlobalStore::new(&metadata);
+    let globals = GlobalStore::shared_new(&metadata);
+    let sync_table = SyncTable::shared_new(&metadata);
     std::thread::scope(|scope| {
         let thread_manager = ThreadManager::new(scope);
         thread_manager.submit_join_thread(
@@ -127,7 +144,8 @@ pub fn initialize_executor(compiler: &mut Compiler) {
             main_metadata,
             main_method,
             metadata.as_slice(),
-            &mut globals,
+            globals,
+            sync_table,
         );
     });
 }

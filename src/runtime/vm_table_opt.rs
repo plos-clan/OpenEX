@@ -1,9 +1,8 @@
 use smol_str::{SmolStr, ToSmolStr, format_smolstr};
 use std::collections::{HashMap, HashSet};
-use std::sync::{Condvar, Mutex};
-use std::thread;
 
 use crate::compiler::ast::vm_ir::{ByteCode, Value};
+use crate::runtime::context::SyncTable;
 use crate::runtime::executor::{RunState, StackFrame};
 use crate::runtime::{MetadataUnit, RuntimeError};
 
@@ -29,66 +28,10 @@ impl MemoKey {
     }
 }
 
-struct LockState {
-    owner: Option<std::thread::ThreadId>,
-    count: usize,
-}
-
-struct FunctionLock {
-    state: Mutex<LockState>,
-    cvar: Condvar,
-}
-
-impl FunctionLock {
-    fn new() -> Self {
-        Self {
-            state: Mutex::new(LockState {
-                owner: None,
-                count: 0,
-            }),
-            cvar: Condvar::new(),
-        }
-    }
-
-    fn lock(&self) {
-        let tid = thread::current().id();
-        let mut state = self.state.lock().unwrap();
-        loop {
-            match state.owner {
-                None => {
-                    state.owner = Some(tid);
-                    state.count = 1;
-                    return;
-                }
-                Some(owner) if owner == tid => {
-                    state.count += 1;
-                    return;
-                }
-                _ => {
-                    state = self.cvar.wait(state).unwrap();
-                }
-            }
-        }
-    }
-
-    fn unlock(&self) {
-        let tid = thread::current().id();
-        let mut state = self.state.lock().unwrap();
-        if state.owner == Some(tid) {
-            state.count = state.count.saturating_sub(1);
-            if state.count == 0 {
-                state.owner = None;
-                self.cvar.notify_one();
-            }
-        }
-    }
-}
-
 pub struct CallCache {
     map: HashMap<SmolStr, (usize, usize)>,
     memoizable: HashSet<(usize, usize)>,
     memo: HashMap<(usize, usize), HashMap<Vec<MemoKey>, Value>>,
-    locks: HashMap<(usize, usize), FunctionLock>,
 }
 
 impl CallCache {
@@ -96,14 +39,10 @@ impl CallCache {
         let mut map = HashMap::new();
         let mut memoizable = HashSet::new();
         let mut memo = HashMap::new();
-        let mut locks = HashMap::new();
         for (unit_index, unit) in units.iter().enumerate() {
             for (func_index, func) in unit.methods.iter().enumerate() {
                 let self_path = format_smolstr!("{}/{}", unit.names, func.name);
                 map.insert(self_path.clone(), (unit_index, func_index));
-                if func.sync {
-                    locks.insert((unit_index, func_index), FunctionLock::new());
-                }
                 if is_pure_self_recursive(unit, func, &self_path) {
                     let idx = (unit_index, func_index);
                     memoizable.insert(idx);
@@ -115,7 +54,6 @@ impl CallCache {
             map,
             memoizable,
             memo,
-            locks,
         }
     }
 
@@ -150,21 +88,6 @@ impl CallCache {
     ) {
         if let Some(map) = self.memo.get_mut(&(unit_index, func_index)) {
             map.entry(key).or_insert(value);
-        }
-    }
-
-    pub fn lock_if_sync(&self, unit_index: usize, func_index: usize) -> bool {
-        if let Some(lock) = self.locks.get(&(unit_index, func_index)) {
-            lock.lock();
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn unlock_sync(&self, unit_index: usize, func_index: usize) {
-        if let Some(lock) = self.locks.get(&(unit_index, func_index)) {
-            lock.unlock();
         }
     }
 }
@@ -269,6 +192,7 @@ pub fn call_func<'a>(
     stack_frame: &mut StackFrame,
     units: &'a [MetadataUnit],
     call_cache: &CallCache,
+    sync_table: &SyncTable,
 ) -> Result<RunState<'a>, RuntimeError> {
     let result = stack_frame.pop_op_stack();
 
@@ -283,7 +207,7 @@ pub fn call_func<'a>(
     let unit = &units[unit_index];
     let func = &unit.methods[func_index];
     let codes = func.get_codes();
-    let sync_locked = call_cache.lock_if_sync(unit_index, func_index);
+    let sync_locked = sync_table.lock_if_sync(unit_index, func_index);
     if call_cache.is_memoizable(unit_index, func_index)
         && let Some(args) = stack_frame.peek_args(func.args)
         && let Some(key) = CallCache::make_key(args)
@@ -295,7 +219,7 @@ pub fn call_func<'a>(
             stack_frame.push_op_stack(value);
             stack_frame.next_pc();
             if sync_locked {
-                call_cache.unlock_sync(unit_index, func_index);
+                sync_table.unlock(unit_index, func_index);
             }
             return Ok(RunState::Continue);
         }
