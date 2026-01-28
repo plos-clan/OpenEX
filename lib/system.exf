@@ -23,6 +23,9 @@ function readline {
     while {
         c = read();
         if (c == "") {
+            if (line == "") {
+                return null;
+            }
             break;
         }
         if (c == newline) {

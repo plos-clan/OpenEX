@@ -280,6 +280,13 @@ fn run_code<'a>(
                 Ok(state) => return Ok(state),
                 Err(err) => return Err(err),
             },
+            ByteCode::CallConst(const_index) => {
+                match call_const(stack_frame, units, call_cache, sync_table, *const_index) {
+                    Ok(RunState::Continue) => continue,
+                    Ok(state) => return Ok(state),
+                    Err(err) => return Err(err),
+                }
+            }
             ByteCode::Return => return Ok(RunState::Return),
             ByteCode::Jump(pc) => jump(stack_frame, *pc),
             ByteCode::JumpTrue(pc) => jump_true(stack_frame, *pc),
@@ -506,19 +513,18 @@ pub fn call_function(
                         if let Some((unit_index, func_index)) = frame.take_sync_lock() {
                             sync_table.unlock(unit_index, func_index);
                         }
-                        if let Some(ret_var) = frame.get_op_stack_top().cloned() {
-                            if let Some((unit_index, func_index, key)) = frame.take_memo() {
-                                call_cache.store_memo(unit_index, func_index, key, ret_var.clone());
-                            }
-                            if executor.call_stack.is_empty() {
-                                return ret_var;
-                            }
-                            executor
-                                .call_stack
-                                .last_mut()
-                                .unwrap()
-                                .push_op_stack(ret_var);
+                        let ret_var = frame.get_op_stack_top().cloned().unwrap_or(Value::Null);
+                        if let Some((unit_index, func_index, key)) = frame.take_memo() {
+                            call_cache.store_memo(unit_index, func_index, key, ret_var.clone());
                         }
+                        if executor.call_stack.is_empty() {
+                            return ret_var;
+                        }
+                        executor
+                            .call_stack
+                            .last_mut()
+                            .unwrap()
+                            .push_op_stack(ret_var);
                     }
                     RunState::Continue => {}
                     RunState::ThreadExit => {
@@ -537,6 +543,9 @@ pub fn call_function(
                             sync_table.unlock(unit_index, func_index);
                         }
                         executor.frame_index -= 1;
+                        if let Some(parent) = executor.call_stack.last_mut() {
+                            parent.push_op_stack(Value::Null);
+                        }
                     }
                 },
                 Err(state) => {

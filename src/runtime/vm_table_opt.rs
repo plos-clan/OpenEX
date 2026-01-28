@@ -32,6 +32,7 @@ pub struct CallCache {
     map: HashMap<SmolStr, (usize, usize)>,
     memoizable: HashSet<(usize, usize)>,
     memo: HashMap<(usize, usize), HashMap<Vec<MemoKey>, Value>>,
+    const_map: Vec<Vec<Option<(usize, usize)>>>,
 }
 
 impl CallCache {
@@ -39,6 +40,7 @@ impl CallCache {
         let mut map = HashMap::new();
         let mut memoizable = HashSet::new();
         let mut memo = HashMap::new();
+        let mut const_map: Vec<Vec<Option<(usize, usize)>>> = Vec::with_capacity(units.len());
         for (unit_index, unit) in units.iter().enumerate() {
             for (func_index, func) in unit.methods.iter().enumerate() {
                 let self_path = format_smolstr!("{}/{}", unit.names, func.name);
@@ -50,15 +52,38 @@ impl CallCache {
                 }
             }
         }
+        for unit in units {
+            let mut vec = vec![None; unit.constant_table.len()];
+            for (idx, value) in unit.constant_table.iter().enumerate() {
+                if let Value::Ref(path) = value
+                    && let Some(target) = map.get(path)
+                {
+                    vec[idx] = Some(*target);
+                }
+            }
+            const_map.push(vec);
+        }
         Self {
             map,
             memoizable,
             memo,
+            const_map,
         }
     }
 
     pub fn resolve(&self, path: &SmolStr) -> Option<(usize, usize)> {
         self.map.get(path).copied()
+    }
+
+    pub fn resolve_const(
+        &self,
+        unit_index: usize,
+        const_index: usize,
+    ) -> Option<(usize, usize)> {
+        self.const_map
+            .get(unit_index)
+            .and_then(|vec| vec.get(const_index).copied())
+            .flatten()
     }
 
     pub fn is_memoizable(&self, unit_index: usize, func_index: usize) -> bool {
@@ -121,6 +146,12 @@ fn is_pure_self_recursive(
                             _ => return false,
                         }
                     }
+                    _ => return false,
+                }
+            }
+            ByteCode::CallConst(const_index) => {
+                match unit.constant_table.get(*const_index) {
+                    Some(Value::Ref(path)) if path == self_path => {}
                     _ => return false,
                 }
             }
@@ -243,6 +274,112 @@ pub fn call_func<'a>(
     }
     stack_frame.next_pc();
     let native = if func.is_native { Some(path) } else { None };
+    let mut frame = StackFrame::new(
+        unit_index,
+        func.locals,
+        codes,
+        unit.constant_table,
+        func.name.as_str(),
+        func.r_name.as_str(),
+        native,
+        func.args,
+    );
+    if sync_locked {
+        frame.set_sync_lock((unit_index, func_index));
+    }
+    Ok(RunState::CallRequest(frame))
+}
+
+pub fn call_const<'a>(
+    stack_frame: &mut StackFrame,
+    units: &'a [MetadataUnit],
+    call_cache: &CallCache,
+    sync_table: &SyncTable,
+    const_index: usize,
+) -> Result<RunState<'a>, RuntimeError> {
+    let current_unit = stack_frame.get_unit_index();
+    let mut path_ref: Option<SmolStr> = None;
+
+    let (unit_index, func_index) = if let Some(target) =
+        call_cache.resolve_const(current_unit, const_index)
+    {
+        target
+    } else {
+        let Some(Value::Ref(path)) = stack_frame.get_const(const_index) else {
+            return Err(RuntimeError::VMError);
+        };
+        path_ref = Some(path.clone());
+        let Some(target) = call_cache.resolve(path) else {
+            return Err(RuntimeError::NoSuchFunctionException(path.clone()));
+        };
+        target
+    };
+
+    let unit = &units[unit_index];
+    let func = &unit.methods[func_index];
+    let codes = func.get_codes();
+    let sync_locked = sync_table.lock_if_sync(unit_index, func_index);
+
+    if call_cache.is_memoizable(unit_index, func_index)
+        && let Some(args) = stack_frame.peek_args(func.args)
+        && let Some(key) = CallCache::make_key(args)
+    {
+        if let Some(value) = call_cache.get_memo(unit_index, func_index, &key) {
+            for _ in 0..func.args {
+                let _ = stack_frame.pop_op_stack();
+            }
+            stack_frame.push_op_stack(value);
+            stack_frame.next_pc();
+            if sync_locked {
+                sync_table.unlock(unit_index, func_index);
+            }
+            return Ok(RunState::Continue);
+        }
+        let native = if func.is_native {
+            let path = if let Some(path) = path_ref {
+                path
+            } else {
+                let Some(Value::Ref(path)) = stack_frame.get_const(const_index) else {
+                    return Err(RuntimeError::VMError);
+                };
+                path.clone()
+            };
+            Some(path)
+        } else {
+            None
+        };
+        let mut frame = StackFrame::new(
+            unit_index,
+            func.locals,
+            codes,
+            unit.constant_table,
+            func.name.as_str(),
+            func.r_name.as_str(),
+            native,
+            func.args,
+        );
+        frame.set_memo((unit_index, func_index), key);
+        if sync_locked {
+            frame.set_sync_lock((unit_index, func_index));
+        }
+        stack_frame.next_pc();
+        return Ok(RunState::CallRequest(frame));
+    }
+
+    stack_frame.next_pc();
+    let native = if func.is_native {
+        let path = if let Some(path) = path_ref {
+            path
+        } else {
+            let Some(Value::Ref(path)) = stack_frame.get_const(const_index) else {
+                return Err(RuntimeError::VMError);
+            };
+            path.clone()
+        };
+        Some(path)
+    } else {
+        None
+    };
     let mut frame = StackFrame::new(
         unit_index,
         func.locals,

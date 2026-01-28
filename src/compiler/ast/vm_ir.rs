@@ -4,7 +4,7 @@ use smol_str::{SmolStr, ToSmolStr};
 use std::fmt::Display;
 use std::str::FromStr;
 
-use crate::compiler::ast::ssa_ir::{Code, LocalMap, OpCode, OpCodeTable, Operand};
+use crate::compiler::ast::ssa_ir::{Code, LocalAddr, LocalMap, OpCode, OpCodeTable, Operand};
 use crate::compiler::ast::vm_ir::Types::{Bool, Float, Null, Number, Ref, String};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +27,7 @@ pub enum ByteCode {
     JumpTrue(usize),               // 栈顶条件跳转 (pc位置)
     JumpFalse(usize),              // 栈顶反转条件跳转 (pc位置)
     Call,                          // 函数调用 (要求栈上最少有两个引用)
+    CallConst(usize),              // 函数调用 (常量表索引)
     Nol,                           // 空操作
     GetRef,                        // 拼接引用路径
     Return,                        // 退出当前栈帧 (并将栈顶元素压入父栈帧操作栈)
@@ -188,6 +189,13 @@ fn opcode_to_vmir(code: OpCode) -> ByteCode {
     }
 }
 
+fn is_call_const_operand(operand: &Operand) -> bool {
+    matches!(
+        operand,
+        Operand::Reference(_) | Operand::Library(_) | Operand::Call(_)
+    )
+}
+
 impl IrFunction {
     #[must_use]
     pub const fn new(
@@ -219,8 +227,21 @@ impl IrFunction {
         constant_table: &mut ConstantTable,
     ) {
         let mut codes_builder: Vec<ByteCode> = Vec::new();
-        for code in table.opcodes {
-            match code.1 {
+        let entries: Vec<(LocalAddr, OpCode)> = table.opcodes.into_iter().collect();
+        let mut i = 0;
+        while i < entries.len() {
+            let (_addr, op) = &entries[i];
+            if let OpCode::Push(_, imm) = op {
+                if let Some((_, OpCode::Call(_, _))) = entries.get(i + 1)
+                    && is_call_const_operand(imm)
+                {
+                    let index = constant_table.add_operand(imm.clone(), code0);
+                    codes_builder.push(ByteCode::CallConst(index));
+                    i += 2;
+                    continue;
+                }
+            }
+            match op.clone() {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
                         if let Some(index) = locals.get_index(key) {
@@ -305,6 +326,7 @@ impl IrFunction {
                     codes_builder.push(opcode_to_vmir(c));
                 }
             }
+            i += 1;
         }
         self.codes = codes_builder;
     }
@@ -368,11 +390,23 @@ impl VMIRTable {
         locals: &LocalMap,
         const_table: &mut ConstantTable,
     ) {
-        let opcodes = table.opcodes.clone();
+        let entries: Vec<(LocalAddr, OpCode)> = table.opcodes.clone().into_iter().collect();
         let mut codes_builder: Vec<ByteCode> = Vec::new();
         self.globals = locals.now_index;
-        for code in opcodes {
-            match code.1 {
+        let mut i = 0;
+        while i < entries.len() {
+            let (_addr, op) = &entries[i];
+            if let OpCode::Push(_, imm) = op {
+                if let Some((_, OpCode::Call(_, _))) = entries.get(i + 1)
+                    && is_call_const_operand(imm)
+                {
+                    let index = const_table.add_operand(imm.clone(), code0);
+                    codes_builder.push(ByteCode::CallConst(index));
+                    i += 2;
+                    continue;
+                }
+            }
+            match op.clone() {
                 OpCode::Push(_, imm) => {
                     if let Operand::Val(key) = imm {
                         let Some(index) = locals.get_index(key) else {
@@ -419,6 +453,7 @@ impl VMIRTable {
                     codes_builder.push(opcode_to_vmir(c));
                 }
             }
+            i += 1;
         }
         self.codes = codes_builder;
     }

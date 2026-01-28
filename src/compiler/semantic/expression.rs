@@ -383,8 +383,9 @@ fn lower_ref(
             || matches!(left_tree, ASTExprTree::Var(_token))
     );
 
-    let table = lower_expr(semantic, left_tree, code, global_values, None)?.2;
-    opcode_table.append_code(&table);
+    let table = lower_expr(semantic, left_tree, code, global_values, None)?;
+
+    opcode_table.append_code(&table.2);
 
     let code = match right_tree {
         ASTExprTree::Var(token) => Push(None, Operand::Reference(token.text().to_smolstr())),

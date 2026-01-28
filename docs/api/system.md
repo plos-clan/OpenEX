@@ -56,7 +56,7 @@ function println(output) {
 ## `readline` 标准输入行获取
 
 * 无形参
-* 返回值: 返回一行输入
+* 返回值: 返回一行输入 (EOF 时返回 null)
 
 ~~实现过长, 请查阅标准库源码~~
 
